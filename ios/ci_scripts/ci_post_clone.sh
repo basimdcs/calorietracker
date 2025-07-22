@@ -7,7 +7,7 @@ set -e
 
 echo "🚀 Starting Xcode Cloud CI setup..."
 
-# Navigate to the project root
+# Navigate to the project root (go up two levels from ios/ci_scripts)
 cd $CI_WORKSPACE
 
 # Check if we're in Xcode Cloud environment
@@ -40,7 +40,15 @@ fi
 
 # Navigate to iOS directory and install pods
 echo "📱 Installing CocoaPods dependencies..."
-cd ios
-pod install --repo-update
+if [ -d "ios" ]; then
+    cd ios
+    pod install --repo-update
+else
+    echo "❌ Error: iOS directory not found in $CI_WORKSPACE"
+    echo "Current directory: $(pwd)"
+    echo "Directory contents:"
+    ls -la
+    exit 1
+fi
 
 echo "✅ Xcode Cloud CI setup completed successfully!" 
