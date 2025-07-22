@@ -7,12 +7,25 @@ set -e
 
 echo "🔨 Starting pre-build setup..."
 
-# Navigate to the project root
-cd $CI_WORKSPACE
+# Navigate to the repository directory
+# In Xcode Cloud, the repository is typically in /Volumes/workspace/repository
+if [ -n "$CI_WORKSPACE" ]; then
+    echo "📁 Using CI_WORKSPACE: $CI_WORKSPACE"
+    cd "$CI_WORKSPACE"
+else
+    echo "📁 CI_WORKSPACE not set, navigating to repository directory..."
+    # Navigate to the repository directory (up from ios/ci_scripts)
+    cd /Volumes/workspace/repository
+fi
+
+echo "📁 Current directory: $(pwd)"
 
 # Ensure we're in the right directory
 if [ ! -f "package.json" ]; then
     echo "❌ Error: package.json not found. Are we in the right directory?"
+    echo "Current directory: $(pwd)"
+    echo "Directory contents:"
+    ls -la
     exit 1
 fi
 
