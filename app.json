@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.basimdcs.calorietracker",
-      "buildNumber": "1",
+      "buildNumber": "19",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "CalorieTracker needs access to your microphone to record voice descriptions of your meals for easy food logging.",
         "NSCameraUsageDescription": "CalorieTracker needs access to your camera to take photos of your meals for food logging.",
