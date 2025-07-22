@@ -26,8 +26,20 @@ ls -la
 if [ -n "$CI_XCODE_CLOUD" ]; then
     echo "📦 Xcode Cloud environment detected"
     
-    # Use the Node.js version that comes with Xcode Cloud
-    # If Node.js is not available, we'll skip npm commands for now
+    # Install Node.js using Homebrew if not available
+    if ! command -v node &> /dev/null; then
+        echo "📦 Installing Node.js using Homebrew..."
+        # Install Homebrew if not available
+        if ! command -v brew &> /dev/null; then
+            echo "📦 Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            # Add Homebrew to PATH
+            export PATH="/opt/homebrew/bin:$PATH"
+        fi
+        brew install node
+    fi
+    
+    # Now Node.js should be available
     if command -v node &> /dev/null; then
         echo "📦 Node.js is available, installing dependencies..."
         npm ci
@@ -35,8 +47,8 @@ if [ -n "$CI_XCODE_CLOUD" ]; then
         echo "🔧 Installing Expo CLI..."
         npm install -g @expo/cli
     else
-        echo "⚠️ Node.js not available in Xcode Cloud environment"
-        echo "📦 Skipping Node.js dependency installation"
+        echo "❌ Error: Failed to install Node.js"
+        exit 1
     fi
 else
     echo "📦 Local environment detected"
