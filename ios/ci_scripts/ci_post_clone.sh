@@ -7,8 +7,20 @@ set -e
 
 echo "🚀 Starting Xcode Cloud CI setup..."
 
-# Navigate to the project root (go up two levels from ios/ci_scripts)
-cd $CI_WORKSPACE
+# Navigate to the repository directory
+# In Xcode Cloud, the repository is typically in /Volumes/workspace/repository
+if [ -n "$CI_WORKSPACE" ]; then
+    echo "📁 Using CI_WORKSPACE: $CI_WORKSPACE"
+    cd "$CI_WORKSPACE"
+else
+    echo "📁 CI_WORKSPACE not set, navigating to repository directory..."
+    # Navigate to the repository directory (up from ios/ci_scripts)
+    cd /Volumes/workspace/repository
+fi
+
+echo "📁 Current directory: $(pwd)"
+echo "📁 Directory contents:"
+ls -la
 
 # Check if we're in Xcode Cloud environment
 if [ -n "$CI_XCODE_CLOUD" ]; then
@@ -44,7 +56,7 @@ if [ -d "ios" ]; then
     cd ios
     pod install --repo-update
 else
-    echo "❌ Error: iOS directory not found in $CI_WORKSPACE"
+    echo "❌ Error: iOS directory not found in $(pwd)"
     echo "Current directory: $(pwd)"
     echo "Directory contents:"
     ls -la
