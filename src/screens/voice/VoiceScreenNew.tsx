@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View,
+  Text,
   StyleSheet,
   SafeAreaView,
   ScrollView,
@@ -11,7 +12,7 @@ import { ScreenHeader } from '../../components/layout';
 import { RecordingButton } from '../../components/voice/RecordingButton';
 import { TranscriptDisplay } from '../../components/voice/TranscriptDisplay';
 import { VoiceInstructions } from '../../components/voice/VoiceInstructions';
-import { FoodReview } from '../../components/ui/FoodReview';
+import { FoodReviewNew as FoodReview } from '../../components/ui/FoodReview/FoodReviewNew';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import { openAIService } from '../../services/openai';
 import { useFoodStore } from '../../stores/foodStore';

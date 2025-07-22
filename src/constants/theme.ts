@@ -34,6 +34,14 @@ export const colors = {
   error: '#EF4444',
   info: '#3B82F6',
   
+  // Color variants for components
+  blue50: '#EFF6FF',
+  blue200: '#BFDBFE',
+  yellow50: '#FFFBEB',
+  yellow200: '#FDE68A',
+  red50: '#FEF2F2',
+  green50: '#F0FDF4',
+  
   // Background colors
   background: '#FFFFFF',
   backgroundSecondary: '#F9FAFB',
