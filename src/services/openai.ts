@@ -1,6 +1,17 @@
 import OpenAI from 'openai';
 
-const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || 'your-api-key-here';
+// Try multiple ways to get the API key
+const OPENAI_API_KEY = 
+  process.env.EXPO_PUBLIC_OPENAI_API_KEY || 
+  process.env.OPENAI_API_KEY ||
+  'your-api-key-here';
+
+// Debug logging to check environment variable loading
+console.log('🔍 Environment variable check:');
+console.log('EXPO_PUBLIC_OPENAI_API_KEY exists:', !!process.env.EXPO_PUBLIC_OPENAI_API_KEY);
+console.log('OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
+console.log('Final API Key starts with:', OPENAI_API_KEY.substring(0, 10) + '...');
+console.log('API Key length:', OPENAI_API_KEY.length);
 
 // Check if API key is properly configured
 if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your-api-key-here') {
