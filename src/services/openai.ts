@@ -1,6 +1,11 @@
 import OpenAI from 'openai';
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.EXPO_PUBLIC_OPENAI_API_KEY || 'your-api-key-here';
+// Prioritize OPENAI_API_KEY (your EAS secret) over EXPO_PUBLIC_OPENAI_API_KEY
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 
+  (process.env.EXPO_PUBLIC_OPENAI_API_KEY && process.env.EXPO_PUBLIC_OPENAI_API_KEY !== 'your-api-key-here' 
+    ? process.env.EXPO_PUBLIC_OPENAI_API_KEY 
+    : null) || 
+  'your-api-key-here';
 
 // Debug logging to help identify the issue
 console.log('OpenAI API Key Status:', {
@@ -9,7 +14,7 @@ console.log('OpenAI API Key Status:', {
   keyStartsWith: OPENAI_API_KEY?.substring(0, 7) || 'N/A',
   isDefaultValue: OPENAI_API_KEY === 'your-api-key-here',
   envVar: process.env.OPENAI_API_KEY ? 'OPENAI_API_KEY Present' : 
-          process.env.EXPO_PUBLIC_OPENAI_API_KEY ? 'EXPO_PUBLIC_OPENAI_API_KEY Present' : 'Both Missing'
+          (process.env.EXPO_PUBLIC_OPENAI_API_KEY && process.env.EXPO_PUBLIC_OPENAI_API_KEY !== 'your-api-key-here') ? 'EXPO_PUBLIC_OPENAI_API_KEY Present' : 'Both Missing or Invalid'
 });
 
 export interface FoodItem {
