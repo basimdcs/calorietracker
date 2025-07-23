@@ -1,24 +1,16 @@
 import OpenAI from 'openai';
 
-// Try multiple ways to get the API key
-const OPENAI_API_KEY = 
-  process.env.EXPO_PUBLIC_OPENAI_API_KEY || 
-  process.env.OPENAI_API_KEY ||
-  'your-api-key-here';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.EXPO_PUBLIC_OPENAI_API_KEY || 'your-api-key-here';
 
-// Debug logging to check environment variable loading
-console.log('🔍 Environment variable check:');
-console.log('EXPO_PUBLIC_OPENAI_API_KEY exists:', !!process.env.EXPO_PUBLIC_OPENAI_API_KEY);
-console.log('OPENAI_API_KEY exists:', !!process.env.OPENAI_API_KEY);
-console.log('Final API Key starts with:', OPENAI_API_KEY.substring(0, 10) + '...');
-console.log('API Key length:', OPENAI_API_KEY.length);
-
-// Check if API key is properly configured
-if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your-api-key-here') {
-  console.error('❌ OPENAI_API_KEY is not configured properly!');
-  console.error('Please set EXPO_PUBLIC_OPENAI_API_KEY in your environment variables.');
-  console.error('Get your API key from: https://platform.openai.com/api-keys');
-}
+// Debug logging to help identify the issue
+console.log('OpenAI API Key Status:', {
+  hasKey: !!OPENAI_API_KEY,
+  keyLength: OPENAI_API_KEY?.length || 0,
+  keyStartsWith: OPENAI_API_KEY?.substring(0, 7) || 'N/A',
+  isDefaultValue: OPENAI_API_KEY === 'your-api-key-here',
+  envVar: process.env.OPENAI_API_KEY ? 'OPENAI_API_KEY Present' : 
+          process.env.EXPO_PUBLIC_OPENAI_API_KEY ? 'EXPO_PUBLIC_OPENAI_API_KEY Present' : 'Both Missing'
+});
 
 export interface FoodItem {
   name: string;
@@ -41,21 +33,25 @@ class OpenAIService {
   constructor() {
     // Validate API key before creating client
     if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your-api-key-here') {
-      throw new Error('OpenAI API key is not configured. Please set EXPO_PUBLIC_OPENAI_API_KEY environment variable.');
+      console.error('❌ OpenAI API Key is missing or invalid!');
+      console.error('Environment variable EXPO_PUBLIC_OPENAI_API_KEY is not set properly.');
+      throw new Error('OpenAI API key is not configured. Please check your environment variables.');
     }
-    
+
     this.client = new OpenAI({
       apiKey: OPENAI_API_KEY,
     });
+    
+    console.log('✅ OpenAI client initialized successfully');
   }
 
   async transcribeAudio(audioUri: string): Promise<string> {
     try {
-      console.log('Starting transcription for:', audioUri);
+      console.log('🎤 Starting transcription for:', audioUri);
       
-      // Validate API key before making request
+      // Validate API key again before making request
       if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your-api-key-here') {
-        throw new Error('OpenAI API key is not configured. Please set EXPO_PUBLIC_OPENAI_API_KEY environment variable.');
+        throw new Error('OpenAI API key is not configured');
       }
       
       // Use the traditional React Native FormData approach that works with OpenAI
@@ -73,6 +69,8 @@ class OpenAIService {
       formData.append('language', 'ar'); // Arabic context for better Egyptian pronunciation
       formData.append('response_format', 'text');
 
+      console.log('📤 Sending transcription request to OpenAI...');
+
       // Use fetch directly with FormData - this is the React Native way
       const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
@@ -83,14 +81,19 @@ class OpenAIService {
         body: formData,
       });
 
+      console.log('📥 OpenAI response status:', response.status);
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('OpenAI API Error:', response.status, errorText);
+        console.error('❌ OpenAI API Error:', response.status, errorText);
         
+        // Provide more specific error messages
         if (response.status === 401) {
-          throw new Error('Invalid OpenAI API key. Please check your configuration.');
+          throw new Error('Invalid API key. Please check your OpenAI API key configuration.');
         } else if (response.status === 429) {
-          throw new Error('OpenAI API rate limit exceeded. Please try again later.');
+          throw new Error('Rate limit exceeded. Please try again in a moment.');
+        } else if (response.status === 413) {
+          throw new Error('Audio file too large. Please record a shorter message.');
         } else {
           throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
         }
@@ -98,24 +101,24 @@ class OpenAIService {
 
       const transcriptionText = await response.text();
       const cleanedText = transcriptionText.trim();
-      console.log('Transcription result:', cleanedText);
+      console.log('✅ Transcription result:', cleanedText);
       
       if (!cleanedText) {
-        throw new Error('No speech detected in the audio recording. Please try again.');
+        throw new Error('No speech detected in the recording. Please try again.');
       }
       
       return cleanedText;
     } catch (error) {
-      console.error('Error transcribing audio:', error);
+      console.error('❌ Error transcribing audio:', error);
       
-      // Provide more specific error messages
+      // Provide more helpful error messages
       if (error instanceof Error) {
         if (error.message.includes('API key')) {
-          throw new Error('OpenAI API key is not configured. Please contact support.');
-        } else if (error.message.includes('rate limit')) {
-          throw new Error('Service temporarily unavailable. Please try again in a few minutes.');
-        } else if (error.message.includes('No speech detected')) {
-          throw new Error('No speech detected in the recording. Please try again.');
+          throw new Error('Configuration error: Please check your API key setup.');
+        } else if (error.message.includes('network')) {
+          throw new Error('Network error: Please check your internet connection and try again.');
+        } else {
+          throw new Error(`Transcription failed: ${error.message}`);
         }
       }
       

@@ -112,17 +112,43 @@ const VoiceScreen: React.FC = () => {
 
   const processRecording = async (uri: string) => {
     try {
+      console.log('🎤 Processing recording from URI:', uri);
+      
       // Transcribe audio
+      console.log('📝 Starting transcription...');
       const transcription = await openAIService.transcribeAudio(uri);
+      console.log('✅ Transcription completed:', transcription);
       setTranscript(transcription);
 
       // Parse food from transcription
+      console.log('🍽️ Starting food parsing...');
       const foods = await openAIService.parseFoodFromText(transcription);
+      console.log('✅ Food parsing completed:', foods);
       setProcessedFoods(foods);
       setShowFoodReview(true);
     } catch (error) {
-      console.error('Failed to process recording:', error);
-      Alert.alert('Error', 'Failed to process recording. Please try again.');
+      console.error('❌ Failed to process recording:', error);
+      
+      // Provide more specific error messages based on the error type
+      let errorMessage = 'Failed to process recording. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('API key')) {
+          errorMessage = 'Configuration error: Please check your API key setup.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error: Please check your internet connection and try again.';
+        } else if (error.message.includes('No speech detected')) {
+          errorMessage = 'No speech detected in the recording. Please try speaking more clearly.';
+        } else if (error.message.includes('Rate limit')) {
+          errorMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (error.message.includes('Invalid API key')) {
+          errorMessage = 'API key is invalid. Please check your configuration.';
+        } else {
+          errorMessage = `Processing error: ${error.message}`;
+        }
+      }
+      
+      Alert.alert('Processing Error', errorMessage);
     } finally {
       setIsProcessing(false);
     }

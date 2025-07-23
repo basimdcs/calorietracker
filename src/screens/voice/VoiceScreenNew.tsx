@@ -83,25 +83,9 @@ const VoiceScreenNew: React.FC = () => {
       
     } catch (error) {
       console.error('Failed to process recording:', error);
-      
-      // Provide specific error messages based on the error type
-      let errorMessage = 'There was an error processing your recording. Please try again.';
-      
-      if (error instanceof Error) {
-        if (error.message.includes('API key')) {
-          errorMessage = 'Voice processing is not configured. Please contact support.';
-        } else if (error.message.includes('rate limit')) {
-          errorMessage = 'Service is busy. Please try again in a few minutes.';
-        } else if (error.message.includes('No speech detected')) {
-          errorMessage = 'No speech detected in the recording. Please try again.';
-        } else if (error.message.includes('network') || error.message.includes('fetch')) {
-          errorMessage = 'Network error. Please check your internet connection and try again.';
-        }
-      }
-      
       Alert.alert(
         'Processing Error',
-        errorMessage,
+        'There was an error processing your recording. Please try again.',
         [{ text: 'OK' }]
       );
       setVoiceState('idle');
