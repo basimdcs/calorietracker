@@ -2,6 +2,13 @@ import OpenAI from 'openai';
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || 'your-api-key-here';
 
+// Check if API key is properly configured
+if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your-api-key-here') {
+  console.error('❌ OPENAI_API_KEY is not configured properly!');
+  console.error('Please set EXPO_PUBLIC_OPENAI_API_KEY in your environment variables.');
+  console.error('Get your API key from: https://platform.openai.com/api-keys');
+}
+
 export interface FoodItem {
   name: string;
   calories: number;
@@ -21,6 +28,11 @@ class OpenAIService {
   private client: OpenAI;
 
   constructor() {
+    // Validate API key before creating client
+    if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your-api-key-here') {
+      throw new Error('OpenAI API key is not configured. Please set EXPO_PUBLIC_OPENAI_API_KEY environment variable.');
+    }
+    
     this.client = new OpenAI({
       apiKey: OPENAI_API_KEY,
     });
@@ -29,6 +41,11 @@ class OpenAIService {
   async transcribeAudio(audioUri: string): Promise<string> {
     try {
       console.log('Starting transcription for:', audioUri);
+      
+      // Validate API key before making request
+      if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your-api-key-here') {
+        throw new Error('OpenAI API key is not configured. Please set EXPO_PUBLIC_OPENAI_API_KEY environment variable.');
+      }
       
       // Use the traditional React Native FormData approach that works with OpenAI
       // This is the proven pattern from the React Native community
@@ -58,16 +75,39 @@ class OpenAIService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('OpenAI API Error:', response.status, errorText);
-        throw new Error(`OpenAI API error: ${response.status}`);
+        
+        if (response.status === 401) {
+          throw new Error('Invalid OpenAI API key. Please check your configuration.');
+        } else if (response.status === 429) {
+          throw new Error('OpenAI API rate limit exceeded. Please try again later.');
+        } else {
+          throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        }
       }
 
       const transcriptionText = await response.text();
       const cleanedText = transcriptionText.trim();
       console.log('Transcription result:', cleanedText);
       
+      if (!cleanedText) {
+        throw new Error('No speech detected in the audio recording. Please try again.');
+      }
+      
       return cleanedText;
     } catch (error) {
       console.error('Error transcribing audio:', error);
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('API key')) {
+          throw new Error('OpenAI API key is not configured. Please contact support.');
+        } else if (error.message.includes('rate limit')) {
+          throw new Error('Service temporarily unavailable. Please try again in a few minutes.');
+        } else if (error.message.includes('No speech detected')) {
+          throw new Error('No speech detected in the recording. Please try again.');
+        }
+      }
+      
       throw new Error('Failed to transcribe audio. Please try again.');
     }
   }
