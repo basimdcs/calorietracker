@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, spacing } from '../../constants/theme';
 
 interface TabItem {
@@ -25,7 +26,7 @@ const tabs: TabItem[] = [
   },
   {
     key: 'Voice',
-    title: 'Voice',
+    title: 'Record',
     icon: 'mic',
     activeIcon: 'mic',
   },
@@ -48,8 +49,10 @@ export const CustomBottomTab: React.FC<CustomBottomTabProps> = ({
   descriptors,
   navigation,
 }) => {
+  const insets = useSafeAreaInsets();
+  
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
       {state.routes.map((route: any, index: number) => {
         const { options } = descriptors[route.key];
         const label = options.tabBarLabel ?? options.title ?? route.name;
@@ -70,6 +73,30 @@ export const CustomBottomTab: React.FC<CustomBottomTabProps> = ({
 
         const tab = tabs.find(t => t.key === route.name);
         if (!tab) return null;
+
+        // Special styling for Record button (Voice screen)
+        if (tab.key === 'Voice') {
+          return (
+            <TouchableOpacity
+              key={route.key}
+              accessibilityRole="button"
+              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityLabel={options.tabBarAccessibilityLabel}
+              testID={options.tabBarTestID}
+              onPress={onPress}
+              style={styles.recordTab}
+            >
+              <View style={styles.recordButton}>
+                <MaterialIcons
+                  name="mic"
+                  size={28}
+                  color={colors.white}
+                />
+              </View>
+              <Text style={styles.recordLabel}>{tab.title}</Text>
+            </TouchableOpacity>
+          );
+        }
 
         return (
           <TouchableOpacity
@@ -109,7 +136,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderTopWidth: 1,
     borderTopColor: colors.gray200,
-    paddingBottom: spacing.sm,
     paddingTop: spacing.sm,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
@@ -130,5 +156,30 @@ const styles = StyleSheet.create({
     fontSize: fonts.xs,
     fontWeight: '500' as const,
     marginTop: spacing.xs,
+  },
+  recordTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: spacing.xs,
+  },
+  recordButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  recordLabel: {
+    fontSize: fonts.xs,
+    fontWeight: '500' as const,
+    color: colors.primary,
   },
 }); 

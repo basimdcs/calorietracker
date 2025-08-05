@@ -6,13 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  TextInput,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ParsedFoodItem } from '../../types';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { Button } from '../ui/Button';
-import { nutritionService } from '../../services/nutrition';
 
 interface CookingMethodModalProps {
   visible: boolean;
@@ -22,16 +20,51 @@ interface CookingMethodModalProps {
 }
 
 const COOKING_METHODS = [
-  { method: 'Raw', icon: '🥗', description: 'No cooking involved' },
-  { method: 'Grilled', icon: '🔥', description: 'Adds light smoky flavor' },
-  { method: 'Baked', icon: '🔄', description: 'Oven cooked, minimal oil' },
-  { method: 'Boiled', icon: '💧', description: 'Water cooked, no added fat' },
-  { method: 'Steamed', icon: '♨️', description: 'Steam cooked, retains nutrients' },
-  { method: 'Sautéed', icon: '🍳', description: 'Pan cooked with some oil' },
-  { method: 'Fried', icon: '🔥', description: 'Pan fried, moderate oil' },
-  { method: 'Deep Fried', icon: '🛢️', description: 'Deep fried, high calorie' },
-  { method: 'Roasted', icon: '🔥', description: 'Oven roasted with oil' },
+  { method: 'Grilled', icon: '🔥', arabic: 'مشوي' },
+  { method: 'Fried', icon: '🍳', arabic: 'مقلي' },
+  { method: 'Baked', icon: '🥖', arabic: 'في الفرن' },
+  { method: 'Boiled', icon: '💧', arabic: 'مسلوق' },
+  { method: 'Steamed', icon: '♨️', arabic: 'مطهو بالبخار' },
+  { method: 'Raw', icon: '🥗', arabic: 'نيء' },
 ];
+
+// Enhanced cooking method suggestions for Arabic/Egyptian foods
+const getSuggestedCookingMethods = (foodName: string): string[] => {
+  const name = foodName.toLowerCase();
+  
+  // Meat-based foods
+  if (name.includes('كفتة') || name.includes('لحم') || name.includes('دجاج') || name.includes('فراخ')) {
+    return ['Grilled', 'Fried', 'Baked', 'Boiled'];
+  }
+  
+  // Rice and grains
+  if (name.includes('رز') || name.includes('كشري') || name.includes('برغل')) {
+    return ['Boiled', 'Steamed'];
+  }
+  
+  // Bread and pastries
+  if (name.includes('عيش') || name.includes('خبز') || name.includes('فطير')) {
+    return ['Baked'];
+  }
+  
+  // Vegetables and salads
+  if (name.includes('خضار') || name.includes('سلطة') || name.includes('طماطم') || name.includes('خيار')) {
+    return ['Raw', 'Grilled', 'Steamed'];
+  }
+  
+  // Fruits (most fruits are eaten raw)
+  if (name.includes('فاكهة') || name.includes('تفاح') || name.includes('موز') || name.includes('برتقال') || name.includes('مانجا') || name.includes('مانجو')) {
+    return ['Raw'];
+  }
+  
+  // Fish and seafood
+  if (name.includes('سمك') || name.includes('جمبري') || name.includes('كابوريا')) {
+    return ['Grilled', 'Fried', 'Baked'];
+  }
+  
+  // Default suggestions
+  return ['Grilled', 'Fried', 'Baked', 'Boiled'];
+};
 
 export const CookingMethodModal: React.FC<CookingMethodModalProps> = ({
   visible,
@@ -40,11 +73,9 @@ export const CookingMethodModal: React.FC<CookingMethodModalProps> = ({
   onCancel,
 }) => {
   const [selectedMethod, setSelectedMethod] = useState('');
-  const [customMethod, setCustomMethod] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
 
   const suggestedMethods = useMemo(() => 
-    food ? nutritionService.getSuggestedCookingMethods(food.name) : []
+    food ? getSuggestedCookingMethods(food.name) : []
   , [food]);
 
   const filteredMethods = useMemo(() => 
@@ -57,19 +88,11 @@ export const CookingMethodModal: React.FC<CookingMethodModalProps> = ({
 
   const handleMethodSelect = (method: string) => {
     setSelectedMethod(method);
-    setShowCustomInput(false);
-    setCustomMethod('');
-  };
-
-  const handleCustomMethod = () => {
-    setShowCustomInput(true);
-    setSelectedMethod('');
   };
 
   const handleConfirm = () => {
-    const finalMethod = showCustomInput ? customMethod.trim() : selectedMethod;
-    if (finalMethod) {
-      onConfirm(finalMethod);
+    if (selectedMethod) {
+      onConfirm(selectedMethod);
     }
   };
 
@@ -81,160 +104,115 @@ export const CookingMethodModal: React.FC<CookingMethodModalProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      transparent
+      presentationStyle="pageSheet"
       onRequestClose={onCancel}
     >
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.modal}>
-            {/* Header */}
-            <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <Text style={styles.title}>Cooking Method</Text>
-                <Text style={styles.subtitle} numberOfLines={2}>
-                  How was {food.name} prepared?
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={onCancel}
-                accessibilityLabel="Close"
-                accessibilityRole="button"
-              >
-                <MaterialIcons name="close" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
+      <View style={styles.modalContainer}>
+        <View style={styles.modal}>
+          {/* Header with close button */}
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.closeButton} onPress={onCancel}>
+              <MaterialIcons name="close" size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Cooking Method</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Food Info Section */}
+            <View style={styles.foodSection}>
+              <Text style={styles.foodName}>{food.name}</Text>
+              <Text style={styles.subtitle}>How was this prepared?</Text>
             </View>
 
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-              {/* Impact info */}
-              <View style={styles.infoBox}>
-                <MaterialIcons name="info" size={20} color={colors.primary} />
-                <Text style={styles.infoText}>
-                  Cooking method affects calorie content. Frying adds more calories than grilling.
-                </Text>
-              </View>
-
-              {/* Cooking methods grid */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>
-                  {suggestedMethods.length > 0 ? 'Recommended Methods' : 'Common Methods'}
-                </Text>
-                <View style={styles.methodsGrid}>
-                  {filteredMethods.map((item) => (
-                    <TouchableOpacity
-                      key={item.method}
-                      style={[
-                        styles.methodButton,
-                        selectedMethod === item.method && styles.methodButtonActive
-                      ]}
-                      onPress={() => handleMethodSelect(item.method)}
-                    >
-                      <Text style={styles.methodIcon}>{item.icon}</Text>
-                      <Text style={[
-                        styles.methodText,
-                        selectedMethod === item.method && styles.methodTextActive
-                      ]}>
-                        {item.method}
-                      </Text>
-                      <Text style={styles.methodDescription}>
-                        {item.description}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Custom method option */}
-              <View style={styles.section}>
+            {/* Cooking Methods List */}
+            <View style={styles.section}>
+              {filteredMethods.map((item, index) => (
                 <TouchableOpacity
+                  key={item.method}
                   style={[
-                    styles.customMethodButton,
-                    showCustomInput && styles.customMethodButtonActive
+                    styles.methodButton,
+                    selectedMethod === item.method && styles.methodButtonActive,
+                    index === filteredMethods.length - 1 && styles.methodButtonLast
                   ]}
-                  onPress={handleCustomMethod}
+                  onPress={() => handleMethodSelect(item.method)}
                 >
-                  <MaterialIcons 
-                    name="add" 
-                    size={20} 
-                    color={showCustomInput ? colors.white : colors.primary} 
-                  />
-                  <Text style={[
-                    styles.customMethodText,
-                    showCustomInput && styles.customMethodTextActive
-                  ]}>
-                    Other cooking method
-                  </Text>
-                </TouchableOpacity>
-
-                {showCustomInput && (
-                  <TextInput
-                    style={styles.customInput}
-                    value={customMethod}
-                    onChangeText={setCustomMethod}
-                    placeholder="e.g., Stir-fried, Braised, Smoked..."
-                    autoFocus
-                    returnKeyType="done"
-                    onSubmitEditing={handleConfirm}
-                  />
-                )}
-              </View>
-
-              {/* Nutrition impact preview */}
-              {selectedMethod && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Calorie Impact</Text>
-                  <View style={styles.impactPreview}>
-                    {(() => {
-                      const multiplier = {
-                        'Raw': 1.0,
-                        'Boiled': 1.0,
-                        'Steamed': 1.0,
-                        'Grilled': 1.1,
-                        'Baked': 1.05,
-                        'Roasted': 1.1,
-                        'Sautéed': 1.2,
-                        'Fried': 1.4,
-                        'Deep Fried': 1.8,
-                      }[selectedMethod] || 1.0;
-                      
-                      const change = Math.round((multiplier - 1) * 100);
-                      const newCalories = Math.round(food.calories * multiplier);
-                      
-                      return (
-                        <View style={styles.impactContent}>
-                          <Text style={styles.impactText}>
-                            {change === 0 
-                              ? 'No change to calories' 
-                              : `${change > 0 ? '+' : ''}${change}% calories`
-                            }
-                          </Text>
-                          <Text style={styles.impactCalories}>
-                            {food.calories} → {newCalories} cal
-                          </Text>
-                        </View>
-                      );
-                    })()}
+                  <View style={styles.methodIconContainer}>
+                    <Text style={styles.methodIcon}>{item.icon}</Text>
                   </View>
-                </View>
-              )}
-            </ScrollView>
-
-            {/* Footer buttons */}
-            <View style={styles.footer}>
-              <Button
-                title="Skip"
-                onPress={handleSkip}
-                variant="secondary"
-                style={styles.footerButton}
-              />
-              <Button
-                title="Set Method"
-                onPress={handleConfirm}
-                variant="primary"
-                style={styles.footerButton}
-                disabled={!selectedMethod && !customMethod.trim()}
-              />
+                  <View style={styles.methodContent}>
+                    <Text style={[
+                      styles.methodText,
+                      selectedMethod === item.method && styles.methodTextActive
+                    ]}>
+                      {item.method}
+                    </Text>
+                    <Text style={[
+                      styles.methodArabic,
+                      selectedMethod === item.method && styles.methodArabicActive
+                    ]}>
+                      {item.arabic}
+                    </Text>
+                  </View>
+                  {selectedMethod === item.method && (
+                    <MaterialIcons name="check-circle" size={24} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
             </View>
+
+            {/* Nutrition impact preview */}
+            {selectedMethod && (
+              <View style={styles.section}>
+                <View style={styles.impactCard}>
+                  <Text style={styles.impactTitle}>Calorie Impact</Text>
+                  {(() => {
+                    const multiplier = {
+                      'Raw': 1.0,
+                      'Boiled': 1.0,
+                      'Steamed': 1.0,
+                      'Grilled': 1.1,
+                      'Baked': 1.05,
+                      'Fried': 1.4,
+                    }[selectedMethod] || 1.0;
+                    
+                    const change = Math.round((multiplier - 1) * 100);
+                    const newCalories = Math.round(food.calories * multiplier);
+                    
+                    return (
+                      <View style={styles.impactContent}>
+                        <Text style={styles.impactText}>
+                          {change === 0 
+                            ? 'No change to calories' 
+                            : `${change > 0 ? '+' : ''}${change}% calories`
+                          }
+                        </Text>
+                        <Text style={styles.impactCalories}>
+                          {food.calories} → {newCalories} cal
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                </View>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Footer buttons */}
+          <View style={styles.footer}>
+            <Button
+              title="Skip"
+              onPress={handleSkip}
+              variant="secondary"
+              style={styles.footerButton}
+            />
+            <Button
+              title="Confirm"
+              onPress={handleConfirm}
+              variant="primary"
+              style={styles.footerButton}
+              disabled={!selectedMethod}
+            />
           </View>
         </View>
       </View>
@@ -243,84 +221,69 @@ export const CookingMethodModal: React.FC<CookingMethodModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  container: {
-    flex: 1,
-    justifyContent: 'flex-end',
+    backgroundColor: colors.white,
   },
   modal: {
+    flex: 1,
     backgroundColor: colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '80%',
-    paddingTop: spacing.lg,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray100,
   },
-  headerLeft: {
+  closeButton: {
+    padding: spacing.sm,
+    marginLeft: -spacing.sm,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: fonts.lg,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  content: {
     flex: 1,
   },
-  title: {
+  foodSection: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.gray50,
+  },
+  foodName: {
     fontSize: fonts.xl,
     fontWeight: 'bold',
     color: colors.textPrimary,
     marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: fonts.base,
-    color: colors.textSecondary,
-  },
-  closeButton: {
-    padding: spacing.sm,
-    marginRight: -spacing.sm,
-    marginTop: -spacing.sm,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-  },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.blue50,
-    padding: spacing.md,
-    borderRadius: 8,
-    marginVertical: spacing.md,
-  },
-  infoText: {
-    flex: 1,
     fontSize: fonts.sm,
-    color: colors.primary,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   section: {
-    marginVertical: spacing.md,
-  },
-  sectionTitle: {
-    fontSize: fonts.base,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  methodsGrid: {
-    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   methodButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.gray200,
     backgroundColor: colors.white,
   },
@@ -328,85 +291,74 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.blue50,
   },
+  methodButtonLast: {
+    marginBottom: 0,
+  },
+  methodIconContainer: {
+    width: 40,
+    alignItems: 'center',
+  },
   methodIcon: {
     fontSize: 24,
-    marginRight: spacing.md,
+  },
+  methodContent: {
+    flex: 1,
+    marginLeft: spacing.sm,
   },
   methodText: {
     fontSize: fonts.base,
-    fontWeight: '500',
+    fontWeight: '600',
     color: colors.textPrimary,
-    marginRight: spacing.sm,
-    minWidth: 80,
+    marginBottom: 2,
   },
   methodTextActive: {
     color: colors.primary,
   },
-  methodDescription: {
-    flex: 1,
+  methodArabic: {
     fontSize: fonts.sm,
     color: colors.textSecondary,
   },
-  customMethodButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    borderStyle: 'dashed',
-    backgroundColor: colors.white,
-  },
-  customMethodButtonActive: {
-    backgroundColor: colors.primary,
-    borderStyle: 'solid',
-  },
-  customMethodText: {
-    fontSize: fonts.base,
+  methodArabicActive: {
     color: colors.primary,
-    fontWeight: '500',
   },
-  customMethodTextActive: {
-    color: colors.white,
-  },
-  customInput: {
-    marginTop: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    borderRadius: 8,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: fonts.base,
+  impactCard: {
     backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.gray100,
+    marginBottom: spacing.lg,
   },
-  impactPreview: {
-    backgroundColor: colors.gray50,
-    borderRadius: 8,
-    padding: spacing.md,
+  impactTitle: {
+    fontSize: fonts.base,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   impactContent: {
     alignItems: 'center',
   },
   impactText: {
-    fontSize: fonts.base,
-    color: colors.textPrimary,
-    fontWeight: '500',
+    fontSize: fonts.sm,
+    color: colors.textSecondary,
     marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   impactCalories: {
     fontSize: fonts.lg,
     color: colors.primary,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   footer: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.gray100,
+    backgroundColor: colors.white,
   },
   footerButton: {
     flex: 1,

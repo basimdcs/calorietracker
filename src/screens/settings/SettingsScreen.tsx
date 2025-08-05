@@ -4,72 +4,150 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   Alert,
-  Switch,
   SafeAreaView,
   ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { colors, fonts, spacing } from '../../constants/theme';
-import { Card } from '../../components/ui/Card';
+import { Card, SubscriptionCard, PricingCard } from '../../components/ui';
 import { useUserStore } from '../../stores/userStore';
 import { useUser } from '../../hooks/useUser';
-import { UserProfile, ActivityLevel, Goal } from '../../types';
+import { UserProfile, SUBSCRIPTION_PLANS, SubscriptionTier } from '../../types';
+import useRevenueCat from '../../hooks/useRevenueCat';
+import { testRevenueCatIntegration } from '../../utils/revenueCatTestHelper';
 
 const SettingsScreen: React.FC = () => {
-  const { profile, updateProfile } = useUserStore();
+  const navigation = useNavigation();
+  const { 
+    profile, 
+    updateProfile, 
+    resetProfile, 
+    upgradeSubscription,
+    getUsageStats,
+  } = useUserStore();
   const { userStats } = useUser();
+  const { state: revenueCatState, actions: revenueCatActions } = useRevenueCat();
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(profile);
-  const [notifications, setNotifications] = useState({
-    mealReminders: true,
-    goalAchievements: true,
-    weeklyReports: false,
-  });
+  const [showPricingCards, setShowPricingCards] = useState(false);
 
-  const handleSave = () => {
-    if (localProfile) {
-      updateProfile(localProfile);
-      Alert.alert('Success', 'Profile updated successfully!');
+  const handleUpgradeSubscription = () => {
+    setShowPricingCards(true);
+  };
+
+  const handleSelectPlan = (tier: SubscriptionTier) => {
+    if (tier === 'FREE') {
+      Alert.alert(
+        'Confirm Downgrade',
+        'Are you sure you want to downgrade to the Free plan? You will lose access to premium features.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Downgrade', 
+            style: 'destructive',
+            onPress: () => {
+              upgradeSubscription(tier);
+              setShowPricingCards(false);
+              Alert.alert('Success', 'Your subscription has been updated.');
+            }
+          }
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Upgrade Subscription',
+        `You are about to upgrade to the ${tier} plan. This will redirect you to the App Store to complete your purchase.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Continue',
+            onPress: () => {
+              upgradeSubscription(tier);
+              setShowPricingCards(false);
+              Alert.alert('Success', 'Your subscription has been upgraded!');
+            }
+          }
+        ]
+      );
     }
   };
 
-  const updateProfileField = (field: keyof UserProfile, value: any) => {
-    if (localProfile) {
-      setLocalProfile({
-        ...localProfile,
-        [field]: value,
+  const handleManageSubscription = () => {
+    // Navigate to subscription management
+    Alert.alert('Subscription Management', 'This would open subscription management in the App Store.');
+  };
+
+  const handleRestorePurchases = () => {
+    Alert.alert('Restore Purchases', 'This would restore any previous purchases.');
+  };
+
+  const handleOpenLink = (url: string, title: string) => {
+    Alert.alert(`Open ${title}`, `This would open ${title} in your browser.`);
+  };
+
+  const handleResetProfile = () => {
+    Alert.alert(
+      'Reset Profile',
+      'Resetting your profile will permanently delete all data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            resetProfile();
+            Alert.alert('Success', 'Your profile has been reset.');
+          }
+        }
+      ]
+    );
+  };
+
+  const handleTestRevenueCat = () => {
+    console.log('🧪 Running RevenueCat Integration Test...');
+    console.log('🔍 Current RevenueCat State:', {
+      isInitialized: revenueCatState.isInitialized,
+      isLoading: revenueCatState.isLoading,
+      error: revenueCatState.error,
+      subscriptionTier: revenueCatState.subscriptionStatus.tier,
+      hasCustomerInfo: !!revenueCatState.customerInfo,
+    });
+    console.log('👤 Current Profile:', {
+      hasProfile: !!profile,
+      profileId: profile?.id,
+    });
+    
+    const testResults = testRevenueCatIntegration(revenueCatState, revenueCatActions);
+    
+    // Add manual initialization attempt if not initialized
+    if (!revenueCatState.isInitialized && !revenueCatState.isLoading) {
+      console.log('🚀 Attempting manual RevenueCat initialization...');
+      revenueCatActions.initializeRevenueCat(profile?.id).then(() => {
+        console.log('✅ Manual initialization completed');
+      }).catch((error) => {
+        console.error('❌ Manual initialization failed:', error);
       });
     }
+    
+    Alert.alert(
+      'RevenueCat Test Results',
+      testResults.overallPassed 
+        ? `✅ All tests passed! RevenueCat integration is working correctly.\n\nStatus: ${revenueCatState.isInitialized ? 'Initialized' : 'Not initialized'}\nError: ${revenueCatState.error || 'None'}`
+        : '❌ Some tests failed. Check the console for details.',
+      [
+        { text: 'OK' }
+      ]
+    );
   };
 
-  const getActivityLevelLabel = (level: ActivityLevel) => {
-    switch (level) {
-      case 'sedentary': return 'Sedentary (little or no exercise)';
-      case 'lightly-active': return 'Lightly Active (light exercise 1-3 days/week)';
-      case 'moderately-active': return 'Moderately Active (moderate exercise 3-5 days/week)';
-      case 'very-active': return 'Very Active (hard exercise 6-7 days/week)';
-      case 'extra-active': return 'Extra Active (very hard exercise, physical job)';
-      default: return level;
-    }
-  };
-
-  const getGoalLabel = (goal: Goal) => {
-    switch (goal) {
-      case 'lose': return 'Lose Weight';
-      case 'maintain': return 'Maintain Weight';
-      case 'gain': return 'Gain Weight';
-      default: return goal;
-    }
-  };
+  const usageStats = getUsageStats();
 
   if (!localProfile) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.container}>
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading...</Text>
-          </View>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
     );
@@ -82,11 +160,9 @@ const SettingsScreen: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View style={styles.headerLeft}>
-              <Text style={styles.headerTitle}>
-                ⚙️ Settings
-              </Text>
+              <Text style={styles.headerTitle}>Settings</Text>
               <Text style={styles.headerSubtitle}>
-                Manage your profile and preferences
+                Manage your account and preferences
               </Text>
             </View>
           </View>
@@ -94,273 +170,269 @@ const SettingsScreen: React.FC = () => {
         
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
-            {/* Profile Information */}
-            <Card style={styles.profileCard}>
-              <View style={styles.cardHeader}>
-                <MaterialIcons name="person" size={24} color={colors.primary} />
-                <Text style={styles.cardTitle}>Profile Information</Text>
-              </View>
-              <View style={styles.cardContent}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>
-                    <MaterialIcons name="person" size={16} color={colors.primary} />
-                    {' '}Name
-                  </Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={localProfile.name}
-                    onChangeText={(text) => updateProfileField('name', text)}
-                    placeholder="Enter your name"
-                  />
-                </View>
+            
+            {/* Subscription Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Subscription & Usage</Text>
+              <SubscriptionCard
+                subscriptionStatus={{
+                  isActive: localProfile.subscriptionStatus === 'active',
+                  tier: localProfile.subscriptionTier || 'FREE',
+                  willRenew: true,
+                  isInGracePeriod: false,
+                  expirationDate: localProfile.subscriptionEndDate ? new Date(localProfile.subscriptionEndDate) : undefined,
+                }}
+                usageInfo={{
+                  recordingsUsed: usageStats.recordingsUsed,
+                  recordingsLimit: usageStats.monthlyLimit,
+                  recordingsRemaining: usageStats.recordingsRemaining,
+                  resetDate: new Date(usageStats.resetDate),
+                }}
+                onUpgrade={handleUpgradeSubscription}
+                onManage={handleManageSubscription}
+              />
+              
+              {/* Restore Purchases Button */}
+              <TouchableOpacity 
+                style={styles.restoreButton} 
+                onPress={handleRestorePurchases}
+              >
+                <MaterialIcons name="restore" size={20} color={colors.primary} />
+                <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+              </TouchableOpacity>
+            </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>
-                    <MaterialIcons name="cake" size={16} color={colors.primary} />
-                    {' '}Age
-                  </Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={String(localProfile.age)}
-                    onChangeText={(text) => updateProfileField('age', parseInt(text) || 0)}
-                    placeholder="Enter your age"
-                    keyboardType="numeric"
-                  />
+            {/* Pricing Cards Modal */}
+            {showPricingCards && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Choose Your Plan</Text>
+                  <TouchableOpacity 
+                    onPress={() => setShowPricingCards(false)}
+                    style={styles.closeButton}
+                  >
+                    <MaterialIcons name="close" size={24} color={colors.textSecondary} />
+                  </TouchableOpacity>
                 </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>
-                    <MaterialIcons name="height" size={16} color={colors.primary} />
-                    {' '}Height (cm)
-                  </Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={String(localProfile.height)}
-                    onChangeText={(text) => updateProfileField('height', parseFloat(text) || 0)}
-                    placeholder="Enter your height in cm"
-                    keyboardType="numeric"
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>
-                    <MaterialIcons name="monitor-weight" size={16} color={colors.primary} />
-                    {' '}Weight (kg)
-                  </Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={String(localProfile.weight)}
-                    onChangeText={(text) => updateProfileField('weight', parseFloat(text) || 0)}
-                    placeholder="Enter your weight in kg"
-                    keyboardType="numeric"
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>
-                    <MaterialIcons name="wc" size={16} color={colors.primary} />
-                    {' '}Gender
-                  </Text>
-                  <View style={styles.radioGroup}>
-                    <TouchableOpacity
-                      style={[
-                        styles.radioButton,
-                        localProfile.gender === 'male' && styles.radioButtonActive,
-                      ]}
-                      onPress={() => updateProfileField('gender', 'male')}
-                    >
-                      <Text style={[
-                        styles.radioText,
-                        localProfile.gender === 'male' && styles.radioTextActive,
-                      ]}>
-                        Male
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.radioButton,
-                        localProfile.gender === 'female' && styles.radioButtonActive,
-                      ]}
-                      onPress={() => updateProfileField('gender', 'female')}
-                    >
-                      <Text style={[
-                        styles.radioText,
-                        localProfile.gender === 'female' && styles.radioTextActive,
-                      ]}>
-                        Female
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Card>
-
-            {/* Activity Level */}
-            <Card style={styles.activityCard}>
-              <View style={styles.cardHeader}>
-                <MaterialIcons name="fitness-center" size={24} color={colors.secondary} />
-                <Text style={styles.cardTitle}>Activity Level</Text>
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.sectionDescription}>
-                  Select your typical activity level to calculate your daily calorie needs.
-                </Text>
-                <View style={styles.activityOptions}>
-                  {(['sedentary', 'lightly-active', 'moderately-active', 'very-active', 'extra-active'] as ActivityLevel[]).map((level) => (
-                    <TouchableOpacity
-                      key={level}
-                      style={[
-                        styles.activityOption,
-                        localProfile.activityLevel === level && styles.activityOptionActive,
-                      ]}
-                      onPress={() => updateProfileField('activityLevel', level)}
-                    >
-                      <View style={styles.activityOptionContent}>
-                        <Text style={[
-                          styles.activityOptionText,
-                          localProfile.activityLevel === level && styles.activityOptionTextActive,
-                        ]}>
-                          {getActivityLevelLabel(level)}
-                        </Text>
-                        {localProfile.activityLevel === level && (
-                          <MaterialIcons name="check" size={20} color={colors.white} />
-                        )}
-                      </View>
-                    </TouchableOpacity>
+                <View style={styles.pricingGrid}>
+                  {SUBSCRIPTION_PLANS.map((plan) => (
+                    <PricingCard
+                      key={plan.tier}
+                      plan={plan}
+                      currentTier={localProfile.subscriptionTier || 'FREE'}
+                      onSelect={handleSelectPlan}
+                    />
                   ))}
                 </View>
               </View>
-            </Card>
+            )}
 
-            {/* Goal */}
-            <Card style={styles.goalCard}>
-              <View style={styles.cardHeader}>
-                <MaterialIcons name="flag" size={24} color={colors.accent} />
-                <Text style={styles.cardTitle}>Fitness Goal</Text>
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.sectionDescription}>
-                  Choose your primary fitness goal to set appropriate calorie targets.
-                </Text>
-                <View style={styles.goalOptions}>
-                  {(['lose', 'maintain', 'gain'] as Goal[]).map((goal) => (
-                    <TouchableOpacity
-                      key={goal}
-                      style={[
-                        styles.goalOption,
-                        localProfile.goal === goal && styles.goalOptionActive,
-                      ]}
-                      onPress={() => updateProfileField('goal', goal)}
-                    >
-                      <View style={styles.goalOptionContent}>
-                        <Text style={[
-                          styles.goalOptionText,
-                          localProfile.goal === goal && styles.goalOptionTextActive,
-                        ]}>
-                          {getGoalLabel(goal)}
-                        </Text>
-                        {localProfile.goal === goal && (
-                          <MaterialIcons name="check" size={20} color={colors.white} />
-                        )}
+            {/* Profile Overview */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Profile Overview</Text>
+              
+              {/* Combined Profile Card with Stats */}
+              <TouchableOpacity 
+                style={[styles.settingsCard, styles.profileOverviewCard]}
+                onPress={() => navigation.navigate('ProfileEdit' as never)}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.cardLeft}>
+                    <View style={styles.iconContainer}>
+                      <MaterialIcons name="person" size={24} color={colors.primary} />
+                    </View>
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardTitle}>Edit Profile & Goals</Text>
+                      <Text style={styles.cardSubtitle}>
+                        {localProfile.name || 'Not set'} • {localProfile.age || 'Not set'} years
+                      </Text>
+                      <Text style={styles.cardSubtitle}>
+                        {localProfile.activityLevel || 'Not set'} • {localProfile.goal || 'Not set'}
+                      </Text>
+                    </View>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                </View>
+                
+                {/* Inline Stats */}
+                <View style={styles.inlineStatsContainer}>
+                  <View style={styles.inlineStatItem}>
+                    <Text style={styles.inlineStatValue}>{userStats?.bmr || '--'}</Text>
+                    <Text style={styles.inlineStatLabel}>BMR</Text>
+                  </View>
+                  <View style={styles.inlineStatDivider} />
+                  <View style={styles.inlineStatItem}>
+                    <Text style={styles.inlineStatValue}>{userStats?.tdee || '--'}</Text>
+                    <Text style={styles.inlineStatLabel}>TDEE</Text>
+                  </View>
+                  <View style={styles.inlineStatDivider} />
+                  <View style={styles.inlineStatItem}>
+                    <Text style={styles.inlineStatValue}>{userStats?.calorieGoal || '--'}</Text>
+                    <Text style={styles.inlineStatLabel}>Daily Goal</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* App Settings */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>App Settings</Text>
+              
+              {/* Notifications Card */}
+              <TouchableOpacity 
+                style={styles.settingsCard}
+                onPress={() => navigation.navigate('Notifications' as never)}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.cardLeft}>
+                    <View style={styles.iconContainer}>
+                      <MaterialIcons name="notifications" size={24} color={colors.primary} />
+                    </View>
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardTitle}>Notifications</Text>
+                      <Text style={styles.cardSubtitle}>Meal reminders and goal alerts</Text>
+                    </View>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Support & Legal Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Support & Legal</Text>
+              
+              {/* Privacy Policy */}
+              <TouchableOpacity 
+                style={styles.settingsCard}
+                onPress={() => handleOpenLink('https://example.com/privacy', 'Privacy Policy')}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.cardLeft}>
+                    <View style={styles.iconContainer}>
+                      <MaterialIcons name="privacy-tip" size={24} color={colors.primary} />
+                    </View>
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardTitle}>Privacy Policy</Text>
+                      <Text style={styles.cardSubtitle}>Read our privacy policy</Text>
+                    </View>
+                  </View>
+                  <MaterialIcons name="open-in-new" size={20} color={colors.textSecondary} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Terms of Service */}
+              <TouchableOpacity 
+                style={styles.settingsCard}
+                onPress={() => handleOpenLink('https://example.com/terms', 'Terms of Service')}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.cardLeft}>
+                    <View style={styles.iconContainer}>
+                      <MaterialIcons name="article" size={24} color={colors.primary} />
+                    </View>
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardTitle}>Terms of Service</Text>
+                      <Text style={styles.cardSubtitle}>Read our terms of service</Text>
+                    </View>
+                  </View>
+                  <MaterialIcons name="open-in-new" size={20} color={colors.textSecondary} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Contact Support */}
+              <TouchableOpacity 
+                style={styles.settingsCard}
+                onPress={() => handleOpenLink('mailto:support@calorietracker.com', 'Contact Support')}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.cardLeft}>
+                    <View style={styles.iconContainer}>
+                      <MaterialIcons name="support" size={24} color={colors.primary} />
+                    </View>
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardTitle}>Contact Support</Text>
+                      <Text style={styles.cardSubtitle}>Get help from our team</Text>
+                    </View>
+                  </View>
+                  <MaterialIcons name="email" size={20} color={colors.textSecondary} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Rate the App */}
+              <TouchableOpacity 
+                style={styles.settingsCard}
+                onPress={() => handleOpenLink('https://apps.apple.com/app/id123456789', 'Rate the App')}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.cardLeft}>
+                    <View style={styles.iconContainer}>
+                      <MaterialIcons name="star-rate" size={24} color={colors.primary} />
+                    </View>
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardTitle}>Rate the App</Text>
+                      <Text style={styles.cardSubtitle}>Share your feedback</Text>
+                    </View>
+                  </View>
+                  <MaterialIcons name="open-in-new" size={20} color={colors.textSecondary} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Developer Section - Only show in development */}
+            {__DEV__ && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Developer Tools</Text>
+                
+                {/* RevenueCat Test */}
+                <TouchableOpacity 
+                  style={styles.settingsCard}
+                  onPress={handleTestRevenueCat}
+                >
+                  <View style={styles.cardContent}>
+                    <View style={styles.cardLeft}>
+                      <View style={styles.iconContainer}>
+                        <MaterialIcons name="bug-report" size={24} color={colors.primary} />
                       </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </Card>
-
-            {/* Current Stats */}
-            <Card style={styles.statsCard}>
-              <View style={styles.cardHeader}>
-                <MaterialIcons name="analytics" size={24} color={colors.warning} />
-                <Text style={styles.cardTitle}>Current Stats</Text>
-              </View>
-              <View style={styles.cardContent}>
-                                  <View style={styles.statsGrid}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{Math.round(userStats?.bmr || 0)}</Text>
-                      <Text style={styles.statLabel}>BMR (cal/day)</Text>
+                      <View style={styles.cardText}>
+                        <Text style={styles.cardTitle}>Test RevenueCat</Text>
+                        <Text style={styles.cardSubtitle}>
+                          Status: {revenueCatState.isInitialized ? '✅ Initialized' : '⏳ Not initialized'}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{Math.round(userStats?.tdee || 0)}</Text>
-                      <Text style={styles.statLabel}>TDEE (cal/day)</Text>
+                    <MaterialIcons name="play-arrow" size={24} color={colors.textSecondary} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Account Management Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Account Management</Text>
+              
+              {/* Reset Profile */}
+              <TouchableOpacity 
+                style={[styles.settingsCard, styles.dangerCard]}
+                onPress={handleResetProfile}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.cardLeft}>
+                    <View style={[styles.iconContainer, styles.dangerIcon]}>
+                      <MaterialIcons name="warning" size={24} color={colors.error} />
                     </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{Math.round(userStats?.calorieGoal || 0)}</Text>
-                      <Text style={styles.statLabel}>Daily Goal</Text>
+                    <View style={styles.cardText}>
+                      <Text style={[styles.cardTitle, styles.dangerText]}>Reset Profile</Text>
+                      <Text style={[styles.cardSubtitle, styles.dangerSubtitle]}>
+                        Permanently delete all data
+                      </Text>
                     </View>
                   </View>
-              </View>
-            </Card>
-
-            {/* Notifications */}
-            <Card style={styles.notificationsCard}>
-              <View style={styles.cardHeader}>
-                <MaterialIcons name="notifications" size={24} color={colors.error} />
-                <Text style={styles.cardTitle}>Notifications</Text>
-              </View>
-              <View style={styles.cardContent}>
-                <View style={styles.notificationItem}>
-                  <View style={styles.notificationInfo}>
-                    <Text style={styles.notificationTitle}>Meal Reminders</Text>
-                    <Text style={styles.notificationDescription}>
-                      Get reminded to log your meals
-                    </Text>
-                  </View>
-                  <Switch
-                    value={notifications.mealReminders}
-                    onValueChange={(value) => setNotifications({
-                      ...notifications,
-                      mealReminders: value,
-                    })}
-                    trackColor={{ false: colors.gray300, true: colors.primary }}
-                    thumbColor={colors.white}
-                  />
+                  <MaterialIcons name="chevron-right" size={24} color={colors.error} />
                 </View>
+              </TouchableOpacity>
+            </View>
 
-                <View style={styles.notificationItem}>
-                  <View style={styles.notificationInfo}>
-                    <Text style={styles.notificationTitle}>Goal Achievements</Text>
-                    <Text style={styles.notificationDescription}>
-                      Celebrate when you reach your goals
-                    </Text>
-                  </View>
-                  <Switch
-                    value={notifications.goalAchievements}
-                    onValueChange={(value) => setNotifications({
-                      ...notifications,
-                      goalAchievements: value,
-                    })}
-                    trackColor={{ false: colors.gray300, true: colors.primary }}
-                    thumbColor={colors.white}
-                  />
-                </View>
-
-                <View style={styles.notificationItem}>
-                  <View style={styles.notificationInfo}>
-                    <Text style={styles.notificationTitle}>Weekly Reports</Text>
-                    <Text style={styles.notificationDescription}>
-                      Get a summary of your weekly progress
-                    </Text>
-                  </View>
-                  <Switch
-                    value={notifications.weeklyReports}
-                    onValueChange={(value) => setNotifications({
-                      ...notifications,
-                      weeklyReports: value,
-                    })}
-                    trackColor={{ false: colors.gray300, true: colors.primary }}
-                    thumbColor={colors.white}
-                  />
-                </View>
-              </View>
-            </Card>
-
-            {/* Save Button */}
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <MaterialIcons name="save" size={24} color={colors.white} />
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
@@ -375,7 +447,16 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.backgroundSecondary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: fonts.lg,
+    color: colors.textSecondary,
   },
   header: {
     backgroundColor: colors.white,
@@ -383,11 +464,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.gray200,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
   },
   headerContent: {
     flexDirection: 'row',
@@ -398,7 +474,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: fonts.xl,
+    fontSize: fonts['2xl'],
     fontWeight: 'bold',
     color: colors.textPrimary,
     marginBottom: spacing.xs,
@@ -413,238 +489,140 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     gap: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing['2xl'],
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  section: {
+    gap: spacing.sm,
   },
-  loadingText: {
-    fontSize: fonts.lg,
-    color: colors.textSecondary,
-  },
-  profileCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  activityCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  goalCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  statsCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  notificationsCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  cardTitle: {
+  sectionTitle: {
     fontSize: fonts.lg,
     fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginLeft: spacing.sm,
-  },
-  cardContent: {
-    padding: spacing.lg,
-  },
-  inputGroup: {
-    marginBottom: spacing.lg,
-  },
-  inputLabel: {
-    fontSize: fonts.base,
-    fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  closeButton: {
+    padding: spacing.sm,
+  },
+  restoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    borderRadius: 8,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: fonts.base,
-    color: colors.textPrimary,
-    backgroundColor: colors.white,
-  },
-  radioGroup: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  radioButton: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    alignItems: 'center',
-    backgroundColor: colors.white,
-  },
-  radioButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  radioText: {
-    fontSize: fonts.base,
-    color: colors.textPrimary,
-    fontWeight: '500',
-  },
-  radioTextActive: {
-    color: colors.white,
-  },
-  sectionDescription: {
-    fontSize: fonts.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing.lg,
-    lineHeight: 20,
-  },
-  activityOptions: {
+    justifyContent: 'center',
     gap: spacing.sm,
-  },
-  activityOption: {
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.gray300,
     backgroundColor: colors.white,
-  },
-  activityOptionActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  activityOptionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  activityOptionText: {
-    fontSize: fonts.base,
-    color: colors.textPrimary,
-    flex: 1,
-  },
-  activityOptionTextActive: {
-    color: colors.white,
-  },
-  goalOptions: {
-    gap: spacing.sm,
-  },
-  goalOption: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.gray300,
-    backgroundColor: colors.white,
-  },
-  goalOptionActive: {
-    backgroundColor: colors.primary,
     borderColor: colors.primary,
+    borderRadius: 8,
   },
-  goalOptionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  goalOptionText: {
+  restoreButtonText: {
     fontSize: fonts.base,
-    color: colors.textPrimary,
-    flex: 1,
+    fontWeight: '600',
+    color: colors.primary,
   },
-  goalOptionTextActive: {
-    color: colors.white,
+  pricingGrid: {
+    gap: spacing.lg,
   },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.gray100,
+  // New styles for settings cards
+  settingsCard: {
+    backgroundColor: colors.white,
     borderRadius: 12,
+    marginBottom: spacing.sm,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  statValue: {
-    fontSize: fonts['2xl'],
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  statLabel: {
-    fontSize: fonts.sm,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  notificationItem: {
+  cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
+    padding: spacing.lg,
   },
-  notificationInfo: {
+  cardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  notificationTitle: {
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  cardText: {
+    flex: 1,
+  },
+  cardTitle: {
     fontSize: fonts.base,
     fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
-  notificationDescription: {
+  cardSubtitle: {
     fontSize: fonts.sm,
     color: colors.textSecondary,
   },
-  saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.xl,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  // Profile overview card styles
+  profileOverviewCard: {
+    paddingBottom: spacing.lg,
   },
-  saveButtonText: {
+  inlineStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+  },
+  inlineStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  inlineStatValue: {
     fontSize: fonts.lg,
     fontWeight: 'bold',
-    color: colors.white,
-    marginLeft: spacing.sm,
+    color: colors.primary,
+    marginBottom: 2,
+  },
+  inlineStatLabel: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  inlineStatDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: colors.gray200,
+    marginHorizontal: spacing.sm,
+  },
+  // Danger styles
+  dangerCard: {
+    borderWidth: 1,
+    borderColor: colors.error + '30',
+  },
+  dangerIcon: {
+    backgroundColor: colors.error + '20',
+  },
+  dangerText: {
+    color: colors.error,
+  },
+  dangerSubtitle: {
+    color: colors.error + '80',
   },
 });
 
-export default SettingsScreen; 
+export default SettingsScreen;

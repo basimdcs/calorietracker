@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,23 +14,21 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ParsedFoodItem } from '../../types';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { Button } from '../ui/Button';
-import { nutritionService } from '../../services/nutrition';
+import { getSuggestedUnits, calculateNutrition, getEstimatedWeight, UnitConversion } from '../../utils/unitConversions';
 
 interface QuantityModalProps {
   visible: boolean;
   food: ParsedFoodItem | null;
-  onConfirm: (quantity: number, unit: string) => void;
+  onConfirm: (quantity: number, unit: string, updatedNutrition: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  }) => void;
   onCancel: () => void;
 }
 
-const QUICK_QUANTITIES = [
-  { label: '1/2', value: '0.5' },
-  { label: '1', value: '1' },
-  { label: '1.5', value: '1.5' },
-  { label: '2', value: '2' },
-  { label: '3', value: '3' },
-  { label: '5', value: '5' },
-];
+const QUICK_QUANTITIES = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
 
 export const QuantityModal: React.FC<QuantityModalProps> = ({
   visible,
@@ -41,189 +39,205 @@ export const QuantityModal: React.FC<QuantityModalProps> = ({
   const [quantityInput, setQuantityInput] = useState('1');
   const [selectedUnit, setSelectedUnit] = useState('pieces');
 
-  const suggestedUnits = useMemo(() => 
-    food ? nutritionService.getSuggestedUnits(food.name) : []
-  , [food]);
+  const suggestedUnits = useMemo((): UnitConversion[] => {
+    if (!food) return [];
+    return getSuggestedUnits(food.name);
+  }, [food]);
 
-  // Reset values when modal opens
+  // Reset values when modal opens with valid food
   useEffect(() => {
     if (visible && food) {
       setQuantityInput(String(food.quantity || 1));
-      setSelectedUnit(food.unit || 'pieces');
+      setSelectedUnit(food.unit || suggestedUnits[0]?.unit || 'pieces');
     }
-  }, [visible, food]);
+  }, [visible, food, suggestedUnits]);
 
-  if (!food) return null;
+  const quantity = useMemo(() => {
+    const parsed = parseFloat(quantityInput);
+    return isNaN(parsed) || parsed <= 0 ? 0 : parsed;
+  }, [quantityInput]);
 
-  const quantity = parseFloat(quantityInput) || 0;
-
-  // Calculate preview nutrition with new quantity
-  const previewNutrition = useMemo(() => {
+  // Calculate updated nutrition with proper unit conversions
+  const updatedNutrition = useMemo(() => {
     if (!food || quantity <= 0) return null;
 
-    return nutritionService.calculateNutrition({
-      foodName: food.name,
-      baseNutrition: {
-        calories: food.calories / (food.quantity || 1), // Get per-unit values
-        protein: food.protein / (food.quantity || 1),
-        carbs: food.carbs / (food.quantity || 1),
-        fat: food.fat / (food.quantity || 1),
+    return calculateNutrition(
+      {
+        calories: food.calories,
+        protein: food.protein,
+        carbs: food.carbs,
+        fat: food.fat,
       },
+      food.quantity || 1,
+      food.unit || 'pieces',
       quantity,
-      unit: selectedUnit,
-      cookingMethod: food.cookingMethod,
-    });
+      selectedUnit,
+      food.name
+    );
   }, [food, quantity, selectedUnit]);
 
-  const handleConfirm = () => {
-    if (quantity > 0) {
-      onConfirm(quantity, selectedUnit);
+  // Get estimated weight based on quantity and unit
+  const estimatedWeight = useMemo(() => {
+    if (!food || quantity <= 0) return '0g';
+    return getEstimatedWeight(quantity, selectedUnit, food.name);
+  }, [food, quantity, selectedUnit]);
+
+  const handleConfirm = useCallback(() => {
+    if (quantity > 0 && updatedNutrition) {
+      onConfirm(quantity, selectedUnit, updatedNutrition);
     }
-  };
+  }, [quantity, selectedUnit, updatedNutrition, onConfirm]);
+
+  const handleQuickQuantitySelect = useCallback((value: number) => {
+    setQuantityInput(String(value));
+  }, []);
+
+  const handleUnitSelect = useCallback((unit: string) => {
+    setSelectedUnit(unit);
+  }, []);
+
+  if (!food) {
+    return null;
+  }
+
+  const isValidQuantity = quantity > 0;
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
-      transparent
+      presentationStyle="pageSheet"
       onRequestClose={onCancel}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.overlay}
-      >
-        <View style={styles.container}>
+      <View style={styles.modalContainer}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
           <View style={styles.modal}>
-            {/* Header */}
+            {/* Header with close button */}
             <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <Text style={styles.title}>Set Quantity</Text>
-                <Text style={styles.subtitle} numberOfLines={2}>
-                  For {food.name}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={onCancel}
-                accessibilityLabel="Close"
-                accessibilityRole="button"
-              >
+              <TouchableOpacity style={styles.closeButton} onPress={onCancel}>
                 <MaterialIcons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
+              <Text style={styles.headerTitle}>Set Quantity</Text>
+              <View style={styles.headerSpacer} />
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-              {/* Quick quantity selection */}
+              {/* Food Info Section */}
+              <View style={styles.foodSection}>
+                <Text style={styles.foodName}>{food.name}</Text>
+                <Text style={styles.estimatedWeight}>{estimatedWeight}</Text>
+                {updatedNutrition && (
+                  <Text style={styles.nutritionSummary}>
+                    {updatedNutrition.calories} cal • {updatedNutrition.protein}g protein • {updatedNutrition.carbs}g carbs • {updatedNutrition.fat}g fat
+                  </Text>
+                )}
+              </View>
+
+              {/* Quick Select Section */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Quick Select</Text>
-                <View style={styles.quickQuantities}>
-                  {QUICK_QUANTITIES.map((preset) => (
-                    <TouchableOpacity
-                      key={preset.value}
-                      style={[
-                        styles.quantityButton,
-                        quantityInput === preset.value && styles.quantityButtonActive
-                      ]}
-                      onPress={() => setQuantityInput(preset.value)}
-                    >
-                      <Text style={[
-                        styles.quantityButtonText,
-                        quantityInput === preset.value && styles.quantityButtonTextActive
-                      ]}>
-                        {preset.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                <View style={styles.quickGrid}>
+                  {QUICK_QUANTITIES.map((preset) => {
+                    const isSelected = quantityInput === String(preset);
+                    return (
+                      <TouchableOpacity
+                        key={preset}
+                        style={[
+                          styles.quickButton,
+                          isSelected && styles.quickButtonActive
+                        ]}
+                        onPress={() => handleQuickQuantitySelect(preset)}
+                      >
+                        <Text style={[
+                          styles.quickButtonText,
+                          isSelected && styles.quickButtonTextActive
+                        ]}>
+                          {preset}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
 
-              {/* Custom quantity input */}
+              {/* Manual Entry Section */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Custom Amount</Text>
-                <View style={styles.inputRow}>
-                  <TextInput
-                    style={styles.quantityInput}
-                    value={quantityInput}
-                    onChangeText={setQuantityInput}
-                    placeholder="Enter amount"
-                    keyboardType="decimal-pad"
-                    selectTextOnFocus
-                  />
-                  <View style={styles.unitSelector}>
-                    <Text style={styles.unitText}>{selectedUnit}</Text>
-                    <MaterialIcons name="keyboard-arrow-down" size={16} color={colors.textSecondary} />
-                  </View>
-                </View>
+                <TextInput
+                  style={styles.quantityInput}
+                  value={quantityInput}
+                  onChangeText={setQuantityInput}
+                  placeholder="Enter amount"
+                  keyboardType="decimal-pad"
+                  selectTextOnFocus
+                />
               </View>
 
-              {/* Unit selection */}
+              {/* Unit Selection */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Unit</Text>
                 <View style={styles.unitGrid}>
-                  {suggestedUnits.map((unit) => (
-                    <TouchableOpacity
-                      key={unit.value}
-                      style={[
-                        styles.unitButton,
-                        selectedUnit === unit.value && styles.unitButtonActive,
-                        unit.isRecommended && styles.unitButtonRecommended,
-                      ]}
-                      onPress={() => setSelectedUnit(unit.value)}
-                    >
-                      {unit.isRecommended && (
-                        <MaterialIcons name="star" size={12} color={colors.primary} style={styles.unitStar} />
-                      )}
-                      <Text style={[
-                        styles.unitButtonText,
-                        selectedUnit === unit.value && styles.unitButtonTextActive
-                      ]}>
-                        {unit.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {suggestedUnits.map((unitOption) => {
+                    const isSelected = selectedUnit === unitOption.unit;
+                    return (
+                      <TouchableOpacity
+                        key={unitOption.unit}
+                        style={[
+                          styles.unitButton,
+                          isSelected && styles.unitButtonActive,
+                          unitOption.isRecommended && !isSelected && styles.unitButtonRecommended,
+                        ]}
+                        onPress={() => handleUnitSelect(unitOption.unit)}
+                      >
+                        {unitOption.isRecommended && !isSelected && (
+                          <MaterialIcons 
+                            name="star" 
+                            size={14} 
+                            color={colors.success} 
+                            style={styles.unitStar} 
+                          />
+                        )}
+                        <Text style={[
+                          styles.unitButtonText,
+                          isSelected && styles.unitButtonTextActive
+                        ]}>
+                          {unitOption.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
 
-              {/* Nutrition preview */}
-              {previewNutrition && (
+              {/* Updated Nutrition Preview */}
+              {updatedNutrition && (
                 <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Updated Nutrition</Text>
-                  <View style={styles.nutritionPreview}>
+                  <Text style={styles.sectionTitle}>Nutrition Breakdown</Text>
+                  <View style={styles.nutritionGrid}>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>
-                        {Math.round(previewNutrition.calories)}
-                      </Text>
+                      <Text style={styles.nutritionIcon}>🔥</Text>
+                      <Text style={styles.nutritionValue}>{updatedNutrition.calories}</Text>
                       <Text style={styles.nutritionLabel}>calories</Text>
                     </View>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>
-                        {Math.round(previewNutrition.protein * 10) / 10}g
-                      </Text>
+                      <Text style={styles.nutritionIcon}>💪</Text>
+                      <Text style={styles.nutritionValue}>{updatedNutrition.protein}g</Text>
                       <Text style={styles.nutritionLabel}>protein</Text>
                     </View>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>
-                        {Math.round(previewNutrition.carbs * 10) / 10}g
-                      </Text>
+                      <Text style={styles.nutritionIcon}>🍞</Text>
+                      <Text style={styles.nutritionValue}>{updatedNutrition.carbs}g</Text>
                       <Text style={styles.nutritionLabel}>carbs</Text>
                     </View>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>
-                        {Math.round(previewNutrition.fat * 10) / 10}g
-                      </Text>
+                      <Text style={styles.nutritionIcon}>🥑</Text>
+                      <Text style={styles.nutritionValue}>{updatedNutrition.fat}g</Text>
                       <Text style={styles.nutritionLabel}>fat</Text>
                     </View>
                   </View>
-
-                  {/* Confidence warning */}
-                  {previewNutrition.confidence < 0.7 && (
-                    <View style={styles.warningContainer}>
-                      <MaterialIcons name="warning" size={16} color={colors.warning} />
-                      <Text style={styles.warningText}>
-                        Nutrition estimates may be less accurate for this unit type
-                      </Text>
-                    </View>
-                  )}
                 </View>
               )}
             </ScrollView>
@@ -241,128 +255,126 @@ export const QuantityModal: React.FC<QuantityModalProps> = ({
                 onPress={handleConfirm}
                 variant="primary"
                 style={styles.footerButton}
-                disabled={quantity <= 0}
+                disabled={!isValidQuantity}
               />
             </View>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: colors.white,
   },
-  container: {
+  keyboardView: {
     flex: 1,
-    justifyContent: 'flex-end',
   },
   modal: {
+    flex: 1,
     backgroundColor: colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '85%',
-    paddingTop: spacing.lg,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray100,
   },
-  headerLeft: {
-    flex: 1,
-  },
-  title: {
-    fontSize: fonts.xl,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    fontSize: fonts.base,
-    color: colors.textSecondary,
-  },
   closeButton: {
     padding: spacing.sm,
-    marginRight: -spacing.sm,
-    marginTop: -spacing.sm,
+    marginLeft: -spacing.sm,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: fonts.lg,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  headerSpacer: {
+    width: 40,
   },
   content: {
     flex: 1,
+  },
+  foodSection: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
+    backgroundColor: colors.gray50,
+  },
+  foodName: {
+    fontSize: fonts.xl,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  estimatedWeight: {
+    fontSize: fonts['2xl'],
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: spacing.sm,
+  },
+  nutritionSummary: {
+    fontSize: fonts.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   section: {
-    marginVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   sectionTitle: {
     fontSize: fonts.base,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
-  quickQuantities: {
+  quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  quantityButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+  quickButton: {
+    flex: 1,
+    minWidth: '22%',
+    height: 44,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.gray300,
+    borderWidth: 1.5,
+    borderColor: colors.gray200,
     backgroundColor: colors.white,
-    minWidth: 60,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  quantityButtonActive: {
+  quickButtonActive: {
     borderColor: colors.primary,
     backgroundColor: colors.primary,
   },
-  quantityButtonText: {
+  quickButtonText: {
     fontSize: fonts.base,
+    fontWeight: '600',
     color: colors.textPrimary,
-    fontWeight: '500',
   },
-  quantityButtonTextActive: {
+  quickButtonTextActive: {
     color: colors.white,
   },
-  inputRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'center',
-  },
   quantityInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.gray300,
+    height: 48,
+    borderWidth: 1.5,
+    borderColor: colors.gray200,
     borderRadius: 8,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: fonts.base,
+    fontSize: fonts.lg,
+    textAlign: 'center',
+    fontWeight: '600',
     backgroundColor: colors.white,
-  },
-  unitSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    borderRadius: 8,
-    backgroundColor: colors.gray50,
-  },
-  unitText: {
-    fontSize: fonts.base,
-    color: colors.textPrimary,
   },
   unitGrid: {
     flexDirection: 'row',
@@ -370,15 +382,16 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   unitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.gray300,
+    borderWidth: 1.5,
+    borderColor: colors.gray200,
     backgroundColor: colors.white,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+    minWidth: '48%',
+    justifyContent: 'center',
   },
   unitButtonActive: {
     borderColor: colors.primary,
@@ -386,9 +399,11 @@ const styles = StyleSheet.create({
   },
   unitButtonRecommended: {
     borderColor: colors.success,
+    backgroundColor: colors.green50,
   },
   unitButtonText: {
     fontSize: fonts.sm,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   unitButtonTextActive: {
@@ -397,52 +412,43 @@ const styles = StyleSheet.create({
   unitStar: {
     marginRight: spacing.xs,
   },
-  nutritionPreview: {
+  nutritionGrid: {
     flexDirection: 'row',
-    backgroundColor: colors.gray50,
+    backgroundColor: colors.white,
     borderRadius: 12,
-    padding: spacing.md,
-    gap: spacing.md,
+    padding: spacing.sm,
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.gray100,
   },
   nutritionItem: {
     flex: 1,
     alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  nutritionIcon: {
+    fontSize: 18,
+    marginBottom: spacing.xs,
   },
   nutritionValue: {
-    fontSize: fonts.lg,
+    fontSize: fonts.sm,
     fontWeight: 'bold',
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   nutritionLabel: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
     fontWeight: '500',
-    textAlign: 'center',
-  },
-  warningContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-    padding: spacing.sm,
-    backgroundColor: colors.yellow50,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.yellow200,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: fonts.sm,
-    color: colors.warning,
   },
   footer: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.gray100,
+    backgroundColor: colors.white,
   },
   footerButton: {
     flex: 1,

@@ -1,6 +1,7 @@
 export type Gender = 'male' | 'female';
 export type ActivityLevel = 'sedentary' | 'lightly-active' | 'moderately-active' | 'very-active' | 'extra-active';
 export type Goal = 'lose' | 'maintain' | 'gain';
+export type SubscriptionTier = 'FREE' | 'PRO' | 'ELITE';
 
 export interface UserProfile {
   id: string;
@@ -13,6 +14,12 @@ export interface UserProfile {
   goal: Goal;
   bmr?: number; // calculated
   dailyCalorieGoal?: number; // calculated
+  subscriptionTier?: SubscriptionTier;
+  subscriptionStatus?: 'active' | 'expired' | 'cancelled';
+  subscriptionStartDate?: Date | string;
+  subscriptionEndDate?: Date | string;
+  recordingsUsedThisMonth?: number;
+  monthlyResetDate?: Date | string;
   createdAt: Date | string; // Date when created, string when retrieved from storage
   updatedAt: Date | string; // Date when created, string when retrieved from storage
 }
@@ -60,9 +67,11 @@ export interface ParsedFoodItem {
   unit?: string; // The unit (pieces, grams, cups, etc.)
   cookingMethod?: string; // The cooking method (grilled, fried, baked, etc.)
   needsQuantity?: boolean; // Flag to indicate if quantity clarification is needed
-  suggestedQuantity?: string; // Suggested quantity options
+  suggestedQuantity?: string[]; // Array of suggested quantity options
   needsCookingMethod?: boolean; // Flag to indicate if cooking method clarification is needed
   suggestedCookingMethods?: string[]; // Array of suggested cooking methods
+  isNutritionComplete?: boolean; // Flag to indicate if nutrition calculation is complete
+  nutritionNotes?: string; // Additional notes about nutrition calculation
 }
 
 export interface LoggedFood {
@@ -98,6 +107,8 @@ export interface VoiceRecording {
 export type RootStackParamList = {
   Onboarding: undefined;
   Main: undefined;
+  ProfileEdit: undefined;
+  Notifications: undefined;
 };
 
 export type TabParamList = {
@@ -117,6 +128,7 @@ export interface ButtonProps {
   loading?: boolean;
   icon?: React.ReactNode;
   style?: any;
+  accessibilityLabel?: string;
 }
 
 export interface CardProps {
@@ -208,4 +220,120 @@ export const NUTRITION_CONSTANTS = {
     FIBER: 25, // grams
     SODIUM: 2300 // mg
   }
-}; 
+};
+
+// Error types
+export type VoiceErrorType = 
+  | 'RECORDING_PERMISSION_DENIED'
+  | 'RECORDING_FAILED'
+  | 'TRANSCRIPTION_FAILED'
+  | 'PARSING_FAILED'
+  | 'NETWORK_ERROR'
+  | 'API_KEY_INVALID'
+  | 'RATE_LIMIT_EXCEEDED'
+  | 'AUDIO_FILE_TOO_LARGE'
+  | 'NO_SPEECH_DETECTED'
+  | 'NO_FOOD_DETECTED'
+  | 'UNKNOWN_ERROR';
+
+export interface VoiceError {
+  type: VoiceErrorType;
+  message: string;
+  details?: string;
+  retry?: boolean;
+}
+
+export interface ProcessingState {
+  isProcessing: boolean;
+  stage: 'idle' | 'transcribing' | 'parsing' | 'reviewing';
+  progress?: number;
+  statusMessage?: string;
+}
+
+// Voice processing constants
+export const VOICE_PROCESSING_CONSTANTS = {
+  MAX_RECORDING_DURATION: 300, // 5 minutes in seconds
+  MIN_RECORDING_DURATION: 1, // 1 second
+  MAX_RETRY_ATTEMPTS: 3,
+  RETRY_DELAY: 1000, // 1 second
+  DEFAULT_SERVING_SIZE: 100,
+  DEFAULT_SERVING_UNIT: 'g',
+  COOKING_METHOD_MULTIPLIERS: {
+    'Raw': 1.0,
+    'Boiled': 1.0,
+    'Steamed': 1.0,
+    'Grilled': 1.1,
+    'Baked': 1.05,
+    'Roasted': 1.1,
+    'Sautéed': 1.2,
+    'Stir-fried': 1.25,
+    'Fried': 1.4,
+    'Deep Fried': 1.8,
+    'Braised': 1.15,
+  } as const,
+} as const;
+
+// Subscription-related interfaces and constants
+export interface SubscriptionPlan {
+  tier: SubscriptionTier;
+  name: string;
+  monthlyPrice: number;
+  currency: string;
+  monthlyRecordingLimit: number | null; // null means unlimited
+  features: string[];
+  popular?: boolean;
+}
+
+export interface UsageStats {
+  recordingsUsed: number;
+  recordingsRemaining: number | null; // null means unlimited
+  monthlyLimit: number | null; // null means unlimited
+  resetDate: Date | string;
+  usagePercentage: number; // 0-100
+}
+
+export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+  {
+    tier: 'FREE',
+    name: 'Free',
+    monthlyPrice: 0,
+    currency: 'EGP',
+    monthlyRecordingLimit: 30,
+    features: [
+      '30 voice recordings per month',
+      'Basic food database',
+      'Calorie tracking',
+      'Basic nutrition insights'
+    ]
+  },
+  {
+    tier: 'PRO',
+    name: 'Pro',
+    monthlyPrice: 99,
+    currency: 'EGP',
+    monthlyRecordingLimit: 300,
+    features: [
+      '300 voice recordings per month',
+      'Extended food database',
+      'Advanced nutrition insights',
+      'Detailed progress tracking',
+      'Priority support'
+    ],
+    popular: true
+  },
+  {
+    tier: 'ELITE',
+    name: 'Elite',
+    monthlyPrice: 149,
+    currency: 'EGP',
+    monthlyRecordingLimit: null,
+    features: [
+      'Unlimited voice recordings',
+      'Complete food database',
+      'Premium nutrition insights',
+      'Advanced analytics',
+      'Personal nutrition consultant',
+      'Priority support'
+    ]
+  }
+]; 

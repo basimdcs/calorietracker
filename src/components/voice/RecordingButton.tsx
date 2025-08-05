@@ -13,6 +13,7 @@ interface RecordingButtonProps {
   isRecording: boolean;
   isProcessing: boolean;
   recordingTime: number;
+  remainingTime?: number;
   onStartRecording: () => void;
   onStopRecording: () => void;
   disabled?: boolean;
@@ -22,6 +23,7 @@ export const RecordingButton: React.FC<RecordingButtonProps> = ({
   isRecording,
   isProcessing,
   recordingTime,
+  remainingTime,
   onStartRecording,
   onStopRecording,
   disabled = false,
@@ -55,6 +57,7 @@ export const RecordingButton: React.FC<RecordingButtonProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+
   return (
     <View style={styles.container}>
       <Animated.View
@@ -63,6 +66,7 @@ export const RecordingButton: React.FC<RecordingButtonProps> = ({
           { transform: [{ scale: pulseAnimation }] }
         ]}
       >
+        
         <TouchableOpacity
           style={[
             styles.recordButton,
@@ -97,36 +101,25 @@ export const RecordingButton: React.FC<RecordingButtonProps> = ({
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Recording Info */}
-      {isRecording && (
-        <View style={styles.recordingInfo}>
-          <View style={styles.recordingIndicator}>
-            <View style={styles.recordingDot} />
-            <Text style={styles.recordingText}>Recording</Text>
+      {/* Status and Timer Display */}
+      <View style={styles.statusContainer}>
+        {isRecording && (
+          <View style={styles.timerContainer}>
+            <Text style={styles.recordingTimeText}>
+              {formatTime(recordingTime)}
+            </Text>
+            <Text style={styles.limitText}>
+              20 sec limit
+            </Text>
           </View>
-          <Text style={styles.recordingTime}>{formatTime(recordingTime)}</Text>
-        </View>
-      )}
-
-      {/* Processing Info */}
-      {isProcessing && (
-        <View style={styles.processingInfo}>
-          <MaterialIcons name="hourglass-empty" size={20} color={colors.primary} />
-          <Text style={styles.processingText}>Processing audio...</Text>
-        </View>
-      )}
-
-      {/* Instructions */}
-      {!isRecording && !isProcessing && (
-        <View style={styles.instructions}>
-          <Text style={styles.instructionText}>
-            Tap to record your meal description
-          </Text>
-          <Text style={styles.instructionSubtext}>
-            Speak naturally about what you ate
-          </Text>
-        </View>
-      )}
+        )}
+        {isProcessing && (
+          <Text style={styles.statusText}>Processing...</Text>
+        )}
+        {!isRecording && !isProcessing && (
+          <Text style={styles.statusText}>Tap to record</Text>
+        )}
+      </View>
     </View>
   );
 };
@@ -141,6 +134,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
+    position: 'relative',
+  },
+  statusContainer: {
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  timerContainer: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  recordingTimeText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.primary,
+    fontFamily: 'monospace',
+  },
+  limitText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  statusText: {
+    fontSize: 16,
+    color: colors.textSecondary,
   },
   recordButton: {
     width: 120,
@@ -162,65 +179,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gray300,
     shadowOpacity: 0.1,
     elevation: 2,
-  },
-  recordingInfo: {
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  recordingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  recordingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.error,
-    opacity: 0.8,
-  },
-  recordingText: {
-    fontSize: fonts.base,
-    color: colors.textPrimary,
-    fontWeight: '600',
-  },
-  recordingTime: {
-    fontSize: fonts.xl,
-    color: colors.primary,
-    fontWeight: 'bold',
-    fontVariant: ['tabular-nums'], // Monospace numbers
-  },
-  processingInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.blue50,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.blue200,
-  },
-  processingText: {
-    fontSize: fonts.base,
-    color: colors.primary,
-    fontWeight: '500',
-  },
-  instructions: {
-    alignItems: 'center',
-    maxWidth: 280,
-  },
-  instructionText: {
-    fontSize: fonts.base,
-    color: colors.textPrimary,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  instructionSubtext: {
-    fontSize: fonts.sm,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
   },
 });

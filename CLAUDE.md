@@ -83,8 +83,59 @@ src/
 - Food logs organized by date (YYYY-MM-DD format)
 
 ### Environment Variables
-- `EXPO_PUBLIC_OPENAI_API_KEY` - Required for OpenAI service integration
-- Environment variables should be stored in `.env` file (not committed)
+
+#### Correct .env Configuration
+The project uses a robust multi-source fallback system for environment variables. For proper functionality across development and production builds, configure your `.env` file as follows:
+
+```env
+# Both variables should contain the same API key value
+EXPO_PUBLIC_OPENAI_API_KEY=your-openai-api-key-here
+OPENAI_API_KEY=your-openai-api-key-here
+```
+
+**Important**: 
+- Both variables must contain identical values
+- The `.env` file should never be committed to version control
+- Add `.env` to your `.gitignore` file
+
+#### How Environment Variable Loading Works
+
+The app uses a sophisticated fallback system in `src/config/env.ts`:
+
+1. **Development Environment**: Loads `process.env.OPENAI_API_KEY` directly from `.env` file
+2. **iOS Production Builds**: Falls back to `Constants.expoConfig?.extra?.OPENAI_API_KEY` via `app.config.js`
+3. **Legacy Compatibility**: Additional fallbacks to manifest sources for older Expo versions
+
+#### Configuration Files
+
+**app.config.js** passes environment variables to builds:
+```javascript
+extra: {
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  // ... other config
+}
+```
+
+**eas.json** uses basic production configuration - no explicit environment variables needed:
+```json
+"production": {
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
+```
+
+#### Troubleshooting Environment Variables
+
+- Use the "🔧 Test Environment" button in the Voice screen to debug variable loading
+- Check console logs for detailed environment variable debugging information
+- Ensure `.env` file is in the project root directory
+- Verify both `OPENAI_API_KEY` and `EXPO_PUBLIC_OPENAI_API_KEY` are present with identical values
+
+#### Do NOT:
+- Use only `EXPO_PUBLIC_` prefixed variables for sensitive API keys (they're visible in compiled apps)
+- Modify the existing fallback system in `src/config/env.ts` without thorough testing
+- Remove either variable from `.env` - both are needed for cross-environment compatibility
 
 ### Code Conventions
 - TypeScript strict mode enabled
@@ -92,6 +143,33 @@ src/
 - Zustand stores follow consistent patterns with actions and selectors
 - UI components implement prop interfaces from types
 - Consistent file naming: PascalCase for components, camelCase for utilities
+
+### Critical Development Rules
+
+#### Native Module Safety
+- **NEVER** import native modules at the top level of components
+- Always use dynamic imports: `await import('expo-audio')`
+- Implement proper lazy loading to prevent crashes on component mount
+- Check Platform.OS before using platform-specific APIs
+
+#### Hook Usage Rules (CRITICAL)
+- React hooks can ONLY be called at the top level of components
+- **NEVER** call hooks inside callbacks, conditions, or loops
+- If you need dynamic behavior, use useRef and state management instead
+- When refactoring from hooks to non-hook patterns, ensure no hook violations remain
+
+#### Expo Audio v14 Specific Patterns
+- **No Direct Constructors**: Never use `new Recording()` or `new AudioRecorder()`
+- **Hook-Only API**: Use `useAudioRecorder()` and `useAudioRecorderState()`
+- **Component-Level Hooks**: Hooks must be called at component top level
+- **Built-in State**: Use `recorderState.isRecording`, `recorderState.currentTime`
+- **Automatic Cleanup**: Hooks handle cleanup automatically
+
+#### Error Handling Requirements
+- Every external API call must be wrapped in try-catch
+- Provide meaningful error messages that help diagnose issues
+- Never suppress errors - always log them with context
+- Implement graceful fallbacks when native features fail
 
 ### Common Development Patterns
 

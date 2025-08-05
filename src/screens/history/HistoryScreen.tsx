@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -13,26 +14,21 @@ import { colors, fonts, spacing } from '../../constants/theme';
 import { useFoodStore } from '../../stores/foodStore';
 import { DailyLog, LoggedFood } from '../../types';
 import { Card } from '../../components/ui/Card';
+import { DailyView, WeeklyView, MonthlyView } from '../../components/ui';
 
 type ViewMode = 'daily' | 'weekly' | 'monthly';
 
-interface DayData {
-  date: Date;
-  day: string;
-  calories: number;
-  items: number;
-}
-
-interface MonthData {
-  date: Date;
-  calories: number;
-  items: number;
-}
 
 const HistoryScreen: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('weekly');
-  const { dailyLogs } = useFoodStore();
+  const [viewMode, setViewMode] = useState<ViewMode>('daily');
+  const { dailyLogs, debugStoreState, removeLoggedFood } = useFoodStore();
+
+  // Debug logs
+  React.useEffect(() => {
+    console.log('📊 History Screen - Daily Logs:', dailyLogs);
+    console.log('📊 History Screen - Daily Logs Count:', dailyLogs.length);
+  }, [dailyLogs]);
 
   // Group food items by date
   const groupedByDate = dailyLogs.reduce((acc, log) => {
@@ -43,69 +39,8 @@ const HistoryScreen: React.FC = () => {
   // Get data for selected date
   const selectedDateKey = selectedDate.toISOString().split('T')[0];
   const selectedDateLog = groupedByDate[selectedDateKey];
-  const selectedDateCalories = selectedDateLog?.totalNutrition.calories || 0;
-  const selectedDateItems = selectedDateLog?.foods.length || 0;
 
-  // Generate weekly data
-  const getWeeklyData = (): DayData[] => {
-    const weekData: DayData[] = [];
-    const today = new Date();
 
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateKey = date.toISOString().split('T')[0];
-      const dayLog = groupedByDate[dateKey];
-      const calories = dayLog?.totalNutrition.calories || 0;
-      const items = dayLog?.foods.length || 0;
-
-      weekData.push({
-        date: date,
-        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        calories: calories,
-        items: items,
-      });
-    }
-
-    return weekData;
-  };
-
-  // Generate monthly data
-  const getMonthlyData = (): MonthData[] => {
-    const monthData: MonthData[] = [];
-    const today = new Date();
-
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateKey = date.toISOString().split('T')[0];
-      const dayLog = groupedByDate[dateKey];
-      const calories = dayLog?.totalNutrition.calories || 0;
-      const items = dayLog?.foods.length || 0;
-
-      monthData.push({
-        date: date,
-        calories: calories,
-        items: items,
-      });
-    }
-
-    return monthData;
-  };
-
-  const weeklyData = getWeeklyData();
-  const monthlyData = getMonthlyData();
-  const weeklyAverage = Math.round(weeklyData.reduce((sum, day) => sum + day.calories, 0) / 7);
-  const monthlyAverage = Math.round(monthlyData.reduce((sum, day) => sum + day.calories, 0) / 30);
-
-  const getMealIcon = (index: number): string => {
-    switch (index) {
-      case 0: return '🥞';
-      case 1: return '🥗';
-      case 2: return '🍖';
-      default: return '🍽️';
-    }
-  };
 
   const getMarkedDates = () => {
     const marked: any = {};
@@ -206,148 +141,27 @@ const HistoryScreen: React.FC = () => {
     </Card>
   );
 
-  const renderDailyView = () => (
-    <Card style={styles.dailyCard}>
-      <View style={styles.cardHeader}>
-        <MaterialIcons name="today" size={24} color={colors.secondary} />
-        <Text style={styles.cardTitle}>
-          {selectedDate.toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </Text>
-      </View>
-      <View style={styles.cardContent}>
-        <View style={styles.dailySummary}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{Math.round(selectedDateCalories)}</Text>
-            <Text style={styles.summaryLabel}>Calories</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{selectedDateItems}</Text>
-            <Text style={styles.summaryLabel}>Food Items</Text>
-          </View>
-        </View>
-
-        {selectedDateLog && selectedDateLog.foods.length > 0 ? (
-          <View style={styles.foodList}>
-            <Text style={styles.sectionTitle}>Food Items</Text>
-            {selectedDateLog.foods.map((food, index) => (
-              <View key={food.id} style={styles.foodItem}>
-                <View style={styles.foodInfo}>
-                  <Text style={styles.foodIcon}>{getMealIcon(index)}</Text>
-                  <View style={styles.foodDetails}>
-                    <Text style={styles.foodName} numberOfLines={1}>
-                      {food.foodItem.name}
-                    </Text>
-                    <Text style={styles.foodQuantity}>
-                      {food.quantity} servings
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.foodCalories}>
-                  {Math.round(food.nutrition.calories)} cal
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🍽️</Text>
-            <Text style={styles.emptyText}>No food logged on this date</Text>
-          </View>
-        )}
-      </View>
-    </Card>
-  );
-
-  const renderWeeklyView = () => (
-    <Card style={styles.weeklyCard}>
-      <View style={styles.cardHeader}>
-        <MaterialIcons name="view-week" size={24} color={colors.accent} />
-        <Text style={styles.cardTitle}>Weekly Overview</Text>
-        <Text style={styles.averageText}>Avg: {weeklyAverage} cal/day</Text>
-      </View>
-      <View style={styles.cardContent}>
-        <View style={styles.weekChart}>
-          {weeklyData.map((day, index) => (
-            <View key={index} style={styles.dayColumn}>
-              <Text style={styles.dayLabel}>{day.day}</Text>
-              <View style={styles.dayBar}>
-                <View
-                  style={[
-                    styles.dayBarFill,
-                    {
-                      height: `${Math.min((day.calories / 2000) * 100, 100)}%`,
-                      backgroundColor: day.calories > 0 ? colors.primary : colors.gray300,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={styles.dayCalories}>{Math.round(day.calories)}</Text>
-              <Text style={styles.dayItems}>{day.items} items</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    </Card>
-  );
-
-  const renderMonthlyView = () => (
-    <Card style={styles.monthlyCard}>
-      <View style={styles.cardHeader}>
-        <MaterialIcons name="calendar-view-month" size={24} color={colors.warning} />
-        <Text style={styles.cardTitle}>Monthly Overview</Text>
-        <Text style={styles.averageText}>Avg: {monthlyAverage} cal/day</Text>
-      </View>
-      <View style={styles.cardContent}>
-        <View style={styles.monthGrid}>
-          {monthlyData.map((day, index) => (
-            <View key={index} style={styles.monthDay}>
-              <View
-                style={[
-                  styles.monthDayDot,
-                  {
-                    backgroundColor: day.calories > 0 ? colors.primary : colors.gray300,
-                    opacity: day.calories > 0 ? Math.min(day.calories / 2000, 1) : 0.3,
-                  },
-                ]}
-              />
-            </View>
-          ))}
-        </View>
-        <View style={styles.monthLegend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.gray300 }]} />
-            <Text style={styles.legendText}>No data</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-            <Text style={styles.legendText}>Low calories</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.primary, opacity: 1 }]} />
-            <Text style={styles.legendText}>High calories</Text>
-          </View>
-        </View>
-      </View>
-    </Card>
-  );
-
-  const getDayIcon = (day: string): string => {
-    switch (day.toLowerCase()) {
-      case 'mon': return '🌅';
-      case 'tue': return '🌤️';
-      case 'wed': return '☀️';
-      case 'thu': return '🌤️';
-      case 'fri': return '🌅';
-      case 'sat': return '🎉';
-      case 'sun': return '😴';
-      default: return '📅';
+  const renderContent = () => {
+    switch (viewMode) {
+      case 'weekly':
+        return <WeeklyView dailyLogs={dailyLogs} />;
+      case 'monthly':
+        return <MonthlyView dailyLogs={dailyLogs} />;
+      case 'daily':
+      default:
+        return (
+          <DailyView
+            dailyLog={selectedDateLog}
+            date={selectedDateKey}
+            title="Calories Consumed"
+            showDateHeader={true}
+            onRemoveFood={removeLoggedFood}
+          />
+        );
     }
   };
+
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -371,9 +185,7 @@ const HistoryScreen: React.FC = () => {
             {renderViewModeSelector()}
             
             {viewMode === 'daily' && renderCalendar()}
-            {viewMode === 'daily' && renderDailyView()}
-            {viewMode === 'weekly' && renderWeeklyView()}
-            {viewMode === 'monthly' && renderMonthlyView()}
+            {renderContent()}
           </View>
         </ScrollView>
       </View>
@@ -498,173 +310,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginLeft: spacing.sm,
     flex: 1,
-  },
-  averageText: {
-    fontSize: fonts.sm,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  cardContent: {
-    padding: spacing.lg,
-  },
-  dailySummary: {
-    flexDirection: 'row',
-    marginBottom: spacing.lg,
-  },
-  summaryItem: {
-    flex: 1,
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.gray100,
-    borderRadius: 12,
-    marginHorizontal: spacing.xs,
-  },
-  summaryValue: {
-    fontSize: fonts['2xl'],
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  summaryLabel: {
-    fontSize: fonts.sm,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  foodList: {
-    gap: spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: fonts.lg,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
-  },
-  foodItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.md,
-    backgroundColor: colors.gray100,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-  },
-  foodInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  foodIcon: {
-    fontSize: 24,
-    marginRight: spacing.sm,
-  },
-  foodDetails: {
-    flex: 1,
-  },
-  foodName: {
-    fontSize: fonts.base,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  foodQuantity: {
-    fontSize: fonts.sm,
-    color: colors.textSecondary,
-  },
-  foodCalories: {
-    fontSize: fonts.base,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: spacing.md,
-  },
-  emptyText: {
-    fontSize: fonts.base,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  weekChart: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 200,
-    paddingHorizontal: spacing.sm,
-  },
-  dayColumn: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  dayLabel: {
-    fontSize: fonts.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-  },
-  dayBar: {
-    width: 20,
-    height: 120,
-    backgroundColor: colors.gray200,
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: spacing.sm,
-  },
-  dayBarFill: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderRadius: 10,
-  },
-  dayCalories: {
-    fontSize: fonts.xs,
-    color: colors.textPrimary,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-  },
-  dayItems: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-  },
-  monthGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  monthDay: {
-    width: 16,
-    height: 16,
-    margin: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  monthDayDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  monthLegend: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: spacing.xs,
-  },
-  legendText: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
   },
 });
 

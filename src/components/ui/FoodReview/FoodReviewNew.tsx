@@ -15,7 +15,8 @@ import { Button } from '../Button';
 import { FoodItemCard } from '../../food/FoodItemCard';
 import { QuantityModal } from '../../food/QuantityModal';
 import { CookingMethodModal } from '../../food/CookingMethodModal';
-import { nutritionService } from '../../../services/nutrition';
+import { EditFoodModal } from '../../food/EditFoodModal';
+
 
 interface FoodReviewNewProps {
   foods: ParsedFoodItem[];
@@ -28,6 +29,19 @@ interface FoodReviewNewProps {
 }
 
 type ModalType = 'none' | 'quantity' | 'cooking' | 'edit';
+
+interface NutritionTotals {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface ValidationResult {
+  totalNutrition: NutritionTotals;
+  hasIssues: boolean;
+  issueCount: number;
+}
 
 export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
   foods,
@@ -42,8 +56,8 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
   const [selectedFoodIndex, setSelectedFoodIndex] = useState<number | null>(null);
 
   // Calculate totals and validation
-  const { totalNutrition, hasIssues, issueCount } = useMemo(() => {
-    const total = {
+  const { totalNutrition, hasIssues, issueCount } = useMemo((): ValidationResult => {
+    const total: NutritionTotals = {
       calories: 0,
       protein: 0,
       carbs: 0,
@@ -53,11 +67,13 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
     let issuesCount = 0;
 
     foods.forEach(food => {
+      // Safely add nutrition values
       total.calories += food.calories || 0;
       total.protein += food.protein || 0;
       total.carbs += food.carbs || 0;
       total.fat += food.fat || 0;
 
+      // Count items that need more details
       if (food.needsQuantity || food.needsCookingMethod) {
         issuesCount++;
       }
@@ -70,20 +86,27 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
     };
   }, [foods]);
 
-  const selectedFood = selectedFoodIndex !== null ? foods[selectedFoodIndex] : null;
+  const selectedFood = useMemo(() => {
+    return selectedFoodIndex !== null && selectedFoodIndex < foods.length 
+      ? foods[selectedFoodIndex] 
+      : null;
+  }, [selectedFoodIndex, foods]);
 
   // Modal handlers
   const handleQuantityModal = useCallback((index: number) => {
+    console.log('Opening quantity modal for index:', index);
     setSelectedFoodIndex(index);
     setActiveModal('quantity');
   }, []);
 
   const handleCookingModal = useCallback((index: number) => {
+    console.log('Opening cooking modal for index:', index);
     setSelectedFoodIndex(index);
     setActiveModal('cooking');
   }, []);
 
   const handleEditModal = useCallback((index: number) => {
+    console.log('Opening edit modal for index:', index);
     setSelectedFoodIndex(index);
     setActiveModal('edit');
   }, []);
@@ -94,161 +117,189 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
   }, []);
 
   // Update handlers
-  const handleQuantityUpdate = useCallback((quantity: number, unit: string) => {
-    if (selectedFoodIndex === null || !selectedFood) return;
+  const handleQuantityUpdate = useCallback((quantity: number, unit: string, updatedNutrition: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  }) => {
+    if (selectedFoodIndex === null || !selectedFood) {
+      console.warn('No food selected for quantity update');
+      return;
+    }
 
-    // Calculate new nutrition values using the nutrition service
-    const updatedNutrition = nutritionService.calculateNutrition({
-      foodName: selectedFood.name,
-      baseNutrition: {
-        calories: selectedFood.calories / (selectedFood.quantity || 1),
-        protein: selectedFood.protein / (selectedFood.quantity || 1),
-        carbs: selectedFood.carbs / (selectedFood.quantity || 1),
-        fat: selectedFood.fat / (selectedFood.quantity || 1),
-      },
-      quantity,
-      unit,
-      cookingMethod: selectedFood.cookingMethod,
-    });
+    try {
+      const updatedFood: ParsedFoodItem = {
+        ...selectedFood,
+        quantity,
+        unit,
+        calories: updatedNutrition.calories,
+        protein: updatedNutrition.protein,
+        carbs: updatedNutrition.carbs,
+        fat: updatedNutrition.fat,
+        needsQuantity: false,
+      };
 
-    const updatedFood: ParsedFoodItem = {
-      ...selectedFood,
-      quantity,
-      unit,
-      calories: updatedNutrition.calories,
-      protein: updatedNutrition.protein,
-      carbs: updatedNutrition.carbs,
-      fat: updatedNutrition.fat,
-      confidence: updatedNutrition.confidence,
-      needsQuantity: false,
-    };
-
-    onUpdateFood(selectedFoodIndex, updatedFood);
-    closeModal();
+      onUpdateFood(selectedFoodIndex, updatedFood);
+      closeModal();
+    } catch (error) {
+      console.error('Failed to update food quantity:', error);
+    }
   }, [selectedFoodIndex, selectedFood, onUpdateFood, closeModal]);
 
   const handleCookingUpdate = useCallback((cookingMethod: string) => {
-    if (selectedFoodIndex === null || !selectedFood) return;
+    if (selectedFoodIndex === null || !selectedFood) {
+      console.warn('No food selected for cooking method update');
+      return;
+    }
 
-    // Calculate new nutrition with cooking method
-    const updatedNutrition = nutritionService.calculateNutrition({
-      foodName: selectedFood.name,
-      baseNutrition: {
-        calories: selectedFood.calories,
-        protein: selectedFood.protein,
-        carbs: selectedFood.carbs,
-        fat: selectedFood.fat,
-      },
-      quantity: selectedFood.quantity || 1,
-      unit: selectedFood.unit || 'pieces',
-      cookingMethod,
-    });
+    try {
+      // Calculate cooking method impact on calories
+      const multiplier = {
+        'Raw': 1.0,
+        'Boiled': 1.0,
+        'Steamed': 1.0,
+        'Grilled': 1.1,
+        'Baked': 1.05,
+        'Roasted': 1.1,
+        'Sautéed': 1.2,
+        'Stir-fried': 1.25,
+        'Fried': 1.4,
+        'Deep Fried': 1.8,
+        'Braised': 1.15,
+      }[cookingMethod] || 1.0;
 
-    const updatedFood: ParsedFoodItem = {
-      ...selectedFood,
-      cookingMethod,
-      calories: updatedNutrition.calories,
-      protein: updatedNutrition.protein,
-      carbs: updatedNutrition.carbs,
-      fat: updatedNutrition.fat,
-      confidence: updatedNutrition.confidence,
-      needsCookingMethod: false,
-    };
+      const updatedFood: ParsedFoodItem = {
+        ...selectedFood,
+        cookingMethod,
+        calories: Math.round(selectedFood.calories * multiplier),
+        protein: Math.round((selectedFood.protein * multiplier) * 10) / 10,
+        carbs: Math.round((selectedFood.carbs * multiplier) * 10) / 10,
+        fat: Math.round((selectedFood.fat * multiplier) * 10) / 10,
+        needsCookingMethod: false,
+      };
 
-    onUpdateFood(selectedFoodIndex, updatedFood);
-    closeModal();
+      onUpdateFood(selectedFoodIndex, updatedFood);
+      closeModal();
+    } catch (error) {
+      console.error('Failed to update cooking method:', error);
+    }
   }, [selectedFoodIndex, selectedFood, onUpdateFood, closeModal]);
 
-  const getConfirmButtonText = () => {
-    if (hasIssues) {
-      return `Fix ${issueCount} issue${issueCount > 1 ? 's' : ''} first`;
+  const handleEditUpdate = useCallback((updatedFood: ParsedFoodItem) => {
+    if (selectedFoodIndex === null) {
+      console.warn('No food selected for edit update');
+      return;
     }
-    return `Log ${foods.length} item${foods.length > 1 ? 's' : ''}`;
-  };
+
+    try {
+      onUpdateFood(selectedFoodIndex, updatedFood);
+      closeModal();
+    } catch (error) {
+      console.error('Failed to update food:', error);
+    }
+  }, [selectedFoodIndex, onUpdateFood, closeModal]);
+
+  const getConfirmButtonText = useCallback(() => {
+    if (hasIssues) {
+      return `Fix ${issueCount} issue${issueCount !== 1 ? 's' : ''} first`;
+    }
+    return `Log ${foods.length} item${foods.length !== 1 ? 's' : ''}`;
+  }, [hasIssues, issueCount, foods.length]);
+
+  const formatNutritionValue = useCallback((value: number, unit: string = '') => {
+    return `${Math.round(value * 10) / 10}${unit}`;
+  }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <ScreenHeader
-        title="Review Your Meal 🍽️"
-        subtitle={`${foods.length} food items detected`}
-        rightIcon="close"
-        onRightPress={onCancel}
-      />
+    <>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <ScreenHeader
+          title="Review Your Meal 🍽️"
+          subtitle={`${foods.length} food items detected`}
+          rightIcon="close"
+          onRightPress={onCancel}
+        />
 
-      {/* Summary Stats */}
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{Math.round(totalNutrition.calories)}</Text>
-            <Text style={styles.summaryLabel}>calories</Text>
+        {/* Summary Stats */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>
+                {formatNutritionValue(totalNutrition.calories)}
+              </Text>
+              <Text style={styles.summaryLabel}>calories</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>
+                {formatNutritionValue(totalNutrition.protein, 'g')}
+              </Text>
+              <Text style={styles.summaryLabel}>protein</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>
+                {formatNutritionValue(totalNutrition.carbs, 'g')}
+              </Text>
+              <Text style={styles.summaryLabel}>carbs</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>
+                {formatNutritionValue(totalNutrition.fat, 'g')}
+              </Text>
+              <Text style={styles.summaryLabel}>fat</Text>
+            </View>
           </View>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{Math.round(totalNutrition.protein)}g</Text>
-            <Text style={styles.summaryLabel}>protein</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{Math.round(totalNutrition.carbs)}g</Text>
-            <Text style={styles.summaryLabel}>carbs</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{Math.round(totalNutrition.fat)}g</Text>
-            <Text style={styles.summaryLabel}>fat</Text>
-          </View>
+
+          {hasIssues && (
+            <View style={styles.issuesWarning}>
+              <MaterialIcons name="warning" size={16} color={colors.warning} />
+              <Text style={styles.issuesText}>
+                {issueCount} item{issueCount > 1 ? 's need' : ' needs'} more details
+              </Text>
+            </View>
+          )}
         </View>
 
-        {hasIssues && (
-          <View style={styles.issuesWarning}>
-            <MaterialIcons name="warning" size={16} color={colors.warning} />
-            <Text style={styles.issuesText}>
-              {issueCount} item{issueCount > 1 ? 's need' : ' needs'} more details
-            </Text>
+        {/* Food Items List */}
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <View style={styles.foodList}>
+            {foods.map((food, index) => (
+              <FoodItemCard
+                key={index}
+                food={food}
+                index={index}
+                onEdit={handleEditModal}
+                onRemove={onRemoveFood}
+                onQuickQuantity={handleQuantityModal}
+                onQuickCooking={handleCookingModal}
+              />
+            ))}
+
           </View>
-        )}
-      </View>
+        </ScrollView>
 
-      {/* Food Items List */}
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.foodList}>
-          {foods.map((food, index) => (
-            <FoodItemCard
-              key={index}
-              food={food}
-              index={index}
-              onEdit={handleEditModal}
-              onRemove={onRemoveFood}
-              onQuickQuantity={handleQuantityModal}
-              onQuickCooking={handleCookingModal}
-            />
-          ))}
-
-          {/* Add More Button */}
-          <TouchableOpacity style={styles.addButton} onPress={onAddFood}>
-            <MaterialIcons name="add" size={24} color={colors.primary} />
-            <Text style={styles.addButtonText}>Add more food</Text>
-          </TouchableOpacity>
+        {/* Footer Actions */}
+        <View style={styles.footer}>
+          <Button
+            title="Cancel"
+            onPress={onCancel}
+            variant="secondary"
+            style={styles.footerButton}
+          />
+          <Button
+            title={getConfirmButtonText()}
+            onPress={onConfirm}
+            variant="primary"
+            style={[styles.footerButton, styles.confirmButton]}
+            disabled={hasIssues || isLoading}
+            loading={isLoading}
+            accessibilityLabel={hasIssues ? 'Fix issues before logging food' : 'Log all food items'}
+          />
         </View>
-      </ScrollView>
+      </SafeAreaView>
 
-      {/* Footer Actions */}
-      <View style={styles.footer}>
-        <Button
-          title="Cancel"
-          onPress={onCancel}
-          variant="secondary"
-          style={styles.footerButton}
-        />
-        <Button
-          title={getConfirmButtonText()}
-          onPress={onConfirm}
-          variant="primary"
-          style={[styles.footerButton, styles.confirmButton]}
-          disabled={hasIssues || isLoading}
-          loading={isLoading}
-        />
-      </View>
-
-      {/* Modals */}
+      {/* Modals - Rendered outside SafeAreaView for proper z-index */}
       <QuantityModal
         visible={activeModal === 'quantity'}
         food={selectedFood}
@@ -262,7 +313,14 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
         onConfirm={handleCookingUpdate}
         onCancel={closeModal}
       />
-    </SafeAreaView>
+
+      <EditFoodModal
+        visible={activeModal === 'edit'}
+        food={selectedFood}
+        onConfirm={handleEditUpdate}
+        onCancel={closeModal}
+      />
+    </>
   );
 };
 
@@ -323,24 +381,6 @@ const styles = StyleSheet.create({
   foodList: {
     padding: spacing.lg,
     paddingBottom: spacing.xl,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.lg,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    borderStyle: 'dashed',
-    backgroundColor: colors.blue50,
-    marginTop: spacing.md,
-  },
-  addButtonText: {
-    fontSize: fonts.base,
-    color: colors.primary,
-    fontWeight: '500',
   },
   footer: {
     flexDirection: 'row',

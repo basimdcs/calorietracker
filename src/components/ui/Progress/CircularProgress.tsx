@@ -14,15 +14,16 @@ interface CircularProgressProps {
 
 export const CircularProgress: React.FC<CircularProgressProps> = ({
   progress,
-  size = 120,
-  strokeWidth = 8,
+  size = 144,
+  strokeWidth = 12,
   calories,
   goal,
   color = colors.primary,
 }) => {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
+  const radius = 64;
+  const circumference = 2 * Math.PI * radius; // ~402
   const strokeDasharray = circumference;
+  // For 60% progress: show 60% of arc, hide 40%
   const strokeDashoffset = circumference - (progress * circumference);
 
   return (
@@ -30,33 +31,32 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
       <Svg width={size} height={size} style={styles.svg}>
         {/* Background Circle */}
         <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={colors.gray200}
-          strokeWidth={strokeWidth}
-          fill="transparent"
+          cx={72}
+          cy={72}
+          r={64}
+          stroke="rgba(255, 255, 255, 0.3)"
+          strokeWidth={12}
+          fill="none"
         />
         {/* Progress Circle */}
         <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
+          cx={72}
+          cy={72}
+          r={64}
           stroke={color}
-          strokeWidth={strokeWidth}
-          fill="transparent"
+          strokeWidth={12}
+          fill="none"
           strokeDasharray={strokeDasharray}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          transform="rotate(-90 72 72)"
         />
       </Svg>
       
       {/* Center Content */}
       <View style={styles.centerContent}>
         <Text style={styles.caloriesText}>{Math.round(calories)}</Text>
-        <Text style={styles.goalText}>/ {Math.round(goal)} cal</Text>
-        <Text style={styles.percentageText}>{Math.round(progress * 100)}%</Text>
+        <Text style={styles.unitText}>kcal</Text>
       </View>
     </View>
   );
@@ -75,19 +75,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   caloriesText: {
-    fontSize: fonts['2xl'],
+    fontSize: fonts['4xl'],
     fontWeight: 'bold',
-    color: colors.textPrimary,
+    color: 'white',
+    lineHeight: fonts['4xl'] * 1.1,
   },
-  goalText: {
+  unitText: {
     fontSize: fonts.sm,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  percentageText: {
-    fontSize: fonts.xs,
-    color: colors.primary,
-    fontWeight: '600',
-    marginTop: spacing.xs,
+    color: 'white',
+    opacity: 0.8,
+    marginTop: -4,
   },
 }); 

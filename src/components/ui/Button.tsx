@@ -12,6 +12,7 @@ export const Button: React.FC<ButtonProps> = ({
   loading = false,
   icon,
   style,
+  accessibilityLabel,
 }) => {
   const getButtonStyle = () => {
     const baseStyle = {
@@ -96,6 +97,7 @@ export const Button: React.FC<ButtonProps> = ({
       onPress={onPress}
       disabled={isDisabled}
       activeOpacity={0.7}
+      accessibilityLabel={accessibilityLabel}
     >
       {loading ? (
         <ActivityIndicator

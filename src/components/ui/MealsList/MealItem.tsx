@@ -1,9 +1,10 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LoggedFood } from '../../../types';
 import { colors, fonts, spacing } from '../../../constants/theme';
 import { Card } from '../Card';
+import { useFoodStore } from '../../../stores/foodStore';
 
 interface MealItemProps {
   food: LoggedFood;
@@ -16,6 +17,9 @@ export const MealItem: React.FC<MealItemProps> = ({
   onRemove,
   onUpdateQuantity,
 }) => {
+  const { getDisplayQuantity } = useFoodStore();
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [newQuantityInput, setNewQuantityInput] = useState('');
   const handleRemove = () => {
     Alert.alert(
       'Remove Food',
@@ -29,6 +33,33 @@ export const MealItem: React.FC<MealItemProps> = ({
         },
       ]
     );
+  };
+
+  const handleEditQuantity = () => {
+    const displayQty = getDisplayQuantity(food);
+    setNewQuantityInput(displayQty.amount.toString());
+    setEditModalVisible(true);
+  };
+
+  const handleSaveQuantity = () => {
+    const newAmount = parseFloat(newQuantityInput);
+    if (isNaN(newAmount) || newAmount <= 0) {
+      Alert.alert('Invalid Quantity', 'Please enter a valid positive number.');
+      return;
+    }
+
+    // Convert display quantity back to store quantity (serving multiplier)
+    let newQuantityMultiplier;
+    if (food.foodItem.servingSizeUnit === 'g' && food.foodItem.servingSize === 100) {
+      // For gram-based foods, convert grams to quantity multiplier
+      newQuantityMultiplier = newAmount / 100;
+    } else {
+      // For piece-based foods, use the amount directly
+      newQuantityMultiplier = newAmount;
+    }
+
+    onUpdateQuantity(food.id, newQuantityMultiplier);
+    setEditModalVisible(false);
   };
 
   const formatTime = (date: Date | string) => {
@@ -88,9 +119,14 @@ export const MealItem: React.FC<MealItemProps> = ({
           </View>
           
           <View style={styles.detailsRow}>
-            <Text style={styles.quantityText}>
-              {food.quantity} {food.foodItem.servingSizeUnit || 'serving'}
-            </Text>
+            <TouchableOpacity onPress={handleEditQuantity}>
+              <Text style={[styles.quantityText, styles.editableQuantity]}>
+                {(() => {
+                  const displayQty = getDisplayQuantity(food);
+                  return `${displayQty.amount} ${displayQty.unit}`;
+                })()}
+              </Text>
+            </TouchableOpacity>
             <Text style={styles.timeText}>
               {formatTime(food.loggedAt)}
             </Text>
@@ -140,6 +176,52 @@ export const MealItem: React.FC<MealItemProps> = ({
           <Text style={styles.nutritionLabel}>fat</Text>
         </View>
       </View>
+
+      {/* Edit Quantity Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Quantity</Text>
+            <Text style={styles.modalSubtitle}>{food.foodItem.name}</Text>
+            
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.quantityInput}
+                value={newQuantityInput}
+                onChangeText={setNewQuantityInput}
+                placeholder="Enter quantity"
+                keyboardType="numeric"
+                selectTextOnFocus={true}
+                autoFocus={true}
+              />
+              <Text style={styles.unitLabel}>
+                {getDisplayQuantity(food).unit}
+              </Text>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setEditModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleSaveQuantity}
+              >
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Card>
   );
 };
@@ -197,6 +279,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
   },
+  editableQuantity: {
+    backgroundColor: colors.blue50,
+    color: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+  },
   timeText: {
     fontSize: fonts.sm,
     color: colors.textSecondary,
@@ -231,5 +320,87 @@ const styles = StyleSheet.create({
     width: 1,
     height: 20,
     backgroundColor: colors.gray200,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: spacing.xl,
+    width: '80%',
+    maxWidth: 300,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: fonts.lg,
+    fontWeight: '600' as const,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  modalSubtitle: {
+    fontSize: fonts.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  quantityInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: fonts.base,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  unitLabel: {
+    fontSize: fonts.sm,
+    color: colors.textSecondary,
+    fontWeight: '500' as const,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: colors.gray100,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+  },
+  saveButton: {
+    backgroundColor: colors.primary,
+  },
+  cancelButtonText: {
+    fontSize: fonts.sm,
+    fontWeight: '500' as const,
+    color: colors.textSecondary,
+  },
+  saveButtonText: {
+    fontSize: fonts.sm,
+    fontWeight: '500' as const,
+    color: colors.white,
   },
 }); 

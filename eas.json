@@ -15,6 +15,10 @@
       "autoIncrement": true,
       "ios": {
         "distribution": "store"
+      },
+      "environment": "production",
+      "env": {
+        "NODE_ENV": "production"
       }
     }
   },

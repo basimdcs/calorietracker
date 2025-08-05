@@ -24,11 +24,24 @@ interface FoodState {
   // Utility actions
   setCurrentDate: (date: string) => void;
   calculateNutritionForQuantity: (food: FoodItem, quantity: number) => NutritionInfo;
+  
+  // Debug actions
+  debugStoreState: () => void;
+  clearAllData: () => void;
+  updateCurrentDate: () => void;
+  
+  // Display helpers
+  getDisplayQuantity: (food: LoggedFood) => { amount: number; unit: string };
 }
 
 // Helper function to calculate nutrition based on quantity
 const calculateNutritionForQuantity = (food: FoodItem, quantity: number): NutritionInfo => {
   const { nutrition } = food;
+  
+  // The quantity now represents the serving multiplier correctly
+  // For gram-based foods: quantity = actualGrams / 100g (e.g., 100g input = 1.0x multiplier)
+  // For piece-based foods: quantity = number of pieces (e.g., 2 pieces = 2.0x multiplier)
+  
   return {
     calories: Math.round(nutrition.calories * quantity),
     protein: Math.round(nutrition.protein * quantity * 10) / 10,
@@ -98,20 +111,32 @@ export const useFoodStore = create<FoodState>()(
         const { foodItems, dailyLogs, currentDate } = get();
         const food = foodItems.find(item => item.id === foodId);
         
-        if (!food) return;
+        if (!food) {
+          console.error('❌ Food item not found for logging:', foodId);
+          return;
+        }
+
+        console.log('📊 Creating logged food entry for:', {
+          foodId,
+          foodName: food.name,
+          quantity,
+          mealType,
+          currentDate
+        });
 
         const loggedFood: LoggedFood = {
-          id: `${Date.now()}-${Math.random()}`,
+          id: `${Date.now()}-${Math.random().toString().slice(2)}`,
           foodItem: food,
           quantity,
           nutrition: calculateNutritionForQuantity(food, quantity),
-          loggedAt: new Date(),
+          loggedAt: new Date().toISOString(),
           mealType,
         };
 
         const existingLogIndex = dailyLogs.findIndex(log => log.date === currentDate);
         
         if (existingLogIndex >= 0) {
+          console.log('📅 Updating existing daily log for date:', currentDate);
           // Update existing daily log
           const updatedLogs = [...dailyLogs];
           const existingLog = updatedLogs[existingLogIndex];
@@ -123,8 +148,10 @@ export const useFoodStore = create<FoodState>()(
             totalNutrition: sumNutrition(updatedFoods.map(f => f.nutrition)),
           };
           
+          console.log('✅ Updated daily log:', updatedLogs[existingLogIndex]);
           set({ dailyLogs: updatedLogs });
         } else {
+          console.log('📅 Creating new daily log for date:', currentDate);
           // Create new daily log
           const newLog: DailyLog = {
             date: currentDate,
@@ -133,15 +160,18 @@ export const useFoodStore = create<FoodState>()(
             calorieGoal: 2000, // Default, should be updated from user profile
           };
           
+          console.log('✅ Created new daily log:', newLog);
           set({ dailyLogs: [...dailyLogs, newLog] });
         }
       },
 
       removeLoggedFood: (date: string, loggedFoodId: string) => {
-        set((state) => ({
-          dailyLogs: state.dailyLogs.map(log => {
+        console.log('🗑️ Removing logged food:', { date, loggedFoodId });
+        set((state) => {
+          const updatedLogs = state.dailyLogs.map(log => {
             if (log.date === date) {
               const updatedFoods = log.foods.filter(food => food.id !== loggedFoodId);
+              console.log('📊 Updated foods after removal:', updatedFoods);
               return {
                 ...log,
                 foods: updatedFoods,
@@ -149,8 +179,11 @@ export const useFoodStore = create<FoodState>()(
               };
             }
             return log;
-          }),
-        }));
+          });
+          
+          console.log('✅ Food removed successfully');
+          return { dailyLogs: updatedLogs };
+        });
       },
 
       updateLoggedFood: (date: string, loggedFoodId: string, quantity: number) => {
@@ -193,6 +226,85 @@ export const useFoodStore = create<FoodState>()(
       },
 
       calculateNutritionForQuantity,
+      
+      debugStoreState: () => {
+        const state = get();
+        console.log('🔍 Food Store Debug State:');
+        console.log('📅 Current Date:', state.currentDate);
+        console.log('🍎 Food Items Count:', state.foodItems.length);
+        console.log('📊 Daily Logs Count:', state.dailyLogs.length);
+        console.log('📋 Daily Logs:', state.dailyLogs);
+        
+        // Additional debugging info
+        if (state.dailyLogs.length > 0) {
+          const todayLog = state.dailyLogs.find(log => log.date === state.currentDate);
+          if (todayLog) {
+            console.log('📋 Today\'s Log:', todayLog);
+            console.log('🍽️ Today\'s Foods:', todayLog.foods);
+            console.log('📊 Today\'s Total Nutrition:', todayLog.totalNutrition);
+          } else {
+            console.log('❌ No log found for current date:', state.currentDate);
+          }
+        }
+        
+        // Display quantity examples
+        if (state.dailyLogs.length > 0) {
+          const firstLog = state.dailyLogs[0];
+          if (firstLog.foods.length > 0) {
+            const firstFood = firstLog.foods[0];
+            const displayQty = get().getDisplayQuantity(firstFood);
+            console.log('🧮 Display Quantity Example:', {
+              foodName: firstFood.foodItem.name,
+              storedQuantity: firstFood.quantity,
+              servingSize: firstFood.foodItem.servingSize,
+              servingSizeUnit: firstFood.foodItem.servingSizeUnit,
+              displayQuantity: displayQty
+            });
+          }
+        }
+      },
+      
+      clearAllData: () => {
+        console.log('🗑️ Clearing all food store data');
+        set({
+          foodItems: [],
+          dailyLogs: [],
+          currentDate: getTodayString(),
+        });
+        console.log('✅ All data cleared');
+      },
+      
+      // Fix current date if it's wrong
+      updateCurrentDate: () => {
+        const todayString = getTodayString();
+        const currentState = get();
+        if (currentState.currentDate !== todayString) {
+          console.log('📅 Updating current date from', currentState.currentDate, 'to', todayString);
+          set({ currentDate: todayString });
+        }
+      },
+      
+      getDisplayQuantity: (food: LoggedFood) => {
+        const { foodItem, quantity } = food;
+        
+        if (foodItem.servingSizeUnit === 'g' && foodItem.servingSize === 100) {
+          // This is a gram-based food, convert quantity multiplier back to grams
+          const actualGrams = quantity * 100;
+          return {
+            amount: Math.round(actualGrams * 10) / 10,
+            unit: actualGrams === 1 ? 'g' : 'g'
+          };
+        } else {
+          // This is a piece-based food, quantity is the actual count
+          const unit = quantity === 1 ? 
+            foodItem.servingSizeUnit.replace(/s$/, '') : // Remove plural 's' if quantity is 1
+            foodItem.servingSizeUnit;
+          return {
+            amount: Math.round(quantity * 10) / 10,
+            unit: unit
+          };
+        }
+      },
     }),
     {
       name: 'food-storage',

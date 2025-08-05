@@ -18,25 +18,13 @@ const INSTRUCTION_STEPS: InstructionStep[] = [
   {
     icon: 'mic',
     title: 'Record',
-    description: 'Tap the microphone and describe your meal naturally',
-  },
-  {
-    icon: 'hearing',
-    title: 'Listen',
-    description: 'Review the transcript to ensure accuracy',
+    description: 'Tap and describe your meal (20 sec max)',
   },
   {
     icon: 'restaurant',
     title: 'Confirm',
-    description: 'Review detected foods and adjust quantities if needed',
+    description: 'Review and save detected foods',
   },
-];
-
-const EXAMPLE_PHRASES = [
-  'I had two slices of grilled chicken with rice',
-  'I ate a medium apple and some almonds',
-  'I had a cup of coffee with milk and sugar',
-  'I ate a salad with mixed greens and olive oil',
 ];
 
 interface VoiceInstructionsProps {
@@ -81,44 +69,29 @@ export const VoiceInstructions: React.FC<VoiceInstructionsProps> = ({
         ))}
       </View>
 
-      {showExamples && !compact && (
-        <>
-          <View style={styles.divider} />
-          <View style={styles.examplesSection}>
-            <Text style={styles.examplesTitle}>Example phrases:</Text>
-            {EXAMPLE_PHRASES.map((phrase, index) => (
-              <View key={index} style={styles.exampleItem}>
-                <MaterialIcons 
-                  name="format-quote" 
-                  size={12} 
-                  color={colors.textSecondary} 
-                />
-                <Text style={styles.exampleText}>
-                  "{phrase}"
-                </Text>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
+      {/* Examples section */}
+      <View style={styles.examplesSection}>
+        <Text style={styles.examplesTitle}>📝 Examples:</Text>
+        <Text style={styles.exampleText}>
+          "300 grams of rice and 200 grams of chicken breast"
+        </Text>
+        <Text style={styles.exampleText}>
+          "150 grams of pasta with 100 grams of ground beef"
+        </Text>
+        <Text style={styles.exampleText}>
+          "One large apple and 30 grams of almonds"
+        </Text>
+      </View>
 
-      {/* Tips section */}
+      {/* Tips section - simplified */}
       <View style={styles.tipsSection}>
-        <Text style={styles.tipsTitle}>💡 Tips for best results:</Text>
+        <Text style={styles.tipsTitle}>💡 Tips:</Text>
         <Text style={styles.tipText}>
-          • Speak clearly and at a normal pace
+          • Keep recordings under 20 seconds
         </Text>
         <Text style={styles.tipText}>
-          • Include quantities when possible (e.g., "two slices", "one cup")
+          • Include quantities in grams when possible
         </Text>
-        <Text style={styles.tipText}>
-          • Mention cooking methods (grilled, fried, baked)
-        </Text>
-        {!compact && (
-          <Text style={styles.tipText}>
-            • Record in a quiet environment for better accuracy
-          </Text>
-        )}
       </View>
     </Card>
   );
@@ -191,6 +164,7 @@ const styles = StyleSheet.create({
   },
   examplesSection: {
     gap: spacing.xs,
+    marginBottom: spacing.md,
   },
   examplesTitle: {
     fontSize: fonts.sm,
@@ -198,16 +172,12 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
-  exampleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
   exampleText: {
     fontSize: fonts.sm,
-    color: colors.textSecondary,
+    color: colors.primary,
     fontStyle: 'italic',
-    flex: 1,
+    marginBottom: spacing.xs,
+    paddingLeft: spacing.sm,
   },
   tipsSection: {
     marginTop: spacing.md,

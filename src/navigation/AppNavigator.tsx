@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -7,13 +7,16 @@ import { useUserStore } from '../stores/userStore';
 import { RootStackParamList, TabParamList } from '../types';
 import { colors, fonts } from '../constants/theme';
 import { CustomBottomTab } from '../components/ui/CustomBottomTab';
+import useRevenueCat from '../hooks/useRevenueCat';
 
 // Import screens (we'll create these next)
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import HomeScreen from '../screens/home/HomeScreen';
-import VoiceScreen from '../screens/voice/VoiceScreen';
+import VoiceScreen from '../screens/voice/VoiceScreenProduction';
 import HistoryScreen from '../screens/history/HistoryScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
+import ProfileEditScreen from '../screens/settings/ProfileEditScreen';
+import NotificationsScreen from '../screens/settings/NotificationsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -45,15 +48,15 @@ function MainTabNavigator() {
         options={{
           title: 'Dashboard',
           tabBarLabel: 'Home',
-          headerShown: false, // We'll handle header in individual screens
+          headerShown: false,
         }}
       />
       <Tab.Screen 
         name="Voice" 
         component={VoiceScreen}
         options={{
-          title: 'Voice Food Log',
-          tabBarLabel: 'Voice',
+          title: 'Record Food',
+          tabBarLabel: 'Record',
           headerShown: false,
         }}
       />
@@ -118,6 +121,20 @@ function AuthGate() {
         name="Main" 
         component={MainTabNavigator}
       />
+      <Stack.Screen 
+        name="ProfileEdit" 
+        component={ProfileEditScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="Notifications" 
+        component={NotificationsScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack.Navigator>
   );
 }
@@ -125,7 +142,37 @@ function AuthGate() {
 // Main App Navigator Component
 export default function AppNavigator() {
   const { profile, isOnboardingComplete } = useUserStore();
-  // Use a key that changes when auth state changes
+  const { state: revenueCatState, actions: revenueCatActions } = useRevenueCat();
+  
+  // Initialize RevenueCat when profile is available - using stable dependencies
+  useEffect(() => {
+    console.log('🔍 AppNavigator useEffect triggered:', {
+      hasProfile: !!profile,
+      profileId: profile?.id,
+      isInitialized: revenueCatState.isInitialized,
+      isLoading: revenueCatState.isLoading,
+      error: revenueCatState.error,
+    });
+    
+    // Only initialize if we have a profile and RevenueCat isn't already initialized or loading
+    if (profile && !revenueCatState.isInitialized && !revenueCatState.isLoading) {
+      console.log('🚀 Initializing RevenueCat in AppNavigator...');
+      
+      // Use profile ID for RevenueCat user identification
+      revenueCatActions.initializeRevenueCat(profile.id).catch((error) => {
+        console.error('❌ Failed to initialize RevenueCat:', error);
+        // Don't block app startup if RevenueCat fails
+      });
+    } else {
+      console.log('⏭️ Skipping RevenueCat initialization:', {
+        reason: !profile ? 'No profile' : 
+                revenueCatState.isInitialized ? 'Already initialized' :
+                revenueCatState.isLoading ? 'Currently loading' : 'Unknown'
+      });
+    }
+  }, [profile?.id, revenueCatState.isInitialized, revenueCatState.isLoading]); // Include state dependencies
+  
+  // Use a key that changes when auth state changes to force navigation reset
   const navKey = `${!!profile}-${isOnboardingComplete}`;
 
   return (
