@@ -1,57 +1,57 @@
 export const colors = {
-  // Primary palette
-  primary: '#6366F1', // Indigo
-  primaryLight: '#818CF8',
-  primaryDark: '#4F46E5',
-  
-  // Secondary palette
-  secondary: '#EC4899', // Pink
+  // Brand palette (friendlier violet + mint)
+  primary: '#7C3AED',
+  primaryLight: '#A78BFA',
+  primaryDark: '#6D28D9',
+
+  // Secondary palette (kept for accents when needed)
+  secondary: '#EC4899',
   secondaryLight: '#F472B6',
   secondaryDark: '#DB2777',
-  
-  // Accent colors
-  accent: '#10B981', // Emerald
+
+  // Accent colors (mint)
+  accent: '#22C55E',
   accentLight: '#34D399',
-  accentDark: '#059669',
-  
+  accentDark: '#16A34A',
+
   // Neutral colors
   white: '#FFFFFF',
   black: '#000000',
   gray50: '#F9FAFB',
-  gray100: '#F3F4F6',
-  gray200: '#E5E7EB',
-  gray300: '#D1D5DB',
-  gray400: '#9CA3AF',
-  gray500: '#6B7280',
-  gray600: '#4B5563',
-  gray700: '#374151',
+  gray100: '#F1F5F9',
+  gray200: '#E2E8F0',
+  gray300: '#CBD5E1',
+  gray400: '#94A3B8',
+  gray500: '#64748B',
+  gray600: '#475569',
+  gray700: '#334155',
   gray800: '#1F2937',
-  gray900: '#111827',
-  
+  gray900: '#0F172A',
+
   // Status colors
-  success: '#10B981',
+  success: '#22C55E',
   warning: '#F59E0B',
   error: '#EF4444',
   info: '#3B82F6',
-  
-  // Color variants for components
+
+  // Component variants
   blue50: '#EFF6FF',
   blue200: '#BFDBFE',
   yellow50: '#FFFBEB',
   yellow200: '#FDE68A',
   red50: '#FEF2F2',
   green50: '#F0FDF4',
-  
-  // Background colors
-  background: '#FFFFFF',
-  backgroundSecondary: '#F9FAFB',
+
+  // Backgrounds (softer, less corporate)
+  background: '#FAFAFF',
+  backgroundSecondary: '#F6F7FF',
   surface: '#FFFFFF',
-  surfaceSecondary: '#F3F4F6',
-  
+  surfaceSecondary: '#F3F4FA',
+
   // Text colors
-  textPrimary: '#111827',
-  textSecondary: '#6B7280',
-  textTertiary: '#9CA3AF',
+  textPrimary: '#0F172A',
+  textSecondary: '#475569',
+  textTertiary: '#94A3B8',
   textOnPrimary: '#FFFFFF',
   textOnSecondary: '#FFFFFF',
 };
@@ -60,7 +60,7 @@ export const fonts = {
   // Font families
   primary: 'System',
   secondary: 'System',
-  
+
   // Font sizes
   xs: 12,
   sm: 14,
@@ -72,7 +72,7 @@ export const fonts = {
   '4xl': 36,
   '5xl': 48,
   '6xl': 60,
-  
+
   // Font weights
   light: '300' as const,
   normal: '400' as const,
@@ -121,46 +121,32 @@ export const shadows = {
   },
   md: {
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 4,
   },
   lg: {
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 15,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
     elevation: 8,
   },
   xl: {
     shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.2,
-    shadowRadius: 25,
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
     elevation: 12,
   },
 };
 
-// Component-specific constants
 export const components = {
   button: {
-    height: {
-      small: 32,
-      medium: 40,
-      large: 48,
-    },
-    paddingHorizontal: {
-      small: 12,
-      medium: 16,
-      large: 20,
-    },
+    height: { small: 32, medium: 40, large: 48 },
+    paddingHorizontal: { small: 12, medium: 16, large: 20 },
     borderRadius: borderRadius.md,
   },
   card: {
-    padding: {
-      none: 0,
-      small: spacing.sm,
-      medium: spacing.md,
-      large: spacing.lg,
-    },
+    padding: { none: 0, small: spacing.sm, medium: spacing.md, large: spacing.lg },
     borderRadius: borderRadius.lg,
   },
   input: {
@@ -177,12 +163,4 @@ export const layout = {
   containerMaxWidth: 400,
 };
 
-export default {
-  colors,
-  fonts,
-  spacing,
-  borderRadius,
-  shadows,
-  components,
-  layout,
-}; 
+export default { colors, fonts, spacing, borderRadius, shadows, components, layout }; 

@@ -36,11 +36,28 @@ const getEnvironmentVariable = (keyName: string, defaultValue: string = 'not-con
   return defaultValue;
 };
 
+// Enhanced environment variable getter for RevenueCat keys specifically
+const getRevenueCatKey = (keyName: string): string => {
+  // Try both regular and EXPO_PUBLIC prefixed versions
+  const regularKey = getEnvironmentVariable(keyName, 'not-found');
+  if (regularKey !== 'not-found') {
+    return regularKey;
+  }
+  
+  // Try EXPO_PUBLIC prefixed version
+  const expoPublicKey = getEnvironmentVariable(`EXPO_PUBLIC_${keyName}`, 'not-found');
+  if (expoPublicKey !== 'not-found') {
+    return expoPublicKey;
+  }
+  
+  return 'your-api-key-here';
+};
+
 // Specific accessors for each API key
 const getOpenAIKey = (): string => getEnvironmentVariable('OPENAI_API_KEY', 'your-api-key-here');
 const getGeminiKey = (): string => getEnvironmentVariable('GEMINI_API_KEY', 'your-gemini-api-key-here');
-const getRevenueCatIOSKey = (): string => getEnvironmentVariable('REVENUE_CAT_API_KEY_IOS', 'your-ios-api-key-here');
-const getRevenueCatAndroidKey = (): string => getEnvironmentVariable('REVENUE_CAT_API_KEY_ANDROID', 'your-android-api-key-here');
+const getRevenueCatIOSKey = (): string => getRevenueCatKey('REVENUE_CAT_API_KEY_IOS');
+const getRevenueCatAndroidKey = (): string => getRevenueCatKey('REVENUE_CAT_API_KEY_ANDROID');
 
 // Enhanced environment variable loading with multiple fallback strategies
 const getEnvironmentConfig = (): EnvironmentConfig => {
@@ -99,7 +116,20 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     androidKeyLength: revenueCatAndroidKey?.length || 0,
     iosKeyStartsWithAppl: revenueCatIOSKey?.startsWith('appl_') || false,
     androidKeyStartsWithGoog: revenueCatAndroidKey?.startsWith('goog_') || false,
+    isTestFlight: !__DEV__ && process.env.NODE_ENV === 'production',
+    buildType: __DEV__ ? 'development' : 'production'
   });
+
+  // Enhanced warnings for TestFlight
+  if (!__DEV__ && process.env.NODE_ENV === 'production') {
+    console.log('🧪 Production/TestFlight build detected');
+    if (!revenueCatIOSKey || revenueCatIOSKey === 'your-api-key-here') {
+      console.warn('⚠️ RevenueCat iOS API key missing in production build - subscriptions will not work');
+    }
+    if (revenueCatIOSKey && revenueCatIOSKey.length !== 32) {
+      console.warn(`⚠️ RevenueCat iOS API key length unexpected (${revenueCatIOSKey.length} chars) - expected 32 characters`);
+    }
+  }
 
   return {
     OPENAI_API_KEY: openaiApiKey,

@@ -11,11 +11,10 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors, fonts, spacing } from '../../constants/theme';
-import { Card, SubscriptionCard, PricingCard } from '../../components/ui';
-// import { PaywallModal } from '../../components/ui';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useUserStore } from '../../stores/userStore';
 import { useUser } from '../../hooks/useUser';
-import { UserProfile, SUBSCRIPTION_PLANS, SubscriptionTier } from '../../types';
+import { UserProfile } from '../../types';
 import useRevenueCat from '../../hooks/useRevenueCat';
 import { usePaywall } from '../../hooks/usePaywall';
 
@@ -23,90 +22,92 @@ const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { 
     profile, 
-    updateProfile, 
-    resetProfile, 
-    upgradeSubscription,
+    resetProfile,
     getUsageStats,
   } = useUserStore();
   const { userStats } = useUser();
   const { state: revenueCatState } = useRevenueCat();
   const { presentPaywallIfNeededWithAlert } = usePaywall();
-  const [localProfile, setLocalProfile] = useState<UserProfile | null>(profile);
-  const [showPricingCards, setShowPricingCards] = useState(false);
-  const [showPaywallModal, setShowPaywallModal] = useState(false);
-
-  const handleUpgradeSubscription = () => {
-    setShowPricingCards(true);
-  };
 
   const handleUpgradeWithPaywall = async () => {
-    // Use RevenueCat's paywall if available
     if (revenueCatState.isInitialized) {
       await presentPaywallIfNeededWithAlert({
         requiredEntitlement: 'pro',
       });
     } else {
-      // Fallback to modal paywall
-      setShowPaywallModal(true);
+      // Enhanced error message for different scenarios
+      let title = 'Subscription Service Unavailable';
+      let message = 'Subscription service is not available at the moment. Please try again later.';
+      
+      if (revenueCatState.error) {
+        if (revenueCatState.error.includes('TestFlight')) {
+          title = 'TestFlight Limitations';
+          message = 'This is a TestFlight build. Subscriptions may not be available until the app is fully approved by Apple.\n\nThe app will work in free mode for testing purposes.';
+        } else if (revenueCatState.error.includes('API key')) {
+          title = 'Configuration Issue';
+          message = 'There is a configuration issue with the subscription service. Please check back later or contact support.';
+        } else {
+          message = `Subscription service error: ${revenueCatState.error}\n\nPlease try again later.`;
+        }
+      }
+      
+      Alert.alert(title, message, [
+        { text: 'OK' },
+        revenueCatState.error?.includes('TestFlight') ? { 
+          text: 'Debug Info', 
+          onPress: () => showRevenueCatDebugInfo() 
+        } : undefined
+      ].filter(Boolean));
     }
   };
 
-  const handlePaywallDismiss = () => {
-    setShowPaywallModal(false);
-  };
+  const showRevenueCatDebugInfo = () => {
+    const debugInfo = [
+      `• Initialized: ${revenueCatState.isInitialized}`,
+      `• Loading: ${revenueCatState.isLoading}`,
+      `• Error: ${revenueCatState.error || 'None'}`,
+      `• Subscription Tier: ${revenueCatState.subscriptionStatus.tier}`,
+      `• Build Environment: ${process.env.NODE_ENV}`,
+      `• Has Customer Info: ${!!revenueCatState.customerInfo}`,
+    ].join('\n');
 
-  const handlePaywallSuccess = () => {
-    setShowPaywallModal(false);
-    Alert.alert('Success!', 'Welcome to CalorieTracker Pro!');
-  };
-
-  const handleSelectPlan = (tier: SubscriptionTier) => {
-    if (tier === 'FREE') {
-      Alert.alert(
-        'Confirm Downgrade',
-        'Are you sure you want to downgrade to the Free plan? You will lose access to premium features.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Downgrade', 
-            style: 'destructive',
-            onPress: () => {
-              upgradeSubscription(tier);
-              setShowPricingCards(false);
-              Alert.alert('Success', 'Your subscription has been updated.');
-            }
-          }
-        ]
-      );
-    } else {
-      Alert.alert(
-        'Upgrade Subscription',
-        `You are about to upgrade to the ${tier} plan. This will redirect you to the App Store to complete your purchase.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Continue',
-            onPress: () => {
-              upgradeSubscription(tier);
-              setShowPricingCards(false);
-              Alert.alert('Success', 'Your subscription has been upgraded!');
-            }
-          }
-        ]
-      );
-    }
+    Alert.alert(
+      'RevenueCat Debug Info',
+      debugInfo,
+      [
+        { text: 'Copy to Clipboard', onPress: () => {
+          // In a real app, you'd copy to clipboard here
+          console.log('Debug info:', debugInfo);
+        }},
+        { text: 'Retry Initialization', onPress: () => {
+          revenueCatActions.resetInitialization();
+          revenueCatActions.initializeRevenueCat(profile?.id);
+        }},
+        { text: 'Close' }
+      ]
+    );
   };
 
   const handleManageSubscription = () => {
-    // Navigate to subscription management
     Alert.alert('Subscription Management', 'This would open subscription management in the App Store.');
   };
 
-  const handleRestorePurchases = () => {
-    Alert.alert('Restore Purchases', 'This would restore any previous purchases.');
+  const { actions: revenueCatActions } = useRevenueCat();
+  
+  const handleRestorePurchases = async () => {
+    if (revenueCatState.isInitialized) {
+      const success = await revenueCatActions.restorePurchases();
+      if (success) {
+        Alert.alert('Success', 'Your purchases have been restored!');
+      } else {
+        Alert.alert('No Purchases Found', 'No previous purchases were found to restore.');
+      }
+    } else {
+      Alert.alert('Service Unavailable', 'Restore purchases is not available at the moment.');
+    }
   };
 
-  const handleOpenLink = (url: string, title: string) => {
+  const handleOpenLink = (title: string) => {
     Alert.alert(`Open ${title}`, `This would open ${title} in your browser.`);
   };
 
@@ -131,7 +132,7 @@ const SettingsScreen: React.FC = () => {
 
   const usageStats = getUsageStats();
 
-  if (!localProfile) {
+  if (!profile) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
@@ -159,70 +160,91 @@ const SettingsScreen: React.FC = () => {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
             
-            {/* Subscription Section */}
+            {/* Pro Banner */}
+            {(!revenueCatState.subscriptionStatus.isActive || revenueCatState.subscriptionStatus.tier === 'FREE') && (
+              <View style={styles.section}>
+                <LinearGradient
+                  colors={[colors.primary, '#45A049']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.proBanner}
+                >
+                  <View style={styles.proBannerContent}>
+                    <View style={styles.proIconContainer}>
+                      <MaterialIcons name="auto-awesome" size={32} color={colors.white} />
+                    </View>
+                    <View style={styles.proBannerText}>
+                      <Text style={styles.proBannerTitle}>Unlock Kam Calorie Pro</Text>
+                      <Text style={styles.proBannerSubtitle}>
+                        300 recordings/month • Advanced insights • Priority support
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.proUpgradeButton}
+                    onPress={handleUpgradeWithPaywall}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.proUpgradeButtonText}>Get Pro</Text>
+                    <MaterialIcons name="arrow-forward" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                  
+                  {/* Usage Progress */}
+                  <View style={styles.usageProgressContainer}>
+                    <View style={styles.usageProgressHeader}>
+                      <Text style={styles.usageProgressLabel}>Monthly Usage</Text>
+                      <Text style={styles.usageProgressText}>
+                        {usageStats.recordingsUsed} / {usageStats.monthlyLimit || '∞'}
+                      </Text>
+                    </View>
+                    <View style={styles.usageProgressBar}>
+                      <View 
+                        style={[
+                          styles.usageProgressFill,
+                          { width: `${Math.min(100, usageStats.usagePercentage)}%` }
+                        ]} 
+                      />
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+            )}
+            
+            {/* Current Subscription Status - Only show if Pro */}
+            {revenueCatState.subscriptionStatus.isActive && revenueCatState.subscriptionStatus.tier === 'PRO' && (
+              <View style={styles.section}>
+                <View style={styles.proStatusCard}>
+                  <View style={styles.proStatusHeader}>
+                    <View style={styles.proStatusIconContainer}>
+                      <MaterialIcons name="verified" size={24} color={colors.success} />
+                    </View>
+                    <View style={styles.proStatusText}>
+                      <Text style={styles.proStatusTitle}>Pro Member</Text>
+                      <Text style={styles.proStatusSubtitle}>300 recordings/month & premium features</Text>
+                    </View>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.manageButton}
+                    onPress={handleManageSubscription}
+                  >
+                    <Text style={styles.manageButtonText}>Manage</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            
+            {/* Restore Purchases - Always show for support */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Subscription & Usage</Text>
-              <SubscriptionCard
-                subscriptionStatus={{
-                  isActive: localProfile.subscriptionStatus === 'active',
-                  tier: localProfile.subscriptionTier || 'FREE',
-                  willRenew: true,
-                  isInGracePeriod: false,
-                  expirationDate: localProfile.subscriptionEndDate ? new Date(localProfile.subscriptionEndDate) : undefined,
-                }}
-                usageInfo={{
-                  recordingsUsed: usageStats.recordingsUsed,
-                  recordingsLimit: usageStats.monthlyLimit,
-                  recordingsRemaining: usageStats.recordingsRemaining,
-                  resetDate: new Date(usageStats.resetDate),
-                }}
-                onUpgrade={handleUpgradeSubscription}
-                onManage={handleManageSubscription}
-              />
-              
-              {/* RevenueCat Paywall Button */}
               <TouchableOpacity 
-                style={[styles.restoreButton, styles.paywallButton]} 
-                onPress={handleUpgradeWithPaywall}
-              >
-                <MaterialIcons name="payment" size={20} color={colors.white} />
-                <Text style={[styles.restoreButtonText, styles.paywallButtonText]}>Upgrade to Pro</Text>
-              </TouchableOpacity>
-              
-              {/* Restore Purchases Button */}
-              <TouchableOpacity 
-                style={styles.restoreButton} 
+                style={styles.restoreButton}
                 onPress={handleRestorePurchases}
               >
                 <MaterialIcons name="restore" size={20} color={colors.primary} />
                 <Text style={styles.restoreButtonText}>Restore Purchases</Text>
               </TouchableOpacity>
             </View>
-
-            {/* Pricing Cards Modal */}
-            {showPricingCards && (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Choose Your Plan</Text>
-                  <TouchableOpacity 
-                    onPress={() => setShowPricingCards(false)}
-                    style={styles.closeButton}
-                  >
-                    <MaterialIcons name="close" size={24} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.pricingGrid}>
-                  {SUBSCRIPTION_PLANS.map((plan) => (
-                    <PricingCard
-                      key={plan.tier}
-                      plan={plan}
-                      currentTier={localProfile.subscriptionTier || 'FREE'}
-                      onSelect={handleSelectPlan}
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
 
             {/* Profile Overview */}
             <View style={styles.section}>
@@ -241,10 +263,10 @@ const SettingsScreen: React.FC = () => {
                     <View style={styles.cardText}>
                       <Text style={styles.cardTitle}>Edit Profile & Goals</Text>
                       <Text style={styles.cardSubtitle}>
-                        {localProfile.name || 'Not set'} • {localProfile.age || 'Not set'} years
+                        {profile.name || 'Not set'} • {profile.age || 'Not set'} years
                       </Text>
                       <Text style={styles.cardSubtitle}>
-                        {localProfile.activityLevel || 'Not set'} • {localProfile.goal || 'Not set'}
+                        {profile.activityLevel || 'Not set'} • {profile.goal || 'Not set'}
                       </Text>
                     </View>
                   </View>
@@ -302,7 +324,7 @@ const SettingsScreen: React.FC = () => {
               {/* Privacy Policy */}
               <TouchableOpacity 
                 style={styles.settingsCard}
-                onPress={() => handleOpenLink('https://example.com/privacy', 'Privacy Policy')}
+                onPress={() => handleOpenLink('Privacy Policy')}
               >
                 <View style={styles.cardContent}>
                   <View style={styles.cardLeft}>
@@ -321,7 +343,7 @@ const SettingsScreen: React.FC = () => {
               {/* Terms of Service */}
               <TouchableOpacity 
                 style={styles.settingsCard}
-                onPress={() => handleOpenLink('https://example.com/terms', 'Terms of Service')}
+                onPress={() => handleOpenLink('Terms of Service')}
               >
                 <View style={styles.cardContent}>
                   <View style={styles.cardLeft}>
@@ -340,7 +362,7 @@ const SettingsScreen: React.FC = () => {
               {/* Contact Support */}
               <TouchableOpacity 
                 style={styles.settingsCard}
-                onPress={() => handleOpenLink('mailto:support@calorietracker.com', 'Contact Support')}
+                onPress={() => handleOpenLink('Contact Support')}
               >
                 <View style={styles.cardContent}>
                   <View style={styles.cardLeft}>
@@ -359,7 +381,7 @@ const SettingsScreen: React.FC = () => {
               {/* Rate the App */}
               <TouchableOpacity 
                 style={styles.settingsCard}
-                onPress={() => handleOpenLink('https://apps.apple.com/app/id123456789', 'Rate the App')}
+                onPress={() => handleOpenLink('Rate the App')}
               >
                 <View style={styles.cardContent}>
                   <View style={styles.cardLeft}>
@@ -407,13 +429,6 @@ const SettingsScreen: React.FC = () => {
         </ScrollView>
       </View>
       
-      {/* PaywallModal */}
-      {/* <PaywallModal
-        visible={showPaywallModal}
-        onDismiss={handlePaywallDismiss}
-        onPurchaseCompleted={handlePaywallSuccess}
-        requiredEntitlement="pro"
-      /> */}
     </SafeAreaView>
   );
 };
@@ -487,6 +502,154 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: spacing.sm,
   },
+  // Pro Banner Styles
+  proBanner: {
+    borderRadius: 16,
+    padding: spacing.lg,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  proBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  proIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  proBannerText: {
+    flex: 1,
+  },
+  proBannerTitle: {
+    fontSize: fonts.xl,
+    fontWeight: 'bold',
+    color: colors.white,
+    marginBottom: spacing.xs,
+  },
+  proBannerSubtitle: {
+    fontSize: fonts.sm,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 20,
+  },
+  proUpgradeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 12,
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  proUpgradeButtonText: {
+    fontSize: fonts.base,
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  usageProgressContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    padding: spacing.md,
+  },
+  usageProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  usageProgressLabel: {
+    fontSize: fonts.sm,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+  },
+  usageProgressText: {
+    fontSize: fonts.sm,
+    color: colors.white,
+    fontWeight: 'bold',
+  },
+  usageProgressBar: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  usageProgressFill: {
+    height: '100%',
+    backgroundColor: colors.white,
+    borderRadius: 3,
+  },
+  // Pro Status Card (for existing Pro users)
+  proStatusCard: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.success + '20',
+  },
+  proStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  proStatusIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.success + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  proStatusText: {
+    flex: 1,
+  },
+  proStatusTitle: {
+    fontSize: fonts.base,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  proStatusSubtitle: {
+    fontSize: fonts.sm,
+    color: colors.textSecondary,
+  },
+  manageButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.gray100,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+  },
+  manageButtonText: {
+    fontSize: fonts.sm,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  // Restore Button
   restoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -498,22 +661,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary,
     borderRadius: 8,
-  },
-  paywallButton: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-    marginBottom: spacing.sm,
-  },
-  paywallButtonText: {
-    color: colors.white,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   restoreButtonText: {
     fontSize: fonts.base,
     fontWeight: '600',
     color: colors.primary,
-  },
-  pricingGrid: {
-    gap: spacing.lg,
   },
   // New styles for settings cards
   settingsCard: {

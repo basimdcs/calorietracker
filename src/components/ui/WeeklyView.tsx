@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius, shadows } from '../../constants/theme';
 import { DailyLog } from '../../types';
@@ -82,23 +83,23 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
     Animated.stagger(80, animations).start();
   }, [weeklyData]);
 
-  const getBarColor = (status: 'under' | 'target' | 'over') => {
+  const getBarGradient = (status: 'under' | 'target' | 'over'): [string, string] => {
     switch (status) {
       case 'under':
-        return colors.success; // Theme success color
+        return [colors.accentLight, colors.success];
       case 'target':
-        return colors.primary; // Theme primary color
+        return [colors.primaryLight, colors.primary];
       case 'over':
-        return colors.warning; // Theme warning color
+        return [colors.yellow200, colors.warning];
       default:
-        return colors.gray300;
+        return [colors.gray300, colors.gray400];
     }
   };
 
   const renderDay = (day: WeeklyDayData, index: number) => {
     const barHeight = Math.max((day.calories / maxScale) * 60, 2); // Max 60px height
     const goalPosition = (userGoal / maxScale) * 60; // Goal line position
-    const barColor = getBarColor(day.status);
+    const [startCol, endCol] = getBarGradient(day.status);
     const isToday = day.date.toDateString() === new Date().toDateString();
 
     return (
@@ -117,10 +118,16 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
                   inputRange: [0, 1],
                   outputRange: [0, barHeight],
                 }),
-                backgroundColor: barColor,
               },
             ]}
-          />
+          >
+            <LinearGradient
+              colors={[startCol, endCol]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
         </View>
         
         {/* Day info */}
@@ -140,13 +147,24 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
     <Card style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <MaterialIcons name="bar-chart" size={20} color={colors.primary} />
-        <Text style={styles.title}>Weekly Overview</Text>
+        <View style={styles.headerLeft}>
+          <View style={styles.titleRow}>
+            <MaterialIcons name="bar-chart" size={20} color={colors.primary} />
+            <Text style={styles.title}>Weekly Overview</Text>
+          </View>
+          <Text style={styles.subtitle}>Daily calories vs goal</Text>
+        </View>
+        <View style={styles.badge}>
+          <Text style={styles.badgeValue}>{weeklyAverage}</Text>
+          <Text style={styles.badgeLabel}>avg/day</Text>
+        </View>
       </View>
 
-      {/* Chart */}
-      <View style={styles.chartContainer}>
-        {weeklyData.map((day, index) => renderDay(day, index))}
+      {/* Chart Panel */}
+      <View style={styles.chartPanel}>
+        <View style={styles.chartContainer}>
+          {weeklyData.map((day, index) => renderDay(day, index))}
+        </View>
       </View>
 
       {/* Stats */}
@@ -196,8 +214,15 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: spacing.xl,
+  },
+  headerLeft: { flex: 1 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
   },
   title: {
     fontSize: fonts.lg,
@@ -205,11 +230,40 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginLeft: spacing.sm,
   },
+  subtitle: {
+    fontSize: fonts.sm,
+    color: colors.textSecondary,
+    fontWeight: fonts.medium,
+  },
+  badge: {
+    alignItems: 'flex-end',
+  },
+  badgeValue: {
+    fontSize: fonts['2xl'],
+    fontWeight: fonts.bold,
+    color: colors.primary,
+    lineHeight: fonts['2xl'] * 1.1,
+  },
+  badgeLabel: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+    fontWeight: fonts.medium,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  chartPanel: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    marginBottom: spacing.xl,
+  },
   chartContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    marginBottom: spacing.xl,
     paddingHorizontal: spacing.sm,
   },
   dayColumn: {
@@ -219,23 +273,24 @@ const styles = StyleSheet.create({
   },
   chartArea: {
     width: '100%',
-    height: 80, // Fixed height container
+    height: 80,
     position: 'relative',
     justifyContent: 'flex-end',
     alignItems: 'center',
     marginBottom: spacing.md,
   },
   bar: {
-    width: '80%',
-    borderRadius: borderRadius.sm,
+    width: '70%',
+    borderRadius: borderRadius.md,
     minHeight: 2,
+    ...shadows.sm,
   },
   goalLine: {
     position: 'absolute',
     width: '90%',
     height: 1,
     backgroundColor: colors.textSecondary,
-    opacity: 0.6,
+    opacity: 0.5,
   },
   dayInfo: {
     alignItems: 'center',
@@ -269,53 +324,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: colors.gray200,
-    marginHorizontal: spacing.md,
-  },
-  statValue: {
-    fontSize: fonts.lg,
-    fontWeight: fonts.bold,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  statLabel: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-    fontWeight: fonts.medium,
-  },
-  legend: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray100,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  legendLine: {
-    width: 12,
-    height: 1,
-    backgroundColor: colors.textSecondary,
-    opacity: 0.6,
-    marginRight: spacing.xs,
-  },
-  legendDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: spacing.xs,
-  },
-  legendText: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-    fontWeight: fonts.medium,
-  },
+  statItem: { flex: 1, alignItems: 'center' },
+  statDivider: { width: 1, backgroundColor: colors.gray200, marginHorizontal: spacing.md },
+  statValue: { fontSize: fonts.lg, fontWeight: fonts.bold, color: colors.textPrimary, marginBottom: spacing.xs },
+  statLabel: { fontSize: fonts.xs, color: colors.textSecondary, fontWeight: fonts.medium },
+  legend: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.gray200 },
+  legendItem: { flexDirection: 'row', alignItems: 'center' },
+  legendLine: { width: 12, height: 1, backgroundColor: colors.textSecondary, opacity: 0.6, marginRight: spacing.xs },
+  legendDot: { width: 6, height: 6, borderRadius: 3, marginRight: spacing.xs },
+  legendText: { fontSize: fonts.xs, color: colors.textSecondary, fontWeight: fonts.medium },
 });

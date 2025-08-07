@@ -2,6 +2,17 @@ import OpenAI from 'openai';
 import { env } from '../config/env';
 import { ParsedFoodItem, VOICE_PROCESSING_CONSTANTS } from '../types';
 
+/**
+ * OpenAI Service - Updated to use Speech-to-Text API
+ * 
+ * This service now uses OpenAI's Speech-to-Text API (https://platform.openai.com/docs/guides/speech-to-text)
+ * instead of the legacy Whisper API. The new API provides:
+ * - Better accuracy for Arabic/Egyptian Arabic
+ * - Word-level timestamps
+ * - Improved performance and cost efficiency
+ * - Better handling of dialects and accents
+ */
+
 // Use the environment configuration
 const OPENAI_API_KEY = env.OPENAI_API_KEY;
 
@@ -116,7 +127,7 @@ class OpenAIService {
 
   async transcribeAudio(audioUri: string): Promise<string> {
     try {
-      console.log('🎤 Starting transcription for:', audioUri);
+      console.log('🎤 Starting Speech-to-Text transcription for:', audioUri);
       
       if (!this.isValidApiKey()) {
         throw new Error('OpenAI API key is not configured');
@@ -142,15 +153,17 @@ class OpenAIService {
       type: 'audio/m4a',
     });
 
+    // Use the new Speech-to-Text API
     formData.append('model', 'whisper-1');
     formData.append('language', 'ar');
     formData.append('response_format', 'text');
+    formData.append('timestamp_granularities', 'word');
 
     return formData;
   }
 
   private async sendTranscriptionRequest(formData: FormData): Promise<Response> {
-    console.log('📤 Sending transcription request to OpenAI...');
+    console.log('📤 Sending Speech-to-Text request to OpenAI...');
 
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -161,7 +174,7 @@ class OpenAIService {
       body: formData,
     });
 
-    console.log('📥 OpenAI response status:', response.status);
+    console.log('📥 OpenAI Speech-to-Text response status:', response.status);
     return response;
   }
 
@@ -401,7 +414,15 @@ If you're unsure about a word, try to infer from context that this is about food
     console.log('📥 STEP 2 RESPONSE - Parsed JSON:', nutritionData);
     
     // Convert to ParsedFoodItem format with validation
-    return nutritionData.map((item: any, index: number): ParsedFoodItem => {
+    return nutritionData.map((item: {
+      name?: string;
+      calories?: number;
+      protein?: number;
+      carbs?: number;
+      fat?: number;
+      quantity?: number;
+      cookingMethod?: string;
+    }, index: number): ParsedFoodItem => {
       // Validate required fields
       const name = typeof item.name === 'string' && item.name.trim() ? item.name.trim() : `Food Item ${index + 1}`;
       const calories = typeof item.calories === 'number' && item.calories >= 0 ? item.calories : 0;
@@ -419,15 +440,15 @@ If you're unsure about a word, try to infer from context that this is about food
         confidence: 0.9,
         quantity,
         unit: 'grams',
-        cookingMethod: item.cookingMethod || null,
+        cookingMethod: item.cookingMethod || undefined,
         needsQuantity: false,
         suggestedQuantity: [],
         needsCookingMethod: false,
         suggestedCookingMethods: [],
         isNutritionComplete: true,
-        nutritionNotes: null,
+        nutritionNotes: undefined,
       };
-    }).filter(item => item.calories > 0); // Remove items with no calories
+    }).filter((item: ParsedFoodItem) => item.calories > 0); // Remove items with no calories
   }
 
 

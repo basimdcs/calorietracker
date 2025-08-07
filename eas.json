@@ -14,11 +14,17 @@
     "production": {
       "autoIncrement": true,
       "ios": {
-        "distribution": "store"
+        "distribution": "store",
+        "cache": {
+          "disabled": false
+        }
       },
       "environment": "production",
       "env": {
         "NODE_ENV": "production"
+      },
+      "cache": {
+        "disabled": false
       }
     }
   },

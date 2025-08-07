@@ -106,10 +106,10 @@ export const DailyView: React.FC<DailyViewProps> = ({
 
       {/* Calories Widget */}
       <LinearGradient
-        colors={['#C084FC', '#A855F7', '#7C3AED', '#6D28D9']}
+        colors={[colors.primaryLight, colors.primary, colors.primaryDark]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        locations={[0, 0.3, 0.7, 1]}
+        locations={[0, 0.5, 1]}
         style={styles.caloriesCard}
       >
         {/* Header Section */}
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: fonts.xl,
-    fontWeight: 'bold',
+    fontWeight: fonts.semibold,
     color: colors.textPrimary,
     marginBottom: spacing.md,
   },

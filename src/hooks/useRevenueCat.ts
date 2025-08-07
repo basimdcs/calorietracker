@@ -139,14 +139,28 @@ const useRevenueCat = () => {
       return;
     }
     
+    // More lenient attempt limits for TestFlight
+    const { isTestFlightBuild } = await import('../config/revenueCat');
+    const maxAttempts = isTestFlightBuild() ? 5 : maxInitializationAttempts;
+    
     // Prevent too many initialization attempts
-    if (initializationAttemptsRef.current >= maxInitializationAttempts) {
-      console.log('⏭️ RevenueCat initialization blocked - too many attempts');
+    if (initializationAttemptsRef.current >= maxAttempts) {
+      console.log(`⏭️ RevenueCat initialization blocked - too many attempts (${initializationAttemptsRef.current}/${maxAttempts})`);
+      
+      // For TestFlight, set a fallback mode
+      if (isTestFlightBuild()) {
+        console.log('🧪 TestFlight: Setting fallback mode without RevenueCat');
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: 'TestFlight mode: RevenueCat unavailable (subscriptions may not be approved yet)',
+        }));
+      }
       return;
     }
     
-    // Prevent initialization if there's a persistent error
-    if (state.error && state.error.includes('Invalid API key')) {
+    // For TestFlight, be more lenient with API key errors
+    if (state.error && state.error.includes('Invalid API key') && !isTestFlightBuild()) {
       console.log('⏭️ RevenueCat initialization blocked due to API key error');
       return;
     }
@@ -157,7 +171,7 @@ const useRevenueCat = () => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      console.log('🚀 Initializing RevenueCat... (attempt', initializationAttemptsRef.current, ')');
+      console.log('🚀 Initializing RevenueCat... (attempt', initializationAttemptsRef.current, '/', maxAttempts, ')');
       
       // Check if API keys are configured
       const { env } = await import('../config/env');
@@ -165,20 +179,64 @@ const useRevenueCat = () => {
         hasIOSKey: !!env.REVENUE_CAT_API_KEY_IOS,
         keyLength: env.REVENUE_CAT_API_KEY_IOS?.length,
         keyPreview: env.REVENUE_CAT_API_KEY_IOS?.substring(0, 10) + '...',
-        isPlaceholder: env.REVENUE_CAT_API_KEY_IOS === 'your-ios-api-key-here'
+        isPlaceholder: env.REVENUE_CAT_API_KEY_IOS === 'your-ios-api-key-here',
+        isTestFlight: isTestFlightBuild(),
+        buildEnvironment: process.env.NODE_ENV
       });
       
       if (!env.REVENUE_CAT_API_KEY_IOS || env.REVENUE_CAT_API_KEY_IOS === 'your-ios-api-key-here') {
-        throw new Error(`RevenueCat API key not configured. Found: "${env.REVENUE_CAT_API_KEY_IOS}". Please add REVENUE_CAT_API_KEY_IOS to your .env file.`);
+        const errorMsg = `RevenueCat API key not configured. Found: "${env.REVENUE_CAT_API_KEY_IOS}". Please add REVENUE_CAT_API_KEY_IOS to your .env file.`;
+        
+        // For TestFlight, set fallback mode instead of failing
+        if (isTestFlightBuild()) {
+          console.warn('⚠️ TestFlight build detected with missing API key - using fallback mode');
+          setState(prev => ({
+            ...prev,
+            isLoading: false,
+            error: 'TestFlight mode: API key not properly configured',
+            subscriptionStatus: { ...prev.subscriptionStatus, tier: 'FREE' }
+          }));
+          return;
+        }
+        
+        throw new Error(errorMsg);
       }
       
       const { initializeRevenueCat: initRC } = await import('../config/revenueCat');
       await initRC(userID);
       
-      // Get initial customer info
+      // Get initial customer info with timeout for TestFlight
       const PurchasesInstance = getPurchasesInstance();
-      const customerInfo = await PurchasesInstance.getCustomerInfo();
-      const subscriptionStatus = parseSubscriptionStatus(customerInfo);
+      
+      let customerInfo;
+      try {
+        // Use a shorter timeout for TestFlight
+        const timeout = isTestFlightBuild() ? 10000 : 30000;
+        customerInfo = await Promise.race([
+          PurchasesInstance.getCustomerInfo(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Customer info fetch timeout')), timeout)
+          )
+        ]) as any;
+      } catch (customerError) {
+        console.warn('⚠️ Failed to fetch initial customer info:', customerError);
+        
+        if (isTestFlightBuild()) {
+          // For TestFlight, continue without customer info
+          console.log('🧪 TestFlight: Continuing without initial customer info');
+          customerInfo = null;
+        } else {
+          throw customerError;
+        }
+      }
+      
+      const subscriptionStatus = customerInfo ? parseSubscriptionStatus(customerInfo) : {
+        isActive: false,
+        tier: 'FREE' as const,
+        willRenew: false,
+        isInGracePeriod: false,
+      };
+      
       const usageInfo = calculateUsageInfo(subscriptionStatus);
       
       setState(prev => ({
@@ -192,15 +250,33 @@ const useRevenueCat = () => {
       }));
       
       console.log('✅ RevenueCat initialized successfully');
+      
+      // For TestFlight, add additional warnings
+      if (isTestFlightBuild()) {
+        console.log('🧪 TestFlight build - subscriptions may not work until approved by Apple');
+      }
+      
     } catch (error) {
       console.error('❌ Failed to initialize RevenueCat:', error);
       hasInitializedRef.current = false; // Reset on error
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize RevenueCat';
       
+      // Enhanced error handling for TestFlight
+      let finalError = errorMessage;
+      if (isTestFlightBuild()) {
+        finalError = `TestFlight mode: ${errorMessage}\n\nThis is likely due to subscriptions not being approved yet. The app will work in free mode.`;
+      }
+      
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: errorMessage,
+        error: finalError,
+        subscriptionStatus: {
+          isActive: false,
+          tier: 'FREE',
+          willRenew: false,
+          isInGracePeriod: false,
+        },
       }));
       
       // Don't throw error, just log it so app continues to work

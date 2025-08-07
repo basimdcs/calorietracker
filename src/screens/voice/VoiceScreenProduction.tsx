@@ -34,7 +34,7 @@ const VoiceScreenProduction: React.FC = () => {
   const [parsedFoods, setParsedFoods] = useState<ParsedFoodItem[]>([]);
   
   const { addFoodItem, logFood, updateCurrentDate } = useFoodStore();
-  const { incrementRecordingUsage, getUsageStats } = useUserStore();
+  const { incrementRecordingUsage, getUsageStats, profile } = useUserStore();
   const { state: revenueCatState, actions: revenueCatActions } = useRevenueCat();
   const { presentPaywallIfNeededWithAlert } = usePaywall();
   
@@ -71,6 +71,61 @@ const VoiceScreenProduction: React.FC = () => {
       requiredEntitlement: 'pro',
     });
   }, [presentPaywallIfNeededWithAlert]);
+
+  // RevenueCat debug test function
+  const testRevenueCatDebug = useCallback(async () => {
+    console.log('🧪 Testing RevenueCat Debug...');
+    const { env } = await import('../../config/env');
+    const { isTestFlightBuild, getBuildEnvironment } = await import('../../config/revenueCat');
+    
+    const debugInfo = {
+      // Environment info
+      buildEnvironment: getBuildEnvironment(),
+      isTestFlight: isTestFlightBuild(),
+      isDevelopment: __DEV__,
+      nodeEnv: process.env.NODE_ENV,
+      
+      // RevenueCat state
+      rcInitialized: revenueCatState.isInitialized,
+      rcLoading: revenueCatState.isLoading,
+      rcError: revenueCatState.error,
+      rcTier: revenueCatState.subscriptionStatus.tier,
+      rcHasCustomerInfo: !!revenueCatState.customerInfo,
+      
+      // API key info
+      hasIOSKey: !!env.REVENUE_CAT_API_KEY_IOS,
+      iosKeyLength: env.REVENUE_CAT_API_KEY_IOS?.length || 0,
+      iosKeyFormat: env.REVENUE_CAT_API_KEY_IOS?.startsWith('appl_') ? 'Valid' : 'Invalid',
+      
+      // Usage info
+      recordingsUsed: revenueCatState.usageInfo.recordingsUsed,
+      recordingsLimit: revenueCatState.usageInfo.recordingsLimit,
+      recordingsRemaining: revenueCatState.usageInfo.recordingsRemaining,
+    };
+
+    console.log('🔍 RevenueCat Debug Info:', debugInfo);
+
+    const debugText = Object.entries(debugInfo)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join('\n');
+
+    Alert.alert(
+      'RevenueCat Debug Info',
+      debugText,
+      [
+        { text: 'Copy to Console', onPress: () => {
+          console.log('📋 RevenueCat Debug Info (for copying):', JSON.stringify(debugInfo, null, 2));
+        }},
+        { text: 'Retry Init', onPress: () => {
+          revenueCatActions.resetInitialization();
+          setTimeout(() => {
+            revenueCatActions.initializeRevenueCat(profile?.id);
+          }, 1000);
+        }},
+        { text: 'Close' }
+      ]
+    );
+  }, [revenueCatState, revenueCatActions, profile?.id]);
 
   // Start recording
   const handleStartRecording = useCallback(async () => {
@@ -693,6 +748,17 @@ Check console for detailed logs.`,
               </TouchableOpacity>
               <Text style={styles.testDescription}>
                 Test the RevenueCat paywall (remove in production)
+              </Text>
+
+              <TouchableOpacity
+                style={[styles.testButton, { backgroundColor: colors.warning }]}
+                onPress={testRevenueCatDebug}
+              >
+                <MaterialIcons name="bug-report" size={20} color={colors.white} />
+                <Text style={[styles.testButtonText, styles.testButtonTextPrimary]}>🔧 RevenueCat Debug</Text>
+              </TouchableOpacity>
+              <Text style={styles.testDescription}>
+                Debug RevenueCat initialization and configuration issues
               </Text>
             </View>
           )}

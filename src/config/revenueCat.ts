@@ -41,12 +41,19 @@ export const initializeRevenueCat = async (userID?: string): Promise<void> => {
     console.log('🔑 Using RevenueCat API key:', {
       platform: Platform.OS,
       keyPreview: apiKey.substring(0, 10) + '...',
-      keyLength: apiKey.length
+      keyLength: apiKey.length,
+      isTestFlight: isTestFlightBuild(),
+      buildEnvironment: getBuildEnvironment()
     });
     
-    // Validate API key format
-    if (!apiKey || apiKey.length < 20) {
-      throw new Error('Invalid RevenueCat API key: Key is too short or missing');
+    // Enhanced API key validation for TestFlight
+    if (!apiKey || apiKey === 'your-ios-api-key-here' || apiKey === 'your-android-api-key-here') {
+      throw new Error('RevenueCat API key not configured. Please add the correct API key to your environment variables.');
+    }
+    
+    // Validate API key length - RevenueCat iOS keys are 32 characters (appl_ + 27 chars)
+    if (apiKey.length !== 32) {
+      console.warn(`⚠️ API key length unexpected (${apiKey.length} chars). Expected 32 characters for iOS keys.`);
     }
     
     // Check if it's a valid API key format (should start with 'appl_' for iOS or 'goog_' for Android)
@@ -56,29 +63,51 @@ export const initializeRevenueCat = async (userID?: string): Promise<void> => {
       
     if (!isValidFormat) {
       const expectedPrefix = Platform.OS === 'ios' ? 'appl_' : 'goog_';
-      throw new Error(
-        `Invalid RevenueCat API key format for ${Platform.OS}. ` +
-        `Expected ${expectedPrefix} prefix. ` +
-        `Make sure you're using the PUBLIC API key from RevenueCat dashboard, not a Secret API key or Web Billing key. ` +
-        `Go to Project Settings → API Keys in your RevenueCat dashboard.`
+      console.warn(
+        `⚠️ API key format warning: Expected ${expectedPrefix} prefix for ${Platform.OS}. ` +
+        `Current key starts with: ${apiKey.substring(0, 5)}...`
       );
+      
+      // Don't throw error immediately for TestFlight - try to initialize anyway
+      if (!isTestFlightBuild()) {
+        throw new Error(
+          `Invalid RevenueCat API key format for ${Platform.OS}. ` +
+          `Expected ${expectedPrefix} prefix. ` +
+          `Make sure you're using the PUBLIC API key from RevenueCat dashboard.`
+        );
+      }
     }
     
-    // Use the new object-based configuration method
+    // Enhanced configuration for TestFlight/Sandbox
     const configuration: PurchasesConfiguration = {
       apiKey,
       appUserID: userID, // Optional: pass undefined to use anonymous IDs
     };
     
-    // Add a small delay to ensure proper initialization order
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Add extra delay for TestFlight builds to ensure stability
+    const initDelay = isTestFlightBuild() ? 500 : 100;
+    await new Promise(resolve => setTimeout(resolve, initDelay));
     
+    // Configure RevenueCat
     await Purchases.configure(configuration);
     
-    // Set up debug logging (remove in production)
-    if (__DEV__) {
+    // Enhanced logging for TestFlight debugging
+    if (__DEV__ || isTestFlightBuild()) {
       await Purchases.setLogLevel(LOG_LEVEL.DEBUG);
-      console.log('📊 RevenueCat debug logging enabled');
+      console.log('📊 RevenueCat debug logging enabled for debugging');
+    }
+    
+    // TestFlight-specific setup
+    if (isTestFlightBuild()) {
+      console.log('🧪 TestFlight build detected - enabling sandbox mode configurations');
+      
+      // Add TestFlight-specific error handling
+      try {
+        const customerInfo = await Purchases.getCustomerInfo();
+        console.log('✅ Initial customer info fetched successfully in TestFlight');
+      } catch (testError) {
+        console.warn('⚠️ TestFlight customer info fetch failed (this might be normal):', testError);
+      }
     }
     
     console.log('✅ RevenueCat configured successfully');
@@ -86,8 +115,23 @@ export const initializeRevenueCat = async (userID?: string): Promise<void> => {
   } catch (error) {
     console.error('❌ Failed to initialize RevenueCat:', error);
     
-    // Provide specific guidance for common errors
+    // Enhanced error handling for TestFlight
     if (error instanceof Error) {
+      if (isTestFlightBuild()) {
+        // More lenient error handling for TestFlight
+        console.log('⚠️ RevenueCat initialization failed in TestFlight - this might be due to subscription approval status');
+        console.log('💡 For TestFlight testing, ensure your subscriptions are in "Ready to Submit" status');
+        
+        // Don't throw error for certain TestFlight-specific issues
+        if (error.message.includes('Invalid API key') || 
+            error.message.includes('Web Billing') ||
+            error.message.includes('network') ||
+            error.message.includes('timeout')) {
+          console.log('🔄 Continuing without RevenueCat due to TestFlight limitations');
+          return; // Allow app to continue
+        }
+      }
+      
       if (error.message.includes('Web Billing or Paddle API key')) {
         throw new Error(
           '❌ WRONG API KEY TYPE DETECTED!\n\n' +
@@ -107,13 +151,34 @@ export const initializeRevenueCat = async (userID?: string): Promise<void> => {
           '1. Verify you\'re using the correct project in RevenueCat\n' +
           '2. Ensure your bundle ID/package name matches RevenueCat project\n' +
           '3. Use Public API keys (not Secret keys)\n' +
-          '4. Check that the key starts with "appl_" (iOS) or "goog_" (Android)'
+          '4. Check that the key starts with "appl_" (iOS) or "goog_" (Android)\n\n' +
+          '🧪 FOR TESTFLIGHT: Subscriptions must be in "Ready to Submit" status'
         );
       }
     }
     
     throw error;
   }
+};
+
+// Helper function to detect TestFlight builds
+export const isTestFlightBuild = (): boolean => {
+  // Check for TestFlight environment indicators
+  return !__DEV__ && (
+    // Check if running in TestFlight
+    typeof __TESTFLIGHT__ !== 'undefined' ||
+    // Check build configuration
+    process.env.EAS_BUILD_PROFILE === 'preview' ||
+    // Check for TestFlight bundle characteristics
+    process.env.NODE_ENV === 'production'
+  );
+};
+
+// Helper function to get build environment info
+export const getBuildEnvironment = (): string => {
+  if (__DEV__) return 'development';
+  if (isTestFlightBuild()) return 'testflight';
+  return 'production';
 };
 
 // Helper function to identify user (call after login/signup)

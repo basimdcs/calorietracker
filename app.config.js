@@ -55,6 +55,9 @@ export default {
       GEMINI_API_KEY: process.env.GEMINI_API_KEY,
       REVENUE_CAT_API_KEY_IOS: process.env.REVENUE_CAT_API_KEY_IOS,
       REVENUE_CAT_API_KEY_ANDROID: process.env.REVENUE_CAT_API_KEY_ANDROID,
+      // Also pass EXPO_PUBLIC versions as fallback
+      EXPO_PUBLIC_REVENUE_CAT_API_KEY_IOS: process.env.EXPO_PUBLIC_REVENUE_CAT_API_KEY_IOS,
+      EXPO_PUBLIC_REVENUE_CAT_API_KEY_ANDROID: process.env.EXPO_PUBLIC_REVENUE_CAT_API_KEY_ANDROID,
       eas: {
         projectId: "48562b4c-cb8e-436a-90e5-9065e0bcdb4a"
       }
