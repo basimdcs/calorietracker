@@ -12,11 +12,12 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { Card, SubscriptionCard, PricingCard } from '../../components/ui';
+// import { PaywallModal } from '../../components/ui';
 import { useUserStore } from '../../stores/userStore';
 import { useUser } from '../../hooks/useUser';
 import { UserProfile, SUBSCRIPTION_PLANS, SubscriptionTier } from '../../types';
 import useRevenueCat from '../../hooks/useRevenueCat';
-import { testRevenueCatIntegration } from '../../utils/revenueCatTestHelper';
+import { usePaywall } from '../../hooks/usePaywall';
 
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -28,12 +29,35 @@ const SettingsScreen: React.FC = () => {
     getUsageStats,
   } = useUserStore();
   const { userStats } = useUser();
-  const { state: revenueCatState, actions: revenueCatActions } = useRevenueCat();
+  const { state: revenueCatState } = useRevenueCat();
+  const { presentPaywallIfNeededWithAlert } = usePaywall();
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(profile);
   const [showPricingCards, setShowPricingCards] = useState(false);
+  const [showPaywallModal, setShowPaywallModal] = useState(false);
 
   const handleUpgradeSubscription = () => {
     setShowPricingCards(true);
+  };
+
+  const handleUpgradeWithPaywall = async () => {
+    // Use RevenueCat's paywall if available
+    if (revenueCatState.isInitialized) {
+      await presentPaywallIfNeededWithAlert({
+        requiredEntitlement: 'pro',
+      });
+    } else {
+      // Fallback to modal paywall
+      setShowPaywallModal(true);
+    }
+  };
+
+  const handlePaywallDismiss = () => {
+    setShowPaywallModal(false);
+  };
+
+  const handlePaywallSuccess = () => {
+    setShowPaywallModal(false);
+    Alert.alert('Success!', 'Welcome to CalorieTracker Pro!');
   };
 
   const handleSelectPlan = (tier: SubscriptionTier) => {
@@ -104,42 +128,6 @@ const SettingsScreen: React.FC = () => {
     );
   };
 
-  const handleTestRevenueCat = () => {
-    console.log('🧪 Running RevenueCat Integration Test...');
-    console.log('🔍 Current RevenueCat State:', {
-      isInitialized: revenueCatState.isInitialized,
-      isLoading: revenueCatState.isLoading,
-      error: revenueCatState.error,
-      subscriptionTier: revenueCatState.subscriptionStatus.tier,
-      hasCustomerInfo: !!revenueCatState.customerInfo,
-    });
-    console.log('👤 Current Profile:', {
-      hasProfile: !!profile,
-      profileId: profile?.id,
-    });
-    
-    const testResults = testRevenueCatIntegration(revenueCatState, revenueCatActions);
-    
-    // Add manual initialization attempt if not initialized
-    if (!revenueCatState.isInitialized && !revenueCatState.isLoading) {
-      console.log('🚀 Attempting manual RevenueCat initialization...');
-      revenueCatActions.initializeRevenueCat(profile?.id).then(() => {
-        console.log('✅ Manual initialization completed');
-      }).catch((error) => {
-        console.error('❌ Manual initialization failed:', error);
-      });
-    }
-    
-    Alert.alert(
-      'RevenueCat Test Results',
-      testResults.overallPassed 
-        ? `✅ All tests passed! RevenueCat integration is working correctly.\n\nStatus: ${revenueCatState.isInitialized ? 'Initialized' : 'Not initialized'}\nError: ${revenueCatState.error || 'None'}`
-        : '❌ Some tests failed. Check the console for details.',
-      [
-        { text: 'OK' }
-      ]
-    );
-  };
 
   const usageStats = getUsageStats();
 
@@ -191,6 +179,15 @@ const SettingsScreen: React.FC = () => {
                 onUpgrade={handleUpgradeSubscription}
                 onManage={handleManageSubscription}
               />
+              
+              {/* RevenueCat Paywall Button */}
+              <TouchableOpacity 
+                style={[styles.restoreButton, styles.paywallButton]} 
+                onPress={handleUpgradeWithPaywall}
+              >
+                <MaterialIcons name="payment" size={20} color={colors.white} />
+                <Text style={[styles.restoreButtonText, styles.paywallButtonText]}>Upgrade to Pro</Text>
+              </TouchableOpacity>
               
               {/* Restore Purchases Button */}
               <TouchableOpacity 
@@ -379,33 +376,6 @@ const SettingsScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {/* Developer Section - Only show in development */}
-            {__DEV__ && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Developer Tools</Text>
-                
-                {/* RevenueCat Test */}
-                <TouchableOpacity 
-                  style={styles.settingsCard}
-                  onPress={handleTestRevenueCat}
-                >
-                  <View style={styles.cardContent}>
-                    <View style={styles.cardLeft}>
-                      <View style={styles.iconContainer}>
-                        <MaterialIcons name="bug-report" size={24} color={colors.primary} />
-                      </View>
-                      <View style={styles.cardText}>
-                        <Text style={styles.cardTitle}>Test RevenueCat</Text>
-                        <Text style={styles.cardSubtitle}>
-                          Status: {revenueCatState.isInitialized ? '✅ Initialized' : '⏳ Not initialized'}
-                        </Text>
-                      </View>
-                    </View>
-                    <MaterialIcons name="play-arrow" size={24} color={colors.textSecondary} />
-                  </View>
-                </TouchableOpacity>
-              </View>
-            )}
 
             {/* Account Management Section */}
             <View style={styles.section}>
@@ -436,6 +406,14 @@ const SettingsScreen: React.FC = () => {
           </View>
         </ScrollView>
       </View>
+      
+      {/* PaywallModal */}
+      {/* <PaywallModal
+        visible={showPaywallModal}
+        onDismiss={handlePaywallDismiss}
+        onPurchaseCompleted={handlePaywallSuccess}
+        requiredEntitlement="pro"
+      /> */}
     </SafeAreaView>
   );
 };
@@ -520,6 +498,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary,
     borderRadius: 8,
+  },
+  paywallButton: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    marginBottom: spacing.sm,
+  },
+  paywallButtonText: {
+    color: colors.white,
   },
   restoreButtonText: {
     fontSize: fonts.base,

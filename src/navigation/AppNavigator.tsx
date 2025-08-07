@@ -155,7 +155,13 @@ export default function AppNavigator() {
     });
     
     // Only initialize if we have a profile and RevenueCat isn't already initialized or loading
-    if (profile && !revenueCatState.isInitialized && !revenueCatState.isLoading) {
+    if (profile?.id && !revenueCatState.isInitialized && !revenueCatState.isLoading) {
+      // Don't initialize if there's a persistent API key error
+      if (revenueCatState.error && revenueCatState.error.includes('Invalid API key')) {
+        console.log('⏭️ Skipping RevenueCat initialization due to API key error');
+        return;
+      }
+      
       console.log('🚀 Initializing RevenueCat in AppNavigator...');
       
       // Use profile ID for RevenueCat user identification
@@ -165,12 +171,13 @@ export default function AppNavigator() {
       });
     } else {
       console.log('⏭️ Skipping RevenueCat initialization:', {
-        reason: !profile ? 'No profile' : 
+        reason: !profile?.id ? 'No profile ID' : 
                 revenueCatState.isInitialized ? 'Already initialized' :
-                revenueCatState.isLoading ? 'Currently loading' : 'Unknown'
+                revenueCatState.isLoading ? 'Currently loading' : 
+                revenueCatState.error?.includes('Invalid API key') ? 'API key error' : 'Unknown'
       });
     }
-  }, [profile?.id, revenueCatState.isInitialized, revenueCatState.isLoading]); // Include state dependencies
+  }, [profile?.id, revenueCatState.isInitialized, revenueCatState.isLoading, revenueCatState.error]); // Include error in dependencies
   
   // Use a key that changes when auth state changes to force navigation reset
   const navKey = `${!!profile}-${isOnboardingComplete}`;

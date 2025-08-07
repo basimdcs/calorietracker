@@ -30,8 +30,6 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         return colors.gray500;
       case 'PRO':
         return colors.primary;
-      case 'ELITE':
-        return colors.secondary;
       default:
         return colors.gray500;
     }
@@ -43,8 +41,6 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         return 'free-cancellation';
       case 'PRO':
         return 'star';
-      case 'ELITE':
-        return 'diamond';
       default:
         return 'free-cancellation';
     }

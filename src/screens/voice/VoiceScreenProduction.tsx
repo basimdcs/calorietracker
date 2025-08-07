@@ -21,9 +21,10 @@ import { useUserStore } from '../../stores/userStore';
 import { ParsedFoodItem } from '../../types';
 import { useVoiceRecording } from '../../hooks/useVoiceRecording';
 import { useVoiceProcessing } from '../../hooks/useVoiceProcessing';
+import { useRevenueCat } from '../../hooks';
+import { usePaywall } from '../../hooks/usePaywall';
 import { testBasicOpenAIQuery, parseFoodFromTextO3, openAIService } from '../../services/openai';
 import { parseFoodFromTextGemini, testBasicGeminiQuery } from '../../services/gemini';
-// import useRevenueCat from '../../hooks/useRevenueCat'; // Temporarily disabled
 
 // Voice processing states for UI
 type VoiceState = 'ready' | 'recording' | 'processing' | 'reviewing';
@@ -34,7 +35,8 @@ const VoiceScreenProduction: React.FC = () => {
   
   const { addFoodItem, logFood, updateCurrentDate } = useFoodStore();
   const { incrementRecordingUsage, getUsageStats } = useUserStore();
-  // const { state: revenueCatState } = useRevenueCat(); // Temporarily disabled
+  const { state: revenueCatState, actions: revenueCatActions } = useRevenueCat();
+  const { presentPaywallIfNeededWithAlert } = usePaywall();
   
   // Custom hooks for voice functionality
   const voiceRecording = useVoiceRecording();
@@ -43,40 +45,47 @@ const VoiceScreenProduction: React.FC = () => {
   // Derive current error from hooks
   const currentError = voiceRecording.state.error || voiceProcessing.data.error;
 
-  // Get usage stats - temporarily using only userStore until RevenueCat loop is fixed
+  // Get usage stats - use RevenueCat if available, fallback to userStore
   const getCurrentUsageStats = () => {
-    // TODO: Re-enable RevenueCat integration once loop is fixed
-    // if (revenueCatState.isInitialized && !revenueCatState.error) {
-    //   // Use RevenueCat usage info if available
-    //   return {
-    //     recordingsUsed: revenueCatState.usageInfo.recordingsUsed,
-    //     recordingsRemaining: revenueCatState.usageInfo.recordingsRemaining,
-    //     monthlyLimit: revenueCatState.usageInfo.recordingsLimit,
-    //     resetDate: revenueCatState.usageInfo.resetDate.toISOString(),
-    //     usagePercentage: revenueCatState.usageInfo.recordingsLimit 
-    //       ? Math.min(100, (revenueCatState.usageInfo.recordingsUsed / revenueCatState.usageInfo.recordingsLimit) * 100) 
-    //       : 0,
-    //   };
-    // } else {
-    //   // Fallback to userStore
+    if (revenueCatState.isInitialized && !revenueCatState.error) {
+      // Use RevenueCat usage info if available
+      return {
+        recordingsUsed: revenueCatState.usageInfo.recordingsUsed,
+        recordingsRemaining: revenueCatState.usageInfo.recordingsRemaining,
+        monthlyLimit: revenueCatState.usageInfo.recordingsLimit,
+        resetDate: revenueCatState.usageInfo.resetDate.toISOString(),
+        usagePercentage: revenueCatState.usageInfo.recordingsLimit 
+          ? Math.min(100, (revenueCatState.usageInfo.recordingsUsed / revenueCatState.usageInfo.recordingsLimit) * 100) 
+          : 0,
+      };
+    } else {
+      // Fallback to userStore
       return getUsageStats();
-    // }
+    }
   };
+
+  // Temporary test function to force paywall (remove in production)
+  const testPaywall = useCallback(async () => {
+    console.log('🧪 Testing paywall...');
+    await presentPaywallIfNeededWithAlert({
+      requiredEntitlement: 'pro',
+    });
+  }, [presentPaywallIfNeededWithAlert]);
 
   // Start recording
   const handleStartRecording = useCallback(async () => {
-    // Check usage limits before starting recording
     const usageStats = getCurrentUsageStats();
     
     if (usageStats.monthlyLimit !== null && usageStats.recordingsRemaining !== null && usageStats.recordingsRemaining <= 0) {
       Alert.alert(
         'Recording Limit Reached',
-        `You've reached your monthly limit of ${usageStats.monthlyLimit} recordings. Upgrade to PRO for more recordings!`,
+        `You've reached your monthly limit of ${usageStats.monthlyLimit} recordings. Upgrade to PRO for unlimited recordings!`,
         [
           { text: 'Maybe Later', style: 'cancel' },
-          { text: 'Upgrade Now', onPress: () => {
-            // TODO: Navigate to subscription screen
-            Alert.alert('Upgrade', 'This would open the subscription upgrade screen.');
+          { text: 'Upgrade to Pro', onPress: async () => {
+            await presentPaywallIfNeededWithAlert({
+              requiredEntitlement: 'pro',
+            });
           }}
         ]
       );
@@ -88,7 +97,7 @@ const VoiceScreenProduction: React.FC = () => {
       setVoiceState('recording');
       voiceProcessing.actions.clearError();
     }
-  }, [voiceRecording.actions, voiceRecording.state.error, voiceProcessing.actions, getUsageStats]);
+  }, [voiceRecording.actions, voiceRecording.state.error, voiceProcessing.actions, getCurrentUsageStats, presentPaywallIfNeededWithAlert]);
 
 
   // Stop recording
@@ -235,6 +244,10 @@ const VoiceScreenProduction: React.FC = () => {
 
       // Increment recording usage after successful food logging
       incrementRecordingUsage();
+      // Also update RevenueCat usage if initialized
+      if (revenueCatState.isInitialized) {
+        revenueCatActions.updateUsageCount(1);
+      }
       console.log('📊 Recording usage incremented after successful food logging');
 
       // Reset state
@@ -248,7 +261,7 @@ const VoiceScreenProduction: React.FC = () => {
       console.error('❌ Failed to log foods:', error);
       Alert.alert('Error', 'Failed to save food items. Please try again.');
     }
-  }, [parsedFoods, addFoodItem, logFood, voiceProcessing.actions, incrementRecordingUsage, updateCurrentDate]);
+  }, [parsedFoods, addFoodItem, logFood, voiceProcessing.actions, incrementRecordingUsage, updateCurrentDate, revenueCatState.isInitialized, revenueCatActions]);
 
   const handleCancel = useCallback(() => {
     // Cancel recording if in progress
@@ -272,7 +285,7 @@ const VoiceScreenProduction: React.FC = () => {
 
   // Two-Way Comparison: GPT-4 vs Gemini
   const compareApproaches = useCallback(async () => {
-    const testText = "اكلت نصف فرخة مشوية ربع كيلو ريش داني طبق رز و طاجن بمية باللحمة";
+    const testText = "كلت واحدة زبادي مراعي جريك يوجرد لو فات هي حوالي 170 جرام وكلت معلات تشيا سيدز وكلت وشربت واحدة ستاربوكس ميديام سكيم ميلك";
     console.log('🧪 TWO-WAY COMPARISON: GPT-4 vs Gemini for:', testText);
     console.log('═'.repeat(80));
     
@@ -669,6 +682,17 @@ Check console for detailed logs.`,
               </TouchableOpacity>
               <Text style={styles.testDescription}>
                 Compare GPT-4 vs Gemini with full Arabic meal description
+              </Text>
+              
+              <TouchableOpacity
+                style={[styles.testButton, styles.testButtonPrimary]}
+                onPress={testPaywall}
+              >
+                <MaterialIcons name="payment" size={20} color={colors.white} />
+                <Text style={[styles.testButtonText, styles.testButtonTextPrimary]}>🧪 Test RevenueCat Paywall</Text>
+              </TouchableOpacity>
+              <Text style={styles.testDescription}>
+                Test the RevenueCat paywall (remove in production)
               </Text>
             </View>
           )}

@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
+import { colors, fonts, spacing, borderRadius, shadows } from '../../constants/theme';
 import { DailyLog } from '../../types';
 import { Card } from './Card';
 
@@ -17,8 +16,6 @@ interface WeeklyDayData {
   goal: number;
   status: 'under' | 'target' | 'over';
 }
-
-const { width: screenWidth } = Dimensions.get('window');
 
 export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
   // Generate weekly data for the last 7 days
@@ -61,14 +58,12 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
   const weeklyTotal = weeklyData.reduce((sum, day) => sum + day.calories, 0);
   const weeklyAverage = Math.round(weeklyTotal / 7);
   
-  // Get the user's actual calorie goal (use the first non-zero goal or default to 2000)
+  // Get the user's actual calorie goal
   const userGoal = weeklyData.find(day => day.goal > 0)?.goal || 2000;
   
-  // Calculate the maximum value for scaling (consider both calories and user goal)
+  // Calculate scaling - use a sensible maximum that includes user goal
   const maxCalories = Math.max(...weeklyData.map(day => day.calories), userGoal);
-  
-  // Set a reasonable maximum for scaling that includes the user's goal
-  const maxScaleValue = Math.max(maxCalories, userGoal, 2500);
+  const maxScale = Math.max(maxCalories, userGoal * 1.2); // 20% above goal for scaling
   
   // Animation values for bars
   const barAnimations = React.useRef(weeklyData.map(() => new Animated.Value(0))).current;
@@ -90,55 +85,42 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
   const getBarColor = (status: 'under' | 'target' | 'over') => {
     switch (status) {
       case 'under':
-        return '#34C759'; // Apple green
+        return colors.success; // Theme success color
       case 'target':
-        return '#007AFF'; // Apple blue
+        return colors.primary; // Theme primary color
       case 'over':
-        return '#FF9500'; // Apple orange
+        return colors.warning; // Theme warning color
       default:
         return colors.gray300;
     }
   };
 
   const renderDay = (day: WeeklyDayData, index: number) => {
-    const maxHeight = 80;
-    
-    // Scale bars based on maxScaleValue
-    const barHeight = Math.max((day.calories / maxScaleValue) * maxHeight, 4);
-    const goalHeight = (userGoal / maxScaleValue) * maxHeight;
-    
-    // Ensure bars and goal lines never exceed the container height
-    const clampedBarHeight = Math.min(barHeight, maxHeight);
-    const clampedGoalHeight = Math.min(goalHeight, maxHeight);
-    
+    const barHeight = Math.max((day.calories / maxScale) * 60, 2); // Max 60px height
+    const goalPosition = (userGoal / maxScale) * 60; // Goal line position
     const barColor = getBarColor(day.status);
     const isToday = day.date.toDateString() === new Date().toDateString();
 
     return (
-      <View key={index} style={styles.dayContainer}>
-        {/* Goal line - using user's actual goal */}
-        <View style={[styles.goalLine, { bottom: clampedGoalHeight + 100 }]} />
-        
-        {/* Calorie bar - positioned from bottom */}
-        <View style={styles.barWrapper}>
+      <View key={index} style={styles.dayColumn}>
+        {/* Chart area */}
+        <View style={styles.chartArea}>
+          {/* Goal line */}
+          <View style={[styles.goalLine, { bottom: goalPosition }]} />
+          
+          {/* Bar */}
           <Animated.View
             style={[
-              styles.barContainer,
+              styles.bar,
               {
                 height: barAnimations[index].interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0, clampedBarHeight],
+                  outputRange: [0, barHeight],
                 }),
+                backgroundColor: barColor,
               },
             ]}
-          >
-            <LinearGradient
-              colors={[barColor, `${barColor}80`]}
-              style={styles.bar}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-            />
-          </Animated.View>
+          />
         </View>
         
         {/* Day info */}
@@ -155,167 +137,132 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Separate Header Block */}
-      <View style={styles.headerBlock}>
-        <View style={styles.titleRow}>
-          <MaterialIcons name="bar-chart" size={20} color={colors.primary} />
-          <Text style={styles.title}>Weekly Overview</Text>
+    <Card style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <MaterialIcons name="bar-chart" size={20} color={colors.primary} />
+        <Text style={styles.title}>Weekly Overview</Text>
+      </View>
+
+      {/* Chart */}
+      <View style={styles.chartContainer}>
+        {weeklyData.map((day, index) => renderDay(day, index))}
+      </View>
+
+      {/* Stats */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue} numberOfLines={1}>{weeklyTotal.toLocaleString()}</Text>
+          <Text style={styles.statLabel} numberOfLines={1}>Total</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statValue} numberOfLines={1}>{weeklyAverage.toLocaleString()}</Text>
+          <Text style={styles.statLabel} numberOfLines={1}>Average</Text>
         </View>
       </View>
 
-      {/* Chart Card */}
-      <Card style={styles.chartCard}>
-        {/* Chart Section */}
-        <View style={styles.chartSection}>
-          <View style={styles.chart}>
-            {weeklyData.map((day, index) => renderDay(day, index))}
-          </View>
+      {/* Legend */}
+      <View style={styles.legend}>
+        <View style={styles.legendItem}>
+          <View style={styles.legendLine} />
+          <Text style={styles.legendText} numberOfLines={1}>Goal ({userGoal})</Text>
         </View>
-
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{weeklyTotal.toLocaleString()}</Text>
-            <Text style={styles.statLabel}>Total</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{weeklyAverage.toLocaleString()}</Text>
-            <Text style={styles.statLabel}>Average</Text>
-          </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
+          <Text style={styles.legendText} numberOfLines={1}>Under</Text>
         </View>
-
-        {/* Legend */}
-        <View style={styles.legend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendLine, { backgroundColor: colors.textSecondary }]} />
-            <Text style={styles.legendText}>Goal ({userGoal})</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#34C759' }]} />
-            <Text style={styles.legendText}>Under</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#007AFF' }]} />
-            <Text style={styles.legendText}>Target</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#FF9500' }]} />
-            <Text style={styles.legendText}>Over</Text>
-          </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
+          <Text style={styles.legendText} numberOfLines={1}>Target</Text>
         </View>
-      </Card>
-    </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
+          <Text style={styles.legendText} numberOfLines={1}>Over</Text>
+        </View>
+      </View>
+    </Card>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    margin: spacing.sm,
-  },
-  headerBlock: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
-    marginBottom: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: colors.gray100,
+    margin: spacing.sm,
+    ...shadows.md,
+    shadowColor: colors.primary,
   },
-  titleRow: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: spacing.xl,
   },
   title: {
     fontSize: fonts.lg,
-    fontWeight: '600',
+    fontWeight: fonts.semibold,
     color: colors.textPrimary,
     marginLeft: spacing.sm,
   },
-  chartCard: {
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: colors.gray100,
-  },
-  chartSection: {
-    marginBottom: spacing.lg,
-  },
-  chart: {
+  chartContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    height: 120,
-    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.sm,
   },
-  dayContainer: {
+  dayColumn: {
     flex: 1,
     alignItems: 'center',
-    position: 'relative',
     marginHorizontal: 2,
-    minHeight: 160,
   },
-  barWrapper: {
-    width: '85%',
-    height: 80,
+  chartArea: {
+    width: '100%',
+    height: 80, // Fixed height container
+    position: 'relative',
     justifyContent: 'flex-end',
     alignItems: 'center',
-  },
-  barContainer: {
-    width: '100%',
-    borderRadius: borderRadius.sm,
-    overflow: 'hidden',
-    minHeight: 4,
+    marginBottom: spacing.md,
   },
   bar: {
-    flex: 1,
+    width: '80%',
     borderRadius: borderRadius.sm,
+    minHeight: 2,
   },
   goalLine: {
     position: 'absolute',
-    width: '100%',
+    width: '90%',
     height: 1,
     backgroundColor: colors.textSecondary,
-    opacity: 0.4,
+    opacity: 0.6,
   },
   dayInfo: {
     alignItems: 'center',
-    marginTop: spacing.md,
-    width: '100%',
+    minHeight: 40,
   },
   dayText: {
     fontSize: fonts.xs,
-    fontWeight: '600',
+    fontWeight: fonts.semibold,
     color: colors.textSecondary,
     marginBottom: spacing.xs,
     textAlign: 'center',
   },
   todayText: {
     color: colors.primary,
-    fontWeight: '700',
+    fontWeight: fonts.bold,
   },
   caloriesText: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: fonts.medium,
     textAlign: 'center',
   },
   todayCalories: {
     color: colors.textPrimary,
-    fontWeight: '600',
+    fontWeight: fonts.semibold,
   },
-  statsRow: {
+  statsContainer: {
     flexDirection: 'row',
     backgroundColor: colors.backgroundSecondary,
     borderRadius: borderRadius.md,
@@ -333,14 +280,14 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: fonts.lg,
-    fontWeight: '700',
+    fontWeight: fonts.bold,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   statLabel: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: fonts.medium,
   },
   legend: {
     flexDirection: 'row',
@@ -356,6 +303,8 @@ const styles = StyleSheet.create({
   legendLine: {
     width: 12,
     height: 1,
+    backgroundColor: colors.textSecondary,
+    opacity: 0.6,
     marginRight: spacing.xs,
   },
   legendDot: {
@@ -367,6 +316,6 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: fonts.medium,
   },
 });

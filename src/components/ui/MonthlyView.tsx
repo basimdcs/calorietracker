@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
+import { colors, fonts, spacing, borderRadius, shadows } from '../../constants/theme';
 import { DailyLog } from '../../types';
 import { Card } from './Card';
 
@@ -100,9 +100,10 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
   const getIntensityColor = (intensity: number): string => {
     if (intensity === 0) return colors.gray200;
     
-    // Beautiful gradient from light green to dark green
-    const alpha = intensity;
-    return `rgba(16, 185, 129, ${alpha})`; // Green with varying opacity
+    // Use theme accent color with varying opacity for consistency
+    const baseColor = colors.accent; // Theme accent color (emerald)
+    const alpha = Math.max(intensity * 0.8 + 0.2, 0.2); // Ensure minimum visibility
+    return `${baseColor}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`;
   };
 
   const getTextColor = (intensity: number): string => {
@@ -204,7 +205,7 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
         
         {/* Legend */}
         <View style={styles.legend}>
-          <Text style={styles.legendText}>Less</Text>
+          <Text style={styles.legendText} numberOfLines={1}>Less</Text>
           <View style={styles.legendDots}>
             {[0, 0.3, 0.5, 0.7, 1.0].map((intensity, index) => (
               <View
@@ -216,7 +217,7 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
               />
             ))}
           </View>
-          <Text style={styles.legendText}>More</Text>
+          <Text style={styles.legendText} numberOfLines={1}>More</Text>
         </View>
       </View>
 
@@ -225,24 +226,24 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
         <Text style={styles.sectionTitle}>Key Metrics</Text>
         <View style={styles.metricsGrid}>
           <LinearGradient
-            colors={['#10B981', '#059669']}
+            colors={[colors.accent, colors.accentDark]}
             style={styles.metricCard}
           >
-            <MaterialIcons name="local-fire-department" size={18} color={colors.white} />
-            <Text style={[styles.metricValue, { color: colors.white }]}>{currentStreak}</Text>
-            <Text style={[styles.metricLabel, { color: colors.white }]}>Streak</Text>
+            <MaterialIcons name="local-fire-department" size={18} color={colors.textOnPrimary} />
+            <Text style={[styles.metricValue, { color: colors.textOnPrimary }]}>{currentStreak}</Text>
+            <Text style={[styles.metricLabel, { color: colors.textOnPrimary }]} numberOfLines={2}>Streak</Text>
           </LinearGradient>
           
           <View style={styles.metricCard}>
             <MaterialIcons name="event-available" size={18} color={colors.primary} />
             <Text style={styles.metricValue}>{activeDays}</Text>
-            <Text style={styles.metricLabel}>Days</Text>
+            <Text style={styles.metricLabel} numberOfLines={2}>Days</Text>
           </View>
           
           <View style={styles.metricCard}>
             <MaterialIcons name="track-changes" size={18} color={colors.secondary} />
             <Text style={styles.metricValue}>{consistencyPercentage}%</Text>
-            <Text style={styles.metricLabel}>Consistency</Text>
+            <Text style={styles.metricLabel} numberOfLines={2}>Consistency</Text>
           </View>
         </View>
       </View>
@@ -287,11 +288,9 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
 
 const styles = StyleSheet.create({
   container: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
+    backgroundColor: colors.surface,
+    ...shadows.lg,
+    shadowColor: colors.primary,
   },
   header: {
     flexDirection: 'row',
@@ -301,31 +300,33 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: fonts['2xl'],
-    fontWeight: 'bold',
+    fontWeight: fonts.bold,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   subtitle: {
     fontSize: fonts.sm,
     color: colors.textSecondary,
+    fontWeight: fonts.normal,
   },
   averageContainer: {
     alignItems: 'flex-end',
   },
   averageNumber: {
     fontSize: fonts['2xl'],
-    fontWeight: 'bold',
+    fontWeight: fonts.bold,
     color: colors.primary,
   },
   averageLabel: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
+    fontWeight: fonts.medium,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   sectionTitle: {
     fontSize: fonts.lg,
-    fontWeight: '600',
+    fontWeight: fonts.semibold,
     color: colors.textPrimary,
     marginBottom: spacing.md,
   },
@@ -341,7 +342,7 @@ const styles = StyleSheet.create({
   weekDayText: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: fonts.semibold,
     textAlign: 'center',
     width: 32,
   },
@@ -369,7 +370,7 @@ const styles = StyleSheet.create({
   },
   dayCellText: {
     fontSize: fonts.xs,
-    fontWeight: '600',
+    fontWeight: fonts.semibold,
   },
   legend: {
     flexDirection: 'row',
@@ -380,6 +381,7 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
+    fontWeight: fonts.medium,
   },
   legendDots: {
     flexDirection: 'row',
@@ -410,7 +412,7 @@ const styles = StyleSheet.create({
   },
   metricValue: {
     fontSize: fonts.xl,
-    fontWeight: 'bold',
+    fontWeight: fonts.bold,
     color: colors.textPrimary,
     marginVertical: spacing.xs,
     textAlign: 'center',
@@ -419,8 +421,7 @@ const styles = StyleSheet.create({
     fontSize: fonts.xs,
     color: colors.textSecondary,
     textAlign: 'center',
-    fontWeight: '500',
-    numberOfLines: 2,
+    fontWeight: fonts.medium,
   },
   progressContainer: {
     marginTop: spacing.sm,
@@ -438,7 +439,7 @@ const styles = StyleSheet.create({
   },
   progressTitle: {
     fontSize: fonts.lg,
-    fontWeight: '600',
+    fontWeight: fonts.semibold,
     color: colors.textPrimary,
     marginLeft: spacing.sm,
   },
@@ -452,7 +453,7 @@ const styles = StyleSheet.create({
   },
   progressStatValue: {
     fontSize: fonts.lg,
-    fontWeight: 'bold',
+    fontWeight: fonts.bold,
     color: colors.primary,
     marginBottom: spacing.xs,
     textAlign: 'center',
@@ -461,7 +462,7 @@ const styles = StyleSheet.create({
     fontSize: fonts.xs,
     color: colors.textSecondary,
     textAlign: 'center',
-    fontWeight: '500',
+    fontWeight: fonts.medium,
   },
   celebrationBadge: {
     flexDirection: 'row',
@@ -475,8 +476,8 @@ const styles = StyleSheet.create({
   },
   celebrationText: {
     fontSize: fonts.sm,
-    fontWeight: '600',
-    color: colors.white,
+    fontWeight: fonts.semibold,
+    color: colors.textOnPrimary,
     marginLeft: spacing.xs,
   },
 });

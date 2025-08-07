@@ -11,4 +11,6 @@ export { PricingCard } from './PricingCard';
 export { UsageProgressBar } from './UsageProgressBar';
 export { DailyView } from './DailyView';
 export { WeeklyView } from './WeeklyView';
-export { MonthlyView } from './MonthlyView'; 
+export { MonthlyView } from './MonthlyView';
+// export { PaywallScreen } from '../paywall/PaywallScreen';
+// export { PaywallModal } from '../paywall/PaywallModal'; 

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors, fonts, spacing } from '../../constants/theme';
+import { colors, fonts, spacing, shadows, borderRadius } from '../../constants/theme';
 import { useFoodStore } from '../../stores/foodStore';
 import { DailyLog, LoggedFood } from '../../types';
 import { Card } from '../../components/ui/Card';
@@ -108,36 +108,34 @@ const HistoryScreen: React.FC = () => {
         <MaterialIcons name="calendar-today" size={24} color={colors.primary} />
         <Text style={styles.cardTitle}>Calendar View</Text>
       </View>
-      <View style={styles.cardContent}>
-        <Calendar
-          onDayPress={(day) => setSelectedDate(new Date(day.timestamp))}
-          markedDates={getMarkedDates()}
-          theme={{
-            backgroundColor: colors.white,
-            calendarBackground: colors.white,
-            textSectionTitleColor: colors.textPrimary,
-            selectedDayBackgroundColor: colors.primary,
-            selectedDayTextColor: colors.white,
-            todayTextColor: colors.primary,
-            dayTextColor: colors.textPrimary,
-            textDisabledColor: colors.textSecondary,
-            dotColor: colors.primary,
-            selectedDotColor: colors.white,
-            arrowColor: colors.primary,
-            monthTextColor: colors.textPrimary,
-            indicatorColor: colors.primary,
-            textDayFontFamily: 'System',
-            textMonthFontFamily: 'System',
-            textDayHeaderFontFamily: 'System',
-            textDayFontWeight: '300',
-            textMonthFontWeight: 'bold',
-            textDayHeaderFontWeight: '300',
-            textDayFontSize: fonts.base,
-            textMonthFontSize: fonts.lg,
-            textDayHeaderFontSize: fonts.sm,
-          }}
-        />
-      </View>
+      <Calendar
+        onDayPress={(day) => setSelectedDate(new Date(day.timestamp))}
+        markedDates={getMarkedDates()}
+        theme={{
+          backgroundColor: colors.surface,
+          calendarBackground: colors.surface,
+          textSectionTitleColor: colors.textPrimary,
+          selectedDayBackgroundColor: colors.primary,
+          selectedDayTextColor: colors.textOnPrimary,
+          todayTextColor: colors.primary,
+          dayTextColor: colors.textPrimary,
+          textDisabledColor: colors.textTertiary,
+          dotColor: colors.primary,
+          selectedDotColor: colors.textOnPrimary,
+          arrowColor: colors.primary,
+          monthTextColor: colors.textPrimary,
+          indicatorColor: colors.primary,
+          textDayFontFamily: fonts.primary,
+          textMonthFontFamily: fonts.primary,
+          textDayHeaderFontFamily: fonts.primary,
+          textDayFontWeight: fonts.light,
+          textMonthFontWeight: fonts.bold,
+          textDayHeaderFontWeight: fonts.medium,
+          textDayFontSize: fonts.base,
+          textMonthFontSize: fonts.lg,
+          textDayHeaderFontSize: fonts.sm,
+        }}
+      />
     </Card>
   );
 
@@ -196,23 +194,20 @@ const HistoryScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.backgroundSecondary,
   },
   header: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+    ...shadows.sm,
+    shadowColor: colors.black,
   },
   headerContent: {
     flexDirection: 'row',
@@ -224,13 +219,14 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: fonts.xl,
-    fontWeight: 'bold',
+    fontWeight: fonts.bold,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   headerSubtitle: {
     fontSize: fonts.base,
     color: colors.textSecondary,
+    fontWeight: fonts.normal,
   },
   scrollView: {
     flex: 1,
@@ -241,23 +237,20 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   viewModeCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    ...shadows.md,
+    shadowColor: colors.primary,
   },
   viewModeContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.white,
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
     padding: spacing.xs,
   },
   viewModeButton: {
     flex: 1,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
   },
   viewModeButtonActive: {
@@ -265,39 +258,15 @@ const styles = StyleSheet.create({
   },
   viewModeText: {
     fontSize: fonts.base,
-    fontWeight: '600',
+    fontWeight: fonts.semibold,
     color: colors.textSecondary,
   },
   viewModeTextActive: {
-    color: colors.white,
+    color: colors.textOnPrimary,
   },
   calendarCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  dailyCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  weeklyCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  monthlyCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    ...shadows.md,
+    shadowColor: colors.primary,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -306,7 +275,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: fonts.lg,
-    fontWeight: 'bold',
+    fontWeight: fonts.bold,
     color: colors.textPrimary,
     marginLeft: spacing.sm,
     flex: 1,

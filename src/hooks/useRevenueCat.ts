@@ -1,18 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Purchases, { 
   CustomerInfo, 
-  Offerings, 
+  PurchasesOfferings, 
   PurchasesOffering, 
   PurchasesPackage,
   PurchasesError,
 } from 'react-native-purchases';
 import { Alert } from 'react-native';
-import { REVENUE_CAT_CONFIG } from '../config/revenueCat';
+import { REVENUE_CAT_CONFIG, getPurchasesInstance } from '../config/revenueCat';
 
 // Types for our subscription system
 export interface SubscriptionStatus {
   isActive: boolean;
-  tier: 'FREE' | 'PRO' | 'ELITE';
+  tier: 'FREE' | 'PRO';
   expirationDate?: Date;
   willRenew: boolean;
   isInGracePeriod: boolean;
@@ -30,7 +30,7 @@ export interface RevenueCatState {
   isInitialized: boolean;
   isLoading: boolean;
   customerInfo: CustomerInfo | null;
-  offerings: Offerings | null;
+  offerings: PurchasesOfferings | null;
   subscriptionStatus: SubscriptionStatus;
   usageInfo: UsageInfo;
   error: string | null;
@@ -50,15 +50,16 @@ export interface RevenueCatActions {
 
 const DEFAULT_USAGE_LIMITS = {
   FREE: 10,
-  PRO: 300,
-  ELITE: null, // unlimited
+  PRO: null, // unlimited for Pro tier
 };
 
 const useRevenueCat = () => {
   // Refs to prevent re-initialization and track listener state
   const hasInitializedRef = useRef(false);
   const hasListenerRef = useRef(false);
-  const currentUserIdRef = useRef<string | undefined>();
+  const currentUserIdRef = useRef<string | undefined>(undefined);
+  const initializationAttemptsRef = useRef(0);
+  const maxInitializationAttempts = 3;
   
   const [state, setState] = useState<RevenueCatState>({
     isInitialized: false,
@@ -75,7 +76,7 @@ const useRevenueCat = () => {
       recordingsUsed: 0,
       recordingsLimit: DEFAULT_USAGE_LIMITS.FREE,
       recordingsRemaining: DEFAULT_USAGE_LIMITS.FREE,
-      resetDate: new Date(),
+      resetDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
     },
     error: null,
   });
@@ -87,18 +88,6 @@ const useRevenueCat = () => {
     // Check for active entitlements
     const entitlements = customerInfo.entitlements.active;
     
-    if (entitlements[REVENUE_CAT_CONFIG.ENTITLEMENTS.ELITE]) {
-      const entitlement = entitlements[REVENUE_CAT_CONFIG.ENTITLEMENTS.ELITE];
-      return {
-        isActive: true,
-        tier: 'ELITE',
-        expirationDate: entitlement.expirationDate ? new Date(entitlement.expirationDate) : undefined,
-        willRenew: entitlement.willRenew,
-        isInGracePeriod: entitlement.isInGracePeriod,
-        productIdentifier: entitlement.productIdentifier,
-      };
-    }
-    
     if (entitlements[REVENUE_CAT_CONFIG.ENTITLEMENTS.PRO]) {
       const entitlement = entitlements[REVENUE_CAT_CONFIG.ENTITLEMENTS.PRO];
       return {
@@ -106,7 +95,7 @@ const useRevenueCat = () => {
         tier: 'PRO',
         expirationDate: entitlement.expirationDate ? new Date(entitlement.expirationDate) : undefined,
         willRenew: entitlement.willRenew,
-        isInGracePeriod: entitlement.isInGracePeriod,
+        isInGracePeriod: false, // Grace period not directly available in current API
         productIdentifier: entitlement.productIdentifier,
       };
     }
@@ -150,18 +139,45 @@ const useRevenueCat = () => {
       return;
     }
     
+    // Prevent too many initialization attempts
+    if (initializationAttemptsRef.current >= maxInitializationAttempts) {
+      console.log('⏭️ RevenueCat initialization blocked - too many attempts');
+      return;
+    }
+    
+    // Prevent initialization if there's a persistent error
+    if (state.error && state.error.includes('Invalid API key')) {
+      console.log('⏭️ RevenueCat initialization blocked due to API key error');
+      return;
+    }
+    
+    initializationAttemptsRef.current += 1;
     hasInitializedRef.current = true;
     currentUserIdRef.current = userID;
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      console.log('🚀 Initializing RevenueCat...');
+      console.log('🚀 Initializing RevenueCat... (attempt', initializationAttemptsRef.current, ')');
+      
+      // Check if API keys are configured
+      const { env } = await import('../config/env');
+      console.log('🔍 RevenueCat API Key Check:', {
+        hasIOSKey: !!env.REVENUE_CAT_API_KEY_IOS,
+        keyLength: env.REVENUE_CAT_API_KEY_IOS?.length,
+        keyPreview: env.REVENUE_CAT_API_KEY_IOS?.substring(0, 10) + '...',
+        isPlaceholder: env.REVENUE_CAT_API_KEY_IOS === 'your-ios-api-key-here'
+      });
+      
+      if (!env.REVENUE_CAT_API_KEY_IOS || env.REVENUE_CAT_API_KEY_IOS === 'your-ios-api-key-here') {
+        throw new Error(`RevenueCat API key not configured. Found: "${env.REVENUE_CAT_API_KEY_IOS}". Please add REVENUE_CAT_API_KEY_IOS to your .env file.`);
+      }
       
       const { initializeRevenueCat: initRC } = await import('../config/revenueCat');
       await initRC(userID);
       
       // Get initial customer info
-      const customerInfo = await Purchases.getCustomerInfo();
+      const PurchasesInstance = getPurchasesInstance();
+      const customerInfo = await PurchasesInstance.getCustomerInfo();
       const subscriptionStatus = parseSubscriptionStatus(customerInfo);
       const usageInfo = calculateUsageInfo(subscriptionStatus);
       
@@ -179,19 +195,25 @@ const useRevenueCat = () => {
     } catch (error) {
       console.error('❌ Failed to initialize RevenueCat:', error);
       hasInitializedRef.current = false; // Reset on error
+      const errorMessage = error instanceof Error ? error.message : 'Failed to initialize RevenueCat';
+      
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to initialize RevenueCat',
+        error: errorMessage,
       }));
+      
+      // Don't throw error, just log it so app continues to work
+      console.log('🔄 App will continue without RevenueCat integration');
     }
-  }, [parseSubscriptionStatus, calculateUsageInfo]);
+  }, [parseSubscriptionStatus, calculateUsageInfo, state.isInitialized, state.isLoading, state.error]);
 
   // Refresh customer info - use functional state updates to avoid dependency
   const refreshCustomerInfo = useCallback(async () => {
     try {
       console.log('🔄 Refreshing customer info...');
-      const customerInfo = await Purchases.getCustomerInfo();
+      const PurchasesInstance = getPurchasesInstance();
+      const customerInfo = await PurchasesInstance.getCustomerInfo();
       const subscriptionStatus = parseSubscriptionStatus(customerInfo);
       
       setState(prev => {
@@ -222,7 +244,8 @@ const useRevenueCat = () => {
     try {
       console.log('💳 Attempting purchase:', packageToPurchase.identifier);
       
-      const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
+      const PurchasesInstance = getPurchasesInstance();
+      const { customerInfo } = await PurchasesInstance.purchasePackage(packageToPurchase);
       const subscriptionStatus = parseSubscriptionStatus(customerInfo);
       
       setState(prev => {
@@ -243,9 +266,9 @@ const useRevenueCat = () => {
       console.error('❌ Purchase failed:', error);
       
       let errorMessage = 'Purchase failed';
-      if (error instanceof PurchasesError) {
+      if (error && typeof error === 'object' && 'code' in error) {
         // Handle specific RevenueCat errors
-        switch (error.code) {
+        switch ((error as any).code) {
           case 'PURCHASE_CANCELLED':
             errorMessage = 'Purchase was cancelled';
             break;
@@ -256,7 +279,7 @@ const useRevenueCat = () => {
             errorMessage = 'Network error. Please check your connection.';
             break;
           default:
-            errorMessage = error.message || 'Purchase failed';
+            errorMessage = (error as any).message || 'Purchase failed';
         }
       }
       
@@ -277,7 +300,8 @@ const useRevenueCat = () => {
     try {
       console.log('🔄 Restoring purchases...');
       
-      const customerInfo = await Purchases.restorePurchases();
+      const PurchasesInstance = getPurchasesInstance();
+      const customerInfo = await PurchasesInstance.restorePurchases();
       const subscriptionStatus = parseSubscriptionStatus(customerInfo);
       
       setState(prev => {
@@ -309,7 +333,8 @@ const useRevenueCat = () => {
   const getOfferings = useCallback(async () => {
     try {
       console.log('📦 Fetching offerings...');
-      const offerings = await Purchases.getOfferings();
+      const PurchasesInstance = getPurchasesInstance();
+      const offerings = await PurchasesInstance.getOfferings();
       
       setState(prev => ({
         ...prev,
@@ -332,7 +357,8 @@ const useRevenueCat = () => {
     try {
       console.log('👤 Identifying user:', userID);
       currentUserIdRef.current = userID;
-      const { customerInfo } = await Purchases.logIn(userID);
+      const PurchasesInstance = getPurchasesInstance();
+      const { customerInfo } = await PurchasesInstance.logIn(userID);
       const subscriptionStatus = parseSubscriptionStatus(customerInfo);
       
       setState(prev => {
@@ -360,7 +386,9 @@ const useRevenueCat = () => {
   const logoutUser = useCallback(async () => {
     try {
       console.log('👋 Logging out user...');
-      const { customerInfo } = await Purchases.logOut();
+      const PurchasesInstance = getPurchasesInstance();
+      // logOut returns CustomerInfo directly in v9, not an object with customerInfo
+      const customerInfo = await PurchasesInstance.logOut();
       const subscriptionStatus = parseSubscriptionStatus(customerInfo);
       const usageInfo = calculateUsageInfo(subscriptionStatus);
       
@@ -405,14 +433,20 @@ const useRevenueCat = () => {
       });
     };
 
+    const PurchasesInstance = getPurchasesInstance();
+    
     // Add listener
-    Purchases.addCustomerInfoUpdateListener(customerInfoListener);
+    PurchasesInstance.addCustomerInfoUpdateListener(customerInfoListener);
 
     // Cleanup
     return () => {
       console.log('🧹 Cleaning up RevenueCat listeners...');
       hasListenerRef.current = false;
-      Purchases.removeCustomerInfoUpdateListener(customerInfoListener);
+      try {
+        PurchasesInstance.removeCustomerInfoUpdateListener(customerInfoListener);
+      } catch (error) {
+        console.warn('⚠️ Error removing RevenueCat listener:', error);
+      }
     };
   }, [state.isInitialized, parseSubscriptionStatus, calculateUsageInfo]);
 
@@ -422,6 +456,7 @@ const useRevenueCat = () => {
     hasInitializedRef.current = false;
     hasListenerRef.current = false;
     currentUserIdRef.current = undefined;
+    initializationAttemptsRef.current = 0;
     setState(prev => ({
       ...prev,
       isInitialized: false,

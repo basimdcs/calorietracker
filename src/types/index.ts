@@ -1,7 +1,7 @@
 export type Gender = 'male' | 'female';
 export type ActivityLevel = 'sedentary' | 'lightly-active' | 'moderately-active' | 'very-active' | 'extra-active';
 export type Goal = 'lose' | 'maintain' | 'gain';
-export type SubscriptionTier = 'FREE' | 'PRO' | 'ELITE';
+export type SubscriptionTier = 'FREE' | 'PRO';
 
 export interface UserProfile {
   id: string;
@@ -298,9 +298,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Free',
     monthlyPrice: 0,
     currency: 'EGP',
-    monthlyRecordingLimit: 30,
+    monthlyRecordingLimit: 10,
     features: [
-      '30 voice recordings per month',
+      '10 voice recordings per month',
       'Basic food database',
       'Calorie tracking',
       'Basic nutrition insights'
@@ -311,29 +311,15 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Pro',
     monthlyPrice: 99,
     currency: 'EGP',
-    monthlyRecordingLimit: 300,
-    features: [
-      '300 voice recordings per month',
-      'Extended food database',
-      'Advanced nutrition insights',
-      'Detailed progress tracking',
-      'Priority support'
-    ],
-    popular: true
-  },
-  {
-    tier: 'ELITE',
-    name: 'Elite',
-    monthlyPrice: 149,
-    currency: 'EGP',
     monthlyRecordingLimit: null,
     features: [
       'Unlimited voice recordings',
-      'Complete food database',
-      'Premium nutrition insights',
-      'Advanced analytics',
-      'Personal nutrition consultant',
+      'Extended food database',
+      'Advanced nutrition insights',
+      'Detailed progress tracking',
+      'Export data',
       'Priority support'
-    ]
+    ],
+    popular: true
   }
 ]; 

@@ -93,7 +93,7 @@ export const DailyView: React.FC<DailyViewProps> = ({
       {showDateHeader && (
         <View style={styles.dateHeader}>
           <MaterialIcons name="today" size={24} color={colors.primary} />
-          <Text style={styles.dateTitle}>
+          <Text style={styles.dateTitle} numberOfLines={2}>
             {new Date(date).toLocaleDateString('en-US', {
               weekday: 'long',
               year: 'numeric',
@@ -162,23 +162,23 @@ export const DailyView: React.FC<DailyViewProps> = ({
         <Text style={styles.sectionTitle}>Macronutrients</Text>
         <View style={styles.macroGrid}>
           <View style={styles.macroCard}>
-            <Text style={styles.macroLabel}>Protein</Text>
-            <Text style={styles.macroValue}>{Math.round(dailyLog?.totalNutrition.protein || 0)}g</Text>
+            <Text style={styles.macroLabel} numberOfLines={1}>Protein</Text>
+            <Text style={styles.macroValue} numberOfLines={1}>{Math.round(dailyLog?.totalNutrition.protein || 0)}g</Text>
           </View>
           <View style={styles.macroCard}>
-            <Text style={styles.macroLabel}>Carbs</Text>
-            <Text style={styles.macroValue}>{Math.round(dailyLog?.totalNutrition.carbs || 0)}g</Text>
+            <Text style={styles.macroLabel} numberOfLines={1}>Carbs</Text>
+            <Text style={styles.macroValue} numberOfLines={1}>{Math.round(dailyLog?.totalNutrition.carbs || 0)}g</Text>
           </View>
           <View style={styles.macroCard}>
-            <Text style={styles.macroLabel}>Fats</Text>
-            <Text style={styles.macroValue}>{Math.round(dailyLog?.totalNutrition.fat || 0)}g</Text>
+            <Text style={styles.macroLabel} numberOfLines={1}>Fats</Text>
+            <Text style={styles.macroValue} numberOfLines={1}>{Math.round(dailyLog?.totalNutrition.fat || 0)}g</Text>
           </View>
         </View>
       </View>
 
       {/* Food Items List */}
       <View style={styles.foodSection}>
-        <Text style={styles.sectionTitle}>
+        <Text style={styles.sectionTitle} numberOfLines={2}>
           {showDateHeader ? 'Food Items' : "Today's Meals"}
         </Text>
         
@@ -196,10 +196,10 @@ export const DailyView: React.FC<DailyViewProps> = ({
           </View>
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
+            <Text style={styles.emptyText} numberOfLines={2}>
               {showDateHeader ? 'No food logged on this date' : 'No meals logged today'}
             </Text>
-            <Text style={styles.emptySubtext}>
+            <Text style={styles.emptySubtext} numberOfLines={2}>
               {!showDateHeader && 'Use the Record button to log your first meal!'}
             </Text>
           </View>
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: fonts.xl,
     fontWeight: 'bold',
-    color: '#111714',
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   macroGrid: {
@@ -313,21 +313,21 @@ const styles = StyleSheet.create({
   },
   macroCard: {
     flex: 1,
-    backgroundColor: '#f0f4f2',
+    backgroundColor: colors.surfaceSecondary,
     padding: spacing.md,
     borderRadius: 16,
     alignItems: 'center',
   },
   macroLabel: {
     fontSize: fonts.sm,
-    color: '#648772',
+    color: colors.textSecondary,
     marginBottom: spacing.xs,
     fontWeight: '500',
   },
   macroValue: {
     fontSize: fonts['2xl'],
     fontWeight: 'bold',
-    color: '#111714',
+    color: colors.textPrimary,
   },
   foodSection: {
     paddingHorizontal: spacing.lg,
@@ -342,13 +342,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: fonts.base,
-    color: '#648772',
+    color: colors.textSecondary,
     fontWeight: '500',
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: fonts.sm,
-    color: '#648772',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.xs,
     opacity: 0.8,

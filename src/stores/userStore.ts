@@ -141,8 +141,7 @@ export const useUserStore = create<UserState>()(
         // Define monthly limits based on subscription tier (updated to match requirements)
         const monthlyLimits = {
           FREE: 10,
-          PRO: 300,
-          ELITE: null, // unlimited
+          PRO: null, // unlimited
         };
         
         const monthlyLimit = monthlyLimits[subscriptionTier];

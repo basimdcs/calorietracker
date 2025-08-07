@@ -91,6 +91,16 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     manifest2Extra: (Constants.manifest2 as any)?.extra ? 'Available' : 'Not available'
   });
 
+  // Log the actual RevenueCat keys (first 10 chars for security)
+  console.log('🔑 RevenueCat Keys Debug:', {
+    iosKey: revenueCatIOSKey ? `${revenueCatIOSKey.substring(0, 10)}...` : 'NOT FOUND',
+    androidKey: revenueCatAndroidKey ? `${revenueCatAndroidKey.substring(0, 10)}...` : 'NOT FOUND',
+    iosKeyLength: revenueCatIOSKey?.length || 0,
+    androidKeyLength: revenueCatAndroidKey?.length || 0,
+    iosKeyStartsWithAppl: revenueCatIOSKey?.startsWith('appl_') || false,
+    androidKeyStartsWithGoog: revenueCatAndroidKey?.startsWith('goog_') || false,
+  });
+
   return {
     OPENAI_API_KEY: openaiApiKey,
     GEMINI_API_KEY: geminiApiKey,
