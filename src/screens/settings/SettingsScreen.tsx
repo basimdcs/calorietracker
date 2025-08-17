@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useUserStore } from '../../stores/userStore';
 import { useUser } from '../../hooks/useUser';
 import { UserProfile } from '../../types';
-import useRevenueCat from '../../hooks/useRevenueCat';
+import { useRevenueCatContext } from '../../contexts/RevenueCatContext';
 import { usePaywall } from '../../hooks/usePaywall';
 
 const SettingsScreen: React.FC = () => {
@@ -26,7 +26,7 @@ const SettingsScreen: React.FC = () => {
     getUsageStats,
   } = useUserStore();
   const { userStats } = useUser();
-  const { state: revenueCatState } = useRevenueCat();
+  const { state: revenueCatState } = useRevenueCatContext();
   const { presentPaywallIfNeededWithAlert } = usePaywall();
 
   const handleUpgradeWithPaywall = async () => {
@@ -92,7 +92,7 @@ const SettingsScreen: React.FC = () => {
     Alert.alert('Subscription Management', 'This would open subscription management in the App Store.');
   };
 
-  const { actions: revenueCatActions } = useRevenueCat();
+  const { actions: revenueCatActions } = useRevenueCatContext();
   
   const handleRestorePurchases = async () => {
     if (revenueCatState.isInitialized) {

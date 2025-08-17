@@ -13,8 +13,8 @@ export const REVENUE_CAT_CONFIG = {
   
   // Subscription product identifiers
   PRODUCT_IDS: {
-    PRO_MONTHLY: 'calorie_tracker_pro_monthly',
-    PRO_YEARLY: 'calorie_tracker_pro_yearly',
+    PRO_MONTHLY: 'com.basimdcs.calorietracker.Monthly',
+    PRO_YEARLY: 'com.basimdcs.calorietracker.Annual',
   },
   
   // Entitlement identifiers (these should match your RevenueCat dashboard)

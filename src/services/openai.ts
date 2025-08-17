@@ -235,25 +235,36 @@ class OpenAIService {
     return new Error('Transcription failed due to an unknown error. Please try again.');
   }
 
-  // MAIN PARSING METHOD - Now uses O3 approach as primary
-  async parseFoodFromText(text: string): Promise<ParsedFoodItem[]> {
+  // MAIN PARSING METHOD - Uses GPT-4o as primary, GPT-5-nano as backup option
+  async parseFoodFromText(text: string, useGPT5?: boolean): Promise<ParsedFoodItem[]> {
     try {
-      console.log('🔬 Using O3 Enhanced Approach for parsing:', text);
+      console.log('🔬 Parsing food with method:', useGPT5 ? 'GPT-5-nano Enhanced' : 'GPT-4o Legacy');
       console.log('API Key present:', OPENAI_API_KEY ? 'Yes' : 'No');
       console.log('API Key starts with:', OPENAI_API_KEY.substring(0, 10) + '...');
 
-      // Use O3 approach as primary method
-      return await this.parseFoodFromTextO3(text);
+      // Choose method based on parameter
+      if (useGPT5) {
+        console.log('🚀 Using GPT-5-nano Enhanced Approach...');
+        return await this.parseFoodFromTextO3(text);
+      } else {
+        console.log('📚 Using GPT-4o Legacy Approach (Primary)...');
+        return await this.parseFoodFromTextLegacy(text);
+      }
       
     } catch (error) {
-      console.error('❌ O3 approach failed, falling back to legacy method:', error);
+      console.error('❌ Primary approach failed, attempting backup method:', error);
       
-      // Fallback to legacy approach if O3 fails
+      // Fallback to the other method if primary fails
       try {
-        console.log('🔄 Attempting fallback to legacy 2-step approach...');
-        return await this.parseFoodFromTextLegacy(text);
+        if (useGPT5) {
+          console.log('🔄 GPT-5-nano failed, falling back to GPT-4o Legacy approach...');
+          return await this.parseFoodFromTextLegacy(text);
+        } else {
+          console.log('🔄 GPT-4o failed, falling back to GPT-5-nano approach...');
+          return await this.parseFoodFromTextO3(text);
+        }
       } catch (fallbackError) {
-        console.error('❌ Both O3 and legacy approaches failed:', fallbackError);
+        console.error('❌ Both approaches failed:', fallbackError);
         
         if (error instanceof Error) {
           const message = error.message.toLowerCase();
@@ -329,7 +340,7 @@ If you're unsure about a word, try to infer from context that this is about food
         }
       ],
       temperature: 0.1,
-      max_tokens: 200,
+      max_completion_tokens: 200,
     });
 
     const englishText = translationResponse.choices[0]?.message?.content?.trim();
@@ -342,15 +353,24 @@ If you're unsure about a word, try to infer from context that this is about food
   private async parseFoodAndQuantity(text: string): Promise<{name: string, quantity: number, unit: string}[]> {
     const client = this.initializeClient();
     
-    const prompt = `Parse this Arabic/Egyptian Arabic food text and extract food items with their quantities. Convert portions to grams.
+    const prompt = `Parse this Arabic/Egyptian Arabic food text and extract food items with their quantities. Convert portions to grams with smart defaults.
 
           Text: ${text}
           
-          Extract:
-          - Food items 
-          - Quantities in grams (realistic portion sizes)
+          EXTRACTION WITH SMART LOGIC:
+          - Food items with accurate Arabic/Egyptian context
+          - Quantities in grams (use realistic Egyptian portion sizes)
+          - Apply intelligent defaults for common Egyptian foods
+          - Account for regional serving sizes and preparation methods
           
-          Return JSON: [{"name": "food item", "quantity": number_in_grams, "unit": "grams"}]`;
+          SMART QUANTITY LOGIC:
+          - Use standard Egyptian portions: "كوب رز" = 200g, "رغيف عيش" = 90g, "علبة زبادي" = 150g
+          - Convert vague amounts intelligently: "شوية" = 50-100g depending on food type
+          - Apply realistic portions for whole items: "فرخة" = 1200g gross (800g edible)
+          
+          Return JSON: [{"name": "food item", "quantity": number_in_grams, "unit": "grams"}]
+          
+          Provide accurate, contextually appropriate portions for Egyptian cuisine.`;
     
     console.log('📤 STEP 1 REQUEST - Full prompt:', prompt);
     
@@ -358,12 +378,16 @@ If you're unsure about a word, try to infer from context that this is about food
       model: 'gpt-4o',
       messages: [
         {
+          role: 'system',
+          content: 'You are an expert at parsing Arabic/Egyptian food descriptions. Extract food items with quantities and convert to grams.'
+        },
+        {
           role: 'user',
           content: prompt
         }
       ],
       temperature: 0.1,
-      max_tokens: 300,
+      max_completion_tokens: 500,
     });
 
     const content = response.choices[0]?.message?.content;
@@ -383,13 +407,22 @@ If you're unsure about a word, try to infer from context that this is about food
     
     const foodsList = foods.map(f => `- ${f.name}: ${f.quantity}g`).join('\n');
     
-    const prompt = `Calculate calories, protein, carbs, and fat for these food items and quantities. Return ONLY JSON, no explanations:
+    const prompt = `Calculate calories, protein, carbs, and fat for these Egyptian/Arabic food items with nutrition analysis. Return ONLY JSON, no explanations:
 
           Foods with quantities:
           ${foodsList}
           
+          NUTRITION CALCULATION:
+          - Use Egyptian/regional nutrition databases when applicable
+          - Account for local cooking methods and ingredients (oil, ghee, spices)
+          - Apply realistic macro distributions for Middle Eastern cuisine
+          - Consider portion sizes typical in Egyptian diet
+          - Use accurate values for local food brands (مراعي, جهينة, etc.)
+          
           Return ONLY this JSON format:
-          [{"name": "food name", "calories": number, "protein": number, "carbs": number, "fat": number, "quantity": number}]`;
+          [{"name": "food name", "calories": number, "protein": number, "carbs": number, "fat": number, "quantity": number, "cookingMethod": "inferred method if applicable"}]
+          
+          Ensure nutrition values are accurate for Egyptian food context.`;
     
     console.log('📤 STEP 2 REQUEST - Full prompt:', prompt);
     
@@ -397,12 +430,16 @@ If you're unsure about a word, try to infer from context that this is about food
       model: 'gpt-4o',
       messages: [
         {
+          role: 'system',
+          content: 'You are an expert nutritionist specializing in Arabic/Egyptian cuisine. Calculate accurate nutrition values for food items.'
+        },
+        {
           role: 'user',
           content: prompt
         }
       ],
       temperature: 0.1,
-      max_tokens: 500,
+      max_completion_tokens: 800,
     });
 
     const content = response.choices[0]?.message?.content;
@@ -431,26 +468,82 @@ If you're unsure about a word, try to infer from context that this is about food
       const fat = typeof item.fat === 'number' && item.fat >= 0 ? item.fat : 0;
       const quantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 100;
       
+      // Apply smart modal logic even in legacy fallback
+      const smartNeedsQuantity = this.determineNeedsQuantity(name);
+      const smartNeedsCookingMethod = this.determineNeedsCookingMethod(name, item.cookingMethod);
+      
       return {
         name,
         calories,
         protein,
         carbs,
         fat,
-        confidence: 0.9,
+        confidence: 0.8, // Slightly lower confidence for legacy method
         quantity,
         unit: 'grams',
         cookingMethod: item.cookingMethod || undefined,
-        needsQuantity: false,
-        suggestedQuantity: [],
-        needsCookingMethod: false,
-        suggestedCookingMethods: [],
+        needsQuantity: smartNeedsQuantity,
+        suggestedQuantity: smartNeedsQuantity ? ['0.5', '1', '1.5', '2'] : [],
+        needsCookingMethod: smartNeedsCookingMethod,
+        suggestedCookingMethods: smartNeedsCookingMethod ? ['Grilled', 'Fried', 'Baked', 'Boiled'] : [],
         isNutritionComplete: true,
-        nutritionNotes: undefined,
+        nutritionNotes: 'Legacy method with smart modal logic',
       };
     }).filter((item: ParsedFoodItem) => item.calories > 0); // Remove items with no calories
   }
 
+  // Smart modal logic methods for legacy fallback
+  private determineNeedsQuantity(foodName: string): boolean {
+    const name = foodName.toLowerCase();
+    
+    // Vague quantities that need clarification
+    const vagueIndicators = ['شوية', 'كتير', 'بعض', 'some', 'a little', 'قليل', 'كم', 'بشوية'];
+    if (vagueIndicators.some(indicator => name.includes(indicator))) return true;
+    
+    // Ambiguous servings without context
+    if (name.includes('طبق') && !name.includes('صغير') && !name.includes('كبير')) return true;
+    if (name.includes('كوباية') && !name.includes('صغير') && !name.includes('كبير')) return true;
+    
+    // Clear standard portions don't need quantity modal
+    const clearPortions = ['واحد', 'واحدة', 'كوب', 'علبة', 'رغيف', 'ساندوتش', 'برجر', 'وجبة'];
+    if (clearPortions.some(portion => name.includes(portion))) return false;
+    
+    // Specific weights don't need quantity modal
+    if (name.includes('جرام') || name.includes('كيلو') || name.includes('نص') || name.includes('ربع')) return false;
+    
+    return false; // Conservative - only show when truly needed
+  }
+
+  private determineNeedsCookingMethod(foodName: string, existingCookingMethod?: string): boolean {
+    const name = foodName.toLowerCase();
+    
+    // If cooking method already specified, no need for modal
+    if (existingCookingMethod && existingCookingMethod !== 'unknown') return false;
+    
+    // Check for cooking method keywords in the name
+    const cookingKeywords = ['مشوي', 'مقلي', 'مسلوق', 'في الفرن', 'نيء', 'grilled', 'fried', 'baked', 'boiled', 'raw'];
+    if (cookingKeywords.some(keyword => name.includes(keyword))) return false;
+    
+    // Foods that never need cooking method
+    const noCookingNeeded = [
+      // Dairy
+      'زبادي', 'لبن', 'جبن', 'جبنة', 'مراعي', 'قشطة', 'yogurt', 'milk', 'cheese',
+      // Fruits  
+      'تفاح', 'موز', 'برتقال', 'مانجا', 'عنب', 'فراولة', 'apple', 'banana', 'orange', 'mango',
+      // Beverages
+      'قهوة', 'شاي', 'عصير', 'مياه', 'كابتشينو', 'ستاربوكس', 'كوكاكولا', 'coffee', 'tea', 'juice',
+      // Processed foods
+      'بسكويت', 'شيبسي', 'شوكولاتة', 'حلوى', 'عيش', 'خبز'
+    ];
+    
+    if (noCookingNeeded.some(food => name.includes(food))) return false;
+    
+    // Foods that need cooking method
+    const needsCooking = ['لحم', 'فراخ', 'دجاج', 'سمك', 'بيض', 'meat', 'chicken', 'fish', 'egg'];
+    if (needsCooking.some(food => name.includes(food))) return true;
+    
+    return false; // Conservative - only show when truly needed
+  }
 
   private extractJsonContent(content: string): string {
     if (!content || typeof content !== 'string') {
@@ -493,7 +586,7 @@ If you're unsure about a word, try to infer from context that this is about food
 
 
 
-  // O3 APPROACH: Step 1 - Parse to edible grams with ambiguity detection
+  // GPT-5-nano APPROACH: Step 1 - Parse to edible grams with ambiguity detection
   private async parseToEdibleGramsO3(text: string): Promise<O3Step1Response[]> {
     const client = this.initializeClient();
     
@@ -540,55 +633,43 @@ If you're unsure about a word, try to infer from context that this is about food
       required: ["foods"]
     };
 
-    console.log('📤 O3 STEP 1 REQUEST - Input text:', text);
+    console.log('📤 GPT-5-nano STEP 1 REQUEST - Input text:', text);
     
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a nutrition normalizer for Arabic/Egyptian Arabic voice logs.
-Goal: extract foods and convert to EDIBLE cooked grams (remove bones/shells; keep edible skin if typical).
+    const response = await client.responses.create({
+      model: 'gpt-5-nano',
+      instructions: `Parse Arabic/Egyptian food text into JSON format with smart modal flags.
 
-Rules:
-- If the phrase implies a whole or bone-in item (e.g., "نص فرخة", "ورك", "جناح", whole fish), treat the mentioned amount as GROSS, then estimate EDIBLE grams using realistic yields. Record the assumption used.
-- If the phrase gives a net weight (e.g., "١٥٠ جرام", "ربع كيلو كفتة"), treat as EDIBLE unless clearly raw/gross.
-- Map dialect numerals & measures (نص=0.5, ربع=0.25, نص كيلو=500g, ربع كيلو=250g, "مية/مي"=100g, "طبق صغير/كبير"→ pick a realistic range and midpoint).
-- Cooking method: extract if present; else set "unknown".
-- Default basis for unspecific "فرخة/دجاج": whole chicken, grilled/roasted, meat+skin, edible portion.
-- If ambiguous, provide a range and choose a midpoint; set needs flags.
+TASK: Extract foods and convert to edible grams. Set needsQuantity and needsCookingMethod flags intelligently.
 
-Return ONLY JSON. Do not include prose or code fences.
-Each item in the foods array should include all required fields.`
-        },
-        {
-          role: 'user',
-          content: `Text: ${text}
+QUANTITY CONVERSION:
+- نص=0.5, ربع=0.25, نص كيلو=500g, ربع كيلو=250g
+- Standard portions: كوب رز=200g, رغيف عيش=90g, علبة زبادي=150g
+- Whole items: estimate edible portion (chicken: 800g edible from 1200g gross)
+
+MODAL FLAGS (BE CONSERVATIVE):
+needsQuantity=TRUE ONLY for: "شوية", "كتير", "بعض", "قليل" (vague amounts)
+needsQuantity=FALSE for: "واحد", "كوب", "علبة", "رغيف", "١٥٠ جرام" (clear portions)
+
+needsCookingMethod=TRUE ONLY for: raw proteins without cooking method mentioned
+needsCookingMethod=FALSE for: dairy, fruits, beverages, processed foods, foods with cooking method already mentioned
+
+Return ONLY JSON array - no explanations, be fast and concise.`,
+      input: `Text: ${text}
 Return the JSON with foods array only.`
-        }
-      ],
-      temperature: 0.1,
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "food_parsing_step1",
-          schema: step1Schema
-        }
-      }
     });
 
-    const content = response.choices[0]?.message?.content;
-    console.log('📥 O3 STEP 1 RESPONSE - Raw content:', content);
+    const content = response.output_text;
+    console.log('📥 GPT-5-nano STEP 1 RESPONSE - Raw content:', content);
     
     if (!content) throw new Error('No response from OpenAI Step 1');
     
-    const parsed = JSON.parse(content);
-    console.log('📥 O3 STEP 1 RESPONSE - Parsed JSON:', parsed);
+    const parsed = JSON.parse(this.extractJsonContent(content));
+    console.log('📥 GPT-5-nano STEP 1 RESPONSE - Parsed JSON:', parsed);
     
-    return parsed.foods;
+    return parsed.foods || parsed;
   }
 
-  // O3 APPROACH: Step 2 - Calculate macros with sanity checks
+  // GPT-5-nano APPROACH: Step 2 - Calculate macros with sanity checks
   private async calculateMacrosO3(step1Foods: O3Step1Response[]): Promise<O3Step2Response> {
     const client = this.initializeClient();
     
@@ -640,64 +721,46 @@ Return the JSON with foods array only.`
 
     const foodsInput = step1Foods.map(f => `- ${f.name}: ${f.edible_grams}g (${f.cookingMethod})`).join('\n');
     
-    console.log('📤 O3 STEP 2 REQUEST - Foods input:', foodsInput);
+    console.log('📤 GPT-5-nano STEP 2 REQUEST - Foods input:', foodsInput);
     
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a deterministic nutrition calculator.
-Input: array with "name", "edible_grams", and "cookingMethod".
-Tasks:
-1) Map each item to a single nutrition basis deterministically:
-   - If name implies chicken/فرخة and no cut/skin specified → "whole roasted chicken, meat+skin, edible portion".
-   - Respect explicit cut/skin if provided (e.g., صدر/skinless breast, ورك/thigh).
-   - Treat "grilled"≈"roasted" for chicken unless fried/breaded is explicit.
-2) Compute macros and calories.
-3) Apply sanity checks and adjust if needed.
+    const response = await client.responses.create({
+      model: 'gpt-5-nano',
+      instructions: `Calculate nutrition for Arabic/Egyptian foods. Return accurate calories, protein, carbs, fat.
 
-Sanity checks (per 100g edible):
-- protein_g ≤ 35
-- fat_g ≤ 30 (higher only if clearly fatty and stated)
-- carbs_g ≥ 0
-- calories ≈ 4*(P+C)+9*F within ±10%. If outside, adjust calories to macro sum.
-Also ensure totals scale linearly with quantity.
+TASK: Use food name + grams + cooking method to calculate precise nutrition values.
 
-Output ONLY JSON. No prose, no code fences.`
-        },
-        {
-          role: 'user',
-          content: `Foods (edible grams from Step 1):
+NUTRITION RULES:
+- Use Egyptian food database values where applicable
+- Apply cooking multipliers: fried +40% calories, grilled +10%, boiled/raw unchanged
+- Validate: protein ≤35g/100g (≤40g for lean meat), fat ≤30g/100g (≤60g nuts, ≤45g fried)
+- Check: calories ≈ 4*(P+C)+9*F within ±10%
+
+FOOD-SPECIFIC:
+- فرخة = whole roasted chicken, meat+skin, edible portion
+- Egyptian rice/bread: account for typical oil/ghee preparation
+- Local brands (مراعي, جهينة): use accurate fat content
+
+Return ONLY JSON - be fast and precise, no explanations needed.`,
+      input: `Foods (edible grams from Step 1):
 ${foodsInput}
 Return the JSON with foods array and total object.`
-        }
-      ],
-      temperature: 0.1,
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "nutrition_calculation_step2",
-          schema: step2Schema
-        }
-      }
     });
 
-    const content = response.choices[0]?.message?.content;
-    console.log('📥 O3 STEP 2 RESPONSE - Raw content:', content);
+    const content = response.output_text;
+    console.log('📥 GPT-5-nano STEP 2 RESPONSE - Raw content:', content);
     
     if (!content) throw new Error('No response from OpenAI Step 2');
     
-    const parsed = JSON.parse(content);
-    console.log('📥 O3 STEP 2 RESPONSE - Parsed JSON:', parsed);
+    const parsed = JSON.parse(this.extractJsonContent(content));
+    console.log('📥 GPT-5-nano STEP 2 RESPONSE - Parsed JSON:', parsed);
     
     return parsed;
   }
 
-  // O3 APPROACH: Combined flow
+  // GPT-5-nano APPROACH: Combined flow
   async parseFoodFromTextO3(text: string): Promise<ParsedFoodItem[]> {
     try {
-      console.log('🔬 O3 APPROACH: Starting enhanced food parsing for:', text);
+      console.log('🔬 GPT-5-nano APPROACH: Starting enhanced food parsing for:', text);
       
       // Step 1: Parse to edible grams with ambiguity detection
       const step1Results = await this.parseToEdibleGramsO3(text);
@@ -712,11 +775,11 @@ Return the JSON with foods array and total object.`
       // Map to ParsedFoodItem format
       const parsedFoods = this.mapO3ResultsToParsedFoodItems(step1Results, step2Results);
       
-      console.log('✅ O3 APPROACH: Completed successfully with', parsedFoods.length, 'items');
+      console.log('✅ GPT-5-nano APPROACH: Completed successfully with', parsedFoods.length, 'items');
       return parsedFoods;
       
     } catch (error) {
-      console.error('❌ O3 APPROACH: Failed:', error);
+      console.error('❌ GPT-5-nano APPROACH: Failed:', error);
       throw error;
     }
   }
@@ -755,19 +818,12 @@ Return the JSON with foods array and total object.`
     try {
       const client = this.initializeClient();
       
-      const response = await client.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: query
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 200,
+      const response = await client.responses.create({
+        model: 'gpt-5-nano',
+        input: query
       });
 
-      const result = response.choices[0]?.message?.content?.trim();
+      const result = response.output_text?.trim();
       console.log('🧪 Basic OpenAI query result:', result);
       return result || 'No response';
     } catch (error) {

@@ -46,6 +46,9 @@ export interface RevenueCatActions {
   logoutUser: () => Promise<void>;
   resetInitialization: () => void;
   updateUsageCount: (increment?: number) => void;
+  getAvailablePackages: () => PurchasesPackage[];
+  getMonthlyPackage: () => PurchasesPackage | null;
+  getYearlyPackage: () => PurchasesPackage | null;
 }
 
 const DEFAULT_USAGE_LIMITS = {
@@ -54,12 +57,10 @@ const DEFAULT_USAGE_LIMITS = {
 };
 
 const useRevenueCat = () => {
-  // Refs to prevent re-initialization and track listener state
-  const hasInitializedRef = useRef(false);
+  // Simplified refs
+  const isInitializingRef = useRef(false);
   const hasListenerRef = useRef(false);
-  const currentUserIdRef = useRef<string | undefined>(undefined);
-  const initializationAttemptsRef = useRef(0);
-  const maxInitializationAttempts = 3;
+  const currentUserIdRef = useRef<string | undefined>();
   
   const [state, setState] = useState<RevenueCatState>({
     isInitialized: false,
@@ -125,118 +126,33 @@ const useRevenueCat = () => {
     };
   }, []);
 
-  // Initialize RevenueCat - with initialization guard
+  // SIMPLIFIED RevenueCat initialization - no complex retry logic
   const initializeRevenueCat = useCallback(async (userID?: string) => {
-    // Prevent re-initialization
-    if (hasInitializedRef.current || state.isInitialized) {
-      console.log('⏭️ RevenueCat already initialized, skipping...');
+    // Simple guard - only allow one initialization at a time
+    if (isInitializingRef.current) {
+      console.log('⏭️ RevenueCat init skipped - already in progress');
       return;
     }
     
-    // Check if already loading
-    if (state.isLoading) {
-      console.log('⏳ RevenueCat initialization already in progress...');
+    if (state.isInitialized) {
+      console.log('⏭️ RevenueCat init skipped - already initialized');
       return;
     }
     
-    // More lenient attempt limits for TestFlight
-    const { isTestFlightBuild } = await import('../config/revenueCat');
-    const maxAttempts = isTestFlightBuild() ? 5 : maxInitializationAttempts;
-    
-    // Prevent too many initialization attempts
-    if (initializationAttemptsRef.current >= maxAttempts) {
-      console.log(`⏭️ RevenueCat initialization blocked - too many attempts (${initializationAttemptsRef.current}/${maxAttempts})`);
-      
-      // For TestFlight, set a fallback mode
-      if (isTestFlightBuild()) {
-        console.log('🧪 TestFlight: Setting fallback mode without RevenueCat');
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: 'TestFlight mode: RevenueCat unavailable (subscriptions may not be approved yet)',
-        }));
-      }
-      return;
-    }
-    
-    // For TestFlight, be more lenient with API key errors
-    if (state.error && state.error.includes('Invalid API key') && !isTestFlightBuild()) {
-      console.log('⏭️ RevenueCat initialization blocked due to API key error');
-      return;
-    }
-    
-    initializationAttemptsRef.current += 1;
-    hasInitializedRef.current = true;
-    currentUserIdRef.current = userID;
+    isInitializingRef.current = true;
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      console.log('🚀 Initializing RevenueCat... (attempt', initializationAttemptsRef.current, '/', maxAttempts, ')');
+      console.log('🚀 RevenueCat: Starting simple initialization...');
       
-      // Check if API keys are configured
-      const { env } = await import('../config/env');
-      console.log('🔍 RevenueCat API Key Check:', {
-        hasIOSKey: !!env.REVENUE_CAT_API_KEY_IOS,
-        keyLength: env.REVENUE_CAT_API_KEY_IOS?.length,
-        keyPreview: env.REVENUE_CAT_API_KEY_IOS?.substring(0, 10) + '...',
-        isPlaceholder: env.REVENUE_CAT_API_KEY_IOS === 'your-ios-api-key-here',
-        isTestFlight: isTestFlightBuild(),
-        buildEnvironment: process.env.NODE_ENV
-      });
-      
-      if (!env.REVENUE_CAT_API_KEY_IOS || env.REVENUE_CAT_API_KEY_IOS === 'your-ios-api-key-here') {
-        const errorMsg = `RevenueCat API key not configured. Found: "${env.REVENUE_CAT_API_KEY_IOS}". Please add REVENUE_CAT_API_KEY_IOS to your .env file.`;
-        
-        // For TestFlight, set fallback mode instead of failing
-        if (isTestFlightBuild()) {
-          console.warn('⚠️ TestFlight build detected with missing API key - using fallback mode');
-          setState(prev => ({
-            ...prev,
-            isLoading: false,
-            error: 'TestFlight mode: API key not properly configured',
-            subscriptionStatus: { ...prev.subscriptionStatus, tier: 'FREE' }
-          }));
-          return;
-        }
-        
-        throw new Error(errorMsg);
-      }
-      
+      // Import and initialize
       const { initializeRevenueCat: initRC } = await import('../config/revenueCat');
       await initRC(userID);
       
-      // Get initial customer info with timeout for TestFlight
+      // Get customer info
       const PurchasesInstance = getPurchasesInstance();
-      
-      let customerInfo;
-      try {
-        // Use a shorter timeout for TestFlight
-        const timeout = isTestFlightBuild() ? 10000 : 30000;
-        customerInfo = await Promise.race([
-          PurchasesInstance.getCustomerInfo(),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Customer info fetch timeout')), timeout)
-          )
-        ]) as any;
-      } catch (customerError) {
-        console.warn('⚠️ Failed to fetch initial customer info:', customerError);
-        
-        if (isTestFlightBuild()) {
-          // For TestFlight, continue without customer info
-          console.log('🧪 TestFlight: Continuing without initial customer info');
-          customerInfo = null;
-        } else {
-          throw customerError;
-        }
-      }
-      
-      const subscriptionStatus = customerInfo ? parseSubscriptionStatus(customerInfo) : {
-        isActive: false,
-        tier: 'FREE' as const,
-        willRenew: false,
-        isInGracePeriod: false,
-      };
-      
+      const customerInfo = await PurchasesInstance.getCustomerInfo();
+      const subscriptionStatus = parseSubscriptionStatus(customerInfo);
       const usageInfo = calculateUsageInfo(subscriptionStatus);
       
       setState(prev => ({
@@ -249,28 +165,14 @@ const useRevenueCat = () => {
         error: null,
       }));
       
-      console.log('✅ RevenueCat initialized successfully');
-      
-      // For TestFlight, add additional warnings
-      if (isTestFlightBuild()) {
-        console.log('🧪 TestFlight build - subscriptions may not work until approved by Apple');
-      }
+      console.log('✅ RevenueCat: Initialized successfully');
       
     } catch (error) {
-      console.error('❌ Failed to initialize RevenueCat:', error);
-      hasInitializedRef.current = false; // Reset on error
-      const errorMessage = error instanceof Error ? error.message : 'Failed to initialize RevenueCat';
-      
-      // Enhanced error handling for TestFlight
-      let finalError = errorMessage;
-      if (isTestFlightBuild()) {
-        finalError = `TestFlight mode: ${errorMessage}\n\nThis is likely due to subscriptions not being approved yet. The app will work in free mode.`;
-      }
-      
+      console.error('❌ RevenueCat: Initialization failed:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: finalError,
+        error: error instanceof Error ? error.message : 'Initialization failed',
         subscriptionStatus: {
           isActive: false,
           tier: 'FREE',
@@ -278,11 +180,10 @@ const useRevenueCat = () => {
           isInGracePeriod: false,
         },
       }));
-      
-      // Don't throw error, just log it so app continues to work
-      console.log('🔄 App will continue without RevenueCat integration');
+    } finally {
+      isInitializingRef.current = false;
     }
-  }, [parseSubscriptionStatus, calculateUsageInfo, state.isInitialized, state.isLoading, state.error]);
+  }, [parseSubscriptionStatus, calculateUsageInfo]);
 
   // Refresh customer info - use functional state updates to avoid dependency
   const refreshCustomerInfo = useCallback(async () => {
@@ -405,26 +306,22 @@ const useRevenueCat = () => {
     }
   }, [parseSubscriptionStatus, calculateUsageInfo]);
 
-  // Get offerings
+  // SIMPLIFIED offerings fetch 
   const getOfferings = useCallback(async () => {
     try {
-      console.log('📦 Fetching offerings...');
+      console.log('📦 RevenueCat: Fetching offerings...');
       const PurchasesInstance = getPurchasesInstance();
       const offerings = await PurchasesInstance.getOfferings();
       
       setState(prev => ({
         ...prev,
         offerings,
-        error: null,
       }));
       
-      console.log('✅ Offerings fetched successfully');
-    } catch (error) {
-      console.error('❌ Failed to fetch offerings:', error);
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to fetch offerings',
-      }));
+      console.log('✅ RevenueCat: Offerings fetched');
+    } catch (error: any) {
+      console.warn('⚠️ RevenueCat: Offerings fetch failed (Error 23 expected in simulator)');
+      // Don't set error state for offerings failure - let paywall still work
     }
   }, []);
 
@@ -526,18 +423,22 @@ const useRevenueCat = () => {
     };
   }, [state.isInitialized, parseSubscriptionStatus, calculateUsageInfo]);
 
-  // Reset initialization state (useful for testing or error recovery)
+  // SIMPLIFIED reset 
   const resetInitialization = useCallback(() => {
-    console.log('🔄 Resetting RevenueCat initialization state...');
-    hasInitializedRef.current = false;
+    console.log('🔄 RevenueCat: Resetting...');
+    isInitializingRef.current = false;
     hasListenerRef.current = false;
-    currentUserIdRef.current = undefined;
-    initializationAttemptsRef.current = 0;
     setState(prev => ({
       ...prev,
       isInitialized: false,
       isLoading: false,
       error: null,
+      subscriptionStatus: {
+        isActive: false,
+        tier: 'FREE',
+        willRenew: false,
+        isInGracePeriod: false,
+      },
     }));
   }, []);
 
@@ -553,6 +454,19 @@ const useRevenueCat = () => {
     });
   }, [calculateUsageInfo]);
 
+  // Helper functions to easily access product packages
+  const getAvailablePackages = useCallback((): PurchasesPackage[] => {
+    return state.offerings?.current?.availablePackages || [];
+  }, [state.offerings]);
+
+  const getMonthlyPackage = useCallback((): PurchasesPackage | null => {
+    return state.offerings?.current?.monthly || null;
+  }, [state.offerings]);
+
+  const getYearlyPackage = useCallback((): PurchasesPackage | null => {
+    return state.offerings?.current?.annual || null;
+  }, [state.offerings]);
+
   const actions: RevenueCatActions = {
     initializeRevenueCat,
     refreshCustomerInfo,
@@ -563,6 +477,9 @@ const useRevenueCat = () => {
     logoutUser,
     resetInitialization,
     updateUsageCount,
+    getAvailablePackages,
+    getMonthlyPackage,
+    getYearlyPackage,
   };
 
   return {

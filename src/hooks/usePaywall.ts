@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
-import useRevenueCat from './useRevenueCat';
+import { useRevenueCatContext } from '../contexts/RevenueCatContext';
 
 export interface PaywallOptions {
   requiredEntitlement?: string;
@@ -13,7 +13,7 @@ export interface PaywallOptions {
 
 export const usePaywall = () => {
   const [isPresenting, setIsPresenting] = useState(false);
-  const { state, actions } = useRevenueCat();
+  const { state, actions } = useRevenueCatContext();
 
   /**
    * Check if user needs to see paywall for a specific entitlement
@@ -37,8 +37,28 @@ export const usePaywall = () => {
     const { requiredEntitlement = 'pro', offering, onSuccess, onError, onCancel } = options;
 
     if (!state.isInitialized) {
-      const error = 'RevenueCat is not initialized yet. Please try again.';
-      console.error('❌', error);
+      // Enhanced error with more debugging info
+      const error = `RevenueCat is not initialized yet. State: ${JSON.stringify({
+        isInitialized: state.isInitialized,
+        isLoading: state.isLoading,
+        error: state.error,
+        tier: state.subscriptionStatus.tier
+      })}`;
+      console.error('❌ Paywall initialization check failed:', error);
+      
+      // Try to initialize if not already loading
+      if (!state.isLoading && !state.error) {
+        console.log('🔄 Attempting to initialize RevenueCat before paywall...');
+        try {
+          await actions.initializeRevenueCat();
+          // Wait a moment for state to update then recurse
+          setTimeout(() => presentPaywall(options), 500);
+          return false;
+        } catch (initError) {
+          console.error('❌ Failed to initialize RevenueCat:', initError);
+        }
+      }
+      
       onError?.(error);
       return false;
     }
@@ -95,7 +115,34 @@ export const usePaywall = () => {
           return false;
       }
     } catch (error) {
-      const errorMsg = 'There was an error loading the paywall. Please check your internet connection and try again.';
+      // Enhanced error handling for specific RevenueCat errors
+      let errorMsg = 'There was an error loading the paywall. Please check your internet connection and try again.';
+      
+      if (error && typeof error === 'object') {
+        const errorObj = error as any;
+        console.error('❌ Detailed paywall error:', {
+          message: errorObj.message,
+          code: errorObj.code,
+          userInfo: errorObj.userInfo,
+          fullError: error
+        });
+        
+        // Handle specific error codes
+        if (errorObj.code === 23 || errorObj.message?.includes('configuration')) {
+          errorMsg = `Configuration Error (${errorObj.code || '23'})\n\n` +
+            'This usually means:\n' +
+            '• App Store Connect agreements need to be signed\n' +
+            '• Products not in "Ready to Submit" status\n' +
+            '• Banking/tax info incomplete\n' +
+            '• Changes still propagating (wait 24hrs)\n\n' +
+            'For TestFlight: Check App Store Connect agreements and product status.';
+        } else if (errorObj.code === 7 || errorObj.message?.includes('network')) {
+          errorMsg = 'Network error. Please check your internet connection and try again.';
+        } else if (errorObj.message) {
+          errorMsg = `RevenueCat Error: ${errorObj.message}`;
+        }
+      }
+      
       console.error('❌ Error presenting paywall:', error);
       onError?.(errorMsg);
       return false;
@@ -111,8 +158,28 @@ export const usePaywall = () => {
     const { requiredEntitlement = 'pro', offering, onSuccess, onError, onCancel } = options;
 
     if (!state.isInitialized) {
-      const error = 'RevenueCat is not initialized yet. Please try again.';
-      console.error('❌', error);
+      // Enhanced error with more debugging info
+      const error = `RevenueCat is not initialized yet. State: ${JSON.stringify({
+        isInitialized: state.isInitialized,
+        isLoading: state.isLoading,
+        error: state.error,
+        tier: state.subscriptionStatus.tier
+      })}`;
+      console.error('❌ PaywallIfNeeded initialization check failed:', error);
+      
+      // Try to initialize if not already loading
+      if (!state.isLoading && !state.error) {
+        console.log('🔄 Attempting to initialize RevenueCat before paywall...');
+        try {
+          await actions.initializeRevenueCat();
+          // Wait a moment for state to update then recurse
+          setTimeout(() => presentPaywallIfNeeded(options), 500);
+          return false;
+        } catch (initError) {
+          console.error('❌ Failed to initialize RevenueCat:', initError);
+        }
+      }
+      
       onError?.(error);
       return false;
     }
@@ -170,7 +237,34 @@ export const usePaywall = () => {
           return false;
       }
     } catch (error) {
-      const errorMsg = 'There was an error loading the paywall. Please check your internet connection and try again.';
+      // Enhanced error handling for specific RevenueCat errors
+      let errorMsg = 'There was an error loading the paywall. Please check your internet connection and try again.';
+      
+      if (error && typeof error === 'object') {
+        const errorObj = error as any;
+        console.error('❌ Detailed paywall if needed error:', {
+          message: errorObj.message,
+          code: errorObj.code,
+          userInfo: errorObj.userInfo,
+          fullError: error
+        });
+        
+        // Handle specific error codes
+        if (errorObj.code === 23 || errorObj.message?.includes('configuration')) {
+          errorMsg = `Configuration Error (${errorObj.code || '23'})\n\n` +
+            'This usually means:\n' +
+            '• App Store Connect agreements need to be signed\n' +
+            '• Products not in "Ready to Submit" status\n' +
+            '• Banking/tax info incomplete\n' +
+            '• Changes still propagating (wait 24hrs)\n\n' +
+            'For TestFlight: Check App Store Connect agreements and product status.';
+        } else if (errorObj.code === 7 || errorObj.message?.includes('network')) {
+          errorMsg = 'Network error. Please check your internet connection and try again.';
+        } else if (errorObj.message) {
+          errorMsg = `RevenueCat Error: ${errorObj.message}`;
+        }
+      }
+      
       console.error('❌ Error presenting paywall if needed:', error);
       onError?.(errorMsg);
       return false;

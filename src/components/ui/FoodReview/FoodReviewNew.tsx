@@ -43,6 +43,67 @@ interface ValidationResult {
   issueCount: number;
 }
 
+// Smart validation functions to override incorrect AI decisions
+function validateNeedsQuantity(food: ParsedFoodItem): boolean | null {
+  const name = food.name.toLowerCase();
+  
+  // Override AI if it incorrectly flagged these as needing quantity
+  const clearPortions = [
+    // Standard containers/servings
+    'علبة', 'كوب', 'رغيف', 'ساندوتش', 'برجر', 'وجبة', 
+    // Beverages with standard sizes
+    'ستاربوكس', 'كافيه', 'مكدونالدز', 'كنتاكي',
+    // Clear counts
+    'واحد', 'واحدة', '1 ', '2 ', '3 ', 'one', 'two'
+  ];
+  
+  if (clearPortions.some(portion => name.includes(portion))) {
+    return false; // Override AI - these don't need quantity modal
+  }
+  
+  // Override AI if it missed these vague quantities
+  const vagueQuantities = ['شوية', 'كتير', 'بعض', 'قليل', 'some', 'a little'];
+  if (vagueQuantities.some(vague => name.includes(vague))) {
+    return true; // Override AI - these need quantity modal
+  }
+  
+  return null; // No override - trust AI decision
+}
+
+function validateNeedsCookingMethod(food: ParsedFoodItem): boolean | null {
+  const name = food.name.toLowerCase();
+  
+  // Override AI if it incorrectly flagged these as needing cooking method
+  const noCookingNeeded = [
+    // Dairy products - never need cooking method
+    'زبادي', 'لبن', 'جبن', 'جبنة', 'مراعي', 'قشطة', 'yogurt', 'milk', 'cheese',
+    // Fresh fruits - never need cooking method  
+    'تفاح', 'موز', 'برتقال', 'مانجا', 'عنب', 'فراولة', 'apple', 'banana', 'orange',
+    // Beverages - never need cooking method
+    'قهوة', 'شاي', 'عصير', 'مياه', 'كابتشينو', 'ستاربوكس', 'كوكاكولا', 'coffee', 'tea', 'juice',
+    // Processed/ready foods
+    'بسكويت', 'شيبسي', 'شوكولاتة', 'حلوى', 'عيش', 'خبز', 'كرواسون'
+  ];
+  
+  if (noCookingNeeded.some(item => name.includes(item))) {
+    return false; // Override AI - these definitely don't need cooking method
+  }
+  
+  // Override AI if cooking method is already mentioned in name
+  const cookingMethods = ['مشوي', 'مقلي', 'مسلوق', 'في الفرن', 'نيء', 'grilled', 'fried', 'baked', 'boiled'];
+  if (cookingMethods.some(method => name.includes(method))) {
+    return false; // Override AI - cooking method already specified
+  }
+  
+  // Override AI if it missed foods that clearly need cooking method
+  const rawFoods = ['لحم نيء', 'فراخ نيء', 'سمك نيء', 'بيض نيء'];
+  if (rawFoods.some(raw => name.includes(raw))) {
+    return true; // Override AI - these definitely need cooking method
+  }
+  
+  return null; // No override - trust AI decision
+}
+
 export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
   foods,
   onUpdateFood,
@@ -55,7 +116,22 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
   const [activeModal, setActiveModal] = useState<ModalType>('none');
   const [selectedFoodIndex, setSelectedFoodIndex] = useState<number | null>(null);
 
-  // Calculate totals and validation
+  // Smart validation layer - override AI decisions with client-side intelligence
+  const validatedFoods = useMemo(() => {
+    return foods.map(food => {
+      const smartNeedsQuantity = validateNeedsQuantity(food);
+      const smartNeedsCookingMethod = validateNeedsCookingMethod(food);
+      
+      // Only override if AI decision seems incorrect
+      return {
+        ...food,
+        needsQuantity: smartNeedsQuantity !== null ? smartNeedsQuantity : food.needsQuantity,
+        needsCookingMethod: smartNeedsCookingMethod !== null ? smartNeedsCookingMethod : food.needsCookingMethod,
+      };
+    });
+  }, [foods]);
+
+  // Calculate totals and validation using validated foods
   const { totalNutrition, hasIssues, issueCount } = useMemo((): ValidationResult => {
     const total: NutritionTotals = {
       calories: 0,
@@ -66,14 +142,14 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
 
     let issuesCount = 0;
 
-    foods.forEach(food => {
+    validatedFoods.forEach(food => {
       // Safely add nutrition values
       total.calories += food.calories || 0;
       total.protein += food.protein || 0;
       total.carbs += food.carbs || 0;
       total.fat += food.fat || 0;
 
-      // Count items that need more details
+      // Count items that need more details (using validated flags)
       if (food.needsQuantity || food.needsCookingMethod) {
         issuesCount++;
       }
@@ -84,13 +160,13 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
       hasIssues: issuesCount > 0,
       issueCount: issuesCount,
     };
-  }, [foods]);
+  }, [validatedFoods]);
 
   const selectedFood = useMemo(() => {
-    return selectedFoodIndex !== null && selectedFoodIndex < foods.length 
-      ? foods[selectedFoodIndex] 
+    return selectedFoodIndex !== null && selectedFoodIndex < validatedFoods.length 
+      ? validatedFoods[selectedFoodIndex] 
       : null;
-  }, [selectedFoodIndex, foods]);
+  }, [selectedFoodIndex, validatedFoods]);
 
   // Modal handlers
   const handleQuantityModal = useCallback((index: number) => {
@@ -204,8 +280,8 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
     if (hasIssues) {
       return `Fix ${issueCount} issue${issueCount !== 1 ? 's' : ''} first`;
     }
-    return `Log ${foods.length} item${foods.length !== 1 ? 's' : ''}`;
-  }, [hasIssues, issueCount, foods.length]);
+    return `Log ${validatedFoods.length} item${validatedFoods.length !== 1 ? 's' : ''}`;
+  }, [hasIssues, issueCount, validatedFoods.length]);
 
   const formatNutritionValue = useCallback((value: number, unit: string = '') => {
     return `${Math.round(value * 10) / 10}${unit}`;
@@ -217,7 +293,7 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
         {/* Header */}
         <ScreenHeader
           title="Review Your Meal 🍽️"
-          subtitle={`${foods.length} food items detected`}
+          subtitle={`${validatedFoods.length} food items detected`}
           rightIcon="close"
           onRightPress={onCancel}
         />
@@ -264,7 +340,7 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
         {/* Food Items List */}
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.foodList}>
-            {foods.map((food, index) => (
+            {validatedFoods.map((food, index) => (
               <FoodItemCard
                 key={index}
                 food={food}

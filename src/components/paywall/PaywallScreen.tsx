@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { Button } from '../ui/Button';
-import useRevenueCat from '../../hooks/useRevenueCat';
+import { useRevenueCatContext } from '../../contexts/RevenueCatContext';
 
 interface PaywallScreenProps {
   onDismiss?: () => void;
@@ -21,7 +21,7 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const { state, actions } = useRevenueCat();
+  const { state, actions } = useRevenueCatContext();
 
   useEffect(() => {
     // Check if user already has the required entitlement

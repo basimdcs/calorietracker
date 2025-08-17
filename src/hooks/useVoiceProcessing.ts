@@ -15,8 +15,8 @@ export interface VoiceProcessingData {
 }
 
 export interface VoiceProcessingActions {
-  processRecording: (audioUri: string) => Promise<boolean>;
-  retryProcessing: () => Promise<boolean>;
+  processRecording: (audioUri: string, useGPT5?: boolean) => Promise<boolean>;
+  retryProcessing: (useGPT5?: boolean) => Promise<boolean>;
   clearTranscript: () => void;
   clearError: () => void;
   reset: () => void;
@@ -35,7 +35,7 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
   const [progress, setProgress] = useState<number | undefined>(undefined);
   const [lastAudioUri, setLastAudioUri] = useState<string | null>(null);
 
-  const processRecording = useCallback(async (audioUri: string): Promise<boolean> => {
+  const processRecording = useCallback(async (audioUri: string, useGPT5?: boolean): Promise<boolean> => {
     try {
       setError(null);
       setState('transcribing');
@@ -65,8 +65,8 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
       setProgress(75);
       console.log('🤖 Starting food parsing for text:', transcriptionResult);
       
-      // Parse food items
-      const foods = await openAIService.parseFoodFromText(transcriptionResult);
+      // Parse food items with method selection
+      const foods = await openAIService.parseFoodFromText(transcriptionResult, useGPT5);
       
       if (foods.length === 0) {
         Alert.alert(
@@ -122,7 +122,7 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
     }
   }, []);
 
-  const retryProcessing = useCallback(async (): Promise<boolean> => {
+  const retryProcessing = useCallback(async (useGPT5?: boolean): Promise<boolean> => {
     if (!transcript.trim()) {
       console.log('⚠️ No transcript available for retry');
       return false;
@@ -135,8 +135,8 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
       
       console.log('🔄 Retrying food parsing for existing transcript:', transcript);
       
-      // Parse food items using existing transcript
-      const foods = await openAIService.parseFoodFromText(transcript);
+      // Parse food items using existing transcript with method selection
+      const foods = await openAIService.parseFoodFromText(transcript, useGPT5);
       
       if (foods.length === 0) {
         Alert.alert(

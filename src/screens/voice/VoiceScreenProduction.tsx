@@ -21,7 +21,7 @@ import { useUserStore } from '../../stores/userStore';
 import { ParsedFoodItem } from '../../types';
 import { useVoiceRecording } from '../../hooks/useVoiceRecording';
 import { useVoiceProcessing } from '../../hooks/useVoiceProcessing';
-import { useRevenueCat } from '../../hooks';
+import { useRevenueCatContext } from '../../contexts/RevenueCatContext';
 import { usePaywall } from '../../hooks/usePaywall';
 import { testBasicOpenAIQuery, parseFoodFromTextO3, openAIService } from '../../services/openai';
 import { parseFoodFromTextGemini, testBasicGeminiQuery } from '../../services/gemini';
@@ -32,10 +32,11 @@ type VoiceState = 'ready' | 'recording' | 'processing' | 'reviewing';
 const VoiceScreenProduction: React.FC = () => {
   const [voiceState, setVoiceState] = useState<VoiceState>('ready');
   const [parsedFoods, setParsedFoods] = useState<ParsedFoodItem[]>([]);
+  const [useGPT5, setUseGPT5] = useState(false);
   
   const { addFoodItem, logFood, updateCurrentDate } = useFoodStore();
   const { incrementRecordingUsage, getUsageStats, profile } = useUserStore();
-  const { state: revenueCatState, actions: revenueCatActions } = useRevenueCat();
+  const { state: revenueCatState, actions: revenueCatActions } = useRevenueCatContext();
   const { presentPaywallIfNeededWithAlert } = usePaywall();
   
   // Custom hooks for voice functionality
@@ -67,10 +68,40 @@ const VoiceScreenProduction: React.FC = () => {
   // Temporary test function to force paywall (remove in production)
   const testPaywall = useCallback(async () => {
     console.log('🧪 Testing paywall...');
+    
+    // Check RevenueCat initialization status before calling paywall
+    console.log('🔍 Pre-paywall RevenueCat status:', {
+      isInitialized: revenueCatState.isInitialized,
+      isLoading: revenueCatState.isLoading,
+      error: revenueCatState.error,
+      tier: revenueCatState.subscriptionStatus.tier
+    });
+    
+    if (!revenueCatState.isInitialized) {
+      Alert.alert(
+        'RevenueCat Not Ready', 
+        'RevenueCat is not initialized yet. Please try again in a moment.',
+        [
+          {
+            text: 'Retry Initialize',
+            onPress: async () => {
+              console.log('🔄 Manual RevenueCat initialization...');
+              await revenueCatActions.initializeRevenueCat();
+              
+              // Wait a moment then try paywall again
+              setTimeout(() => testPaywall(), 1000);
+            }
+          },
+          { text: 'Cancel' }
+        ]
+      );
+      return;
+    }
+    
     await presentPaywallIfNeededWithAlert({
       requiredEntitlement: 'pro',
     });
-  }, [presentPaywallIfNeededWithAlert]);
+  }, [presentPaywallIfNeededWithAlert, revenueCatState, revenueCatActions]);
 
   // RevenueCat debug test function
   const testRevenueCatDebug = useCallback(async () => {
@@ -115,6 +146,104 @@ const VoiceScreenProduction: React.FC = () => {
       [
         { text: 'Copy to Console', onPress: () => {
           console.log('📋 RevenueCat Debug Info (for copying):', JSON.stringify(debugInfo, null, 2));
+        }},
+        { text: 'Test Offerings', onPress: async () => {
+          console.log('🧪 Testing offerings fetch...');
+          try {
+            await revenueCatActions.getOfferings();
+            Alert.alert('Success', 'Offerings fetched successfully! Check console for details.');
+          } catch (error: any) {
+            console.error('❌ Offerings test failed:', error);
+            Alert.alert('Offerings Error', `Error ${error.code || 'Unknown'}: ${error.message || 'Failed to fetch offerings'}\n\nCheck console for full details.`);
+          }
+        }},
+        { text: 'Full Diagnostic', onPress: async () => {
+          console.log('🔬 Running full RevenueCat diagnostic...');
+          try {
+            const { env } = await import('../../config/env');
+            const { isTestFlightBuild, getBuildEnvironment, getPurchasesInstance } = await import('../../config/revenueCat');
+            const PurchasesInstance = getPurchasesInstance();
+            
+            // Comprehensive diagnostic info
+            const diagnosticInfo = {
+              // Environment
+              buildEnvironment: getBuildEnvironment(),
+              isTestFlight: isTestFlightBuild(),
+              isDevelopment: __DEV__,
+              nodeEnv: process.env.NODE_ENV,
+              
+              // API Keys
+              hasIOSKey: !!env.REVENUE_CAT_API_KEY_IOS,
+              iosKeyLength: env.REVENUE_CAT_API_KEY_IOS?.length || 0,
+              iosKeyFormat: env.REVENUE_CAT_API_KEY_IOS?.startsWith('appl_') ? 'Valid' : 'Invalid',
+              iosKeyPreview: env.REVENUE_CAT_API_KEY_IOS?.substring(0, 10) + '...',
+              
+              // RevenueCat State
+              rcInitialized: revenueCatState.isInitialized,
+              rcLoading: revenueCatState.isLoading,
+              rcError: revenueCatState.error,
+              rcTier: revenueCatState.subscriptionStatus.tier,
+              rcHasCustomerInfo: !!revenueCatState.customerInfo,
+              rcHasOfferings: !!revenueCatState.offerings,
+              rcOfferingsCount: revenueCatState.offerings ? Object.keys(revenueCatState.offerings.all).length : 0,
+            };
+            
+            console.log('🔬 Full Diagnostic Results:', diagnosticInfo);
+            
+            // Try to fetch customer info
+            let customerInfoResult = 'Not attempted';
+            try {
+              const customerInfo = await PurchasesInstance.getCustomerInfo();
+              customerInfoResult = `Success - ${customerInfo.activeSubscriptions.length} active subs`;
+            } catch (custError: any) {
+              customerInfoResult = `Error ${custError.code}: ${custError.message}`;
+            }
+            
+            // Try to fetch offerings
+            let offeringsResult = 'Not attempted';
+            try {
+              const offerings = await PurchasesInstance.getOfferings();
+              offeringsResult = `Success - ${Object.keys(offerings.all).length} offerings, current: ${offerings.current?.identifier || 'none'}`;
+            } catch (offError: any) {
+              offeringsResult = `Error ${offError.code}: ${offError.message}`;
+            }
+            
+            const fullReport = `REVENUECAT DIAGNOSTIC REPORT
+            
+Environment:
+• Build: ${diagnosticInfo.buildEnvironment}
+• TestFlight: ${diagnosticInfo.isTestFlight}
+• Node Env: ${diagnosticInfo.nodeEnv}
+
+API Key:
+• Has Key: ${diagnosticInfo.hasIOSKey}
+• Length: ${diagnosticInfo.iosKeyLength}
+• Format: ${diagnosticInfo.iosKeyFormat}
+• Preview: ${diagnosticInfo.iosKeyPreview}
+
+RevenueCat State:
+• Initialized: ${diagnosticInfo.rcInitialized}
+• Loading: ${diagnosticInfo.rcLoading}
+• Error: ${diagnosticInfo.rcError || 'None'}
+• Tier: ${diagnosticInfo.rcTier}
+• Has Customer Info: ${diagnosticInfo.rcHasCustomerInfo}
+
+Live Tests:
+• Customer Info: ${customerInfoResult}
+• Offerings: ${offeringsResult}
+
+Bundle ID: com.basimdcs.calorietracker
+Products: com.basimdcs.calorietracker.Monthly, com.basimdcs.calorietracker.Annual`;
+
+            Alert.alert('RevenueCat Diagnostic Report', fullReport, [
+              { text: 'Copy to Console', onPress: () => console.log('📋 DIAGNOSTIC REPORT:\n', fullReport) },
+              { text: 'Close' }
+            ]);
+            
+          } catch (error: any) {
+            console.error('❌ Diagnostic failed:', error);
+            Alert.alert('Diagnostic Error', `Failed to run diagnostic: ${error.message}`);
+          }
         }},
         { text: 'Retry Init', onPress: () => {
           revenueCatActions.resetInitialization();
@@ -161,7 +290,7 @@ const VoiceScreenProduction: React.FC = () => {
     
     if (audioUri) {
       setVoiceState('processing');
-      const success = await voiceProcessing.actions.processRecording(audioUri);
+      const success = await voiceProcessing.actions.processRecording(audioUri, useGPT5);
       
       if (success) {
         console.log('🎉 Processing successful, parsed foods:', voiceProcessing.data.parsedFoods);
@@ -179,7 +308,7 @@ const VoiceScreenProduction: React.FC = () => {
         );
       }
     }
-  }, [voiceRecording.actions, voiceProcessing.actions, voiceProcessing.data.parsedFoods, voiceRecording.state.error]);
+  }, [voiceRecording.actions, voiceProcessing.actions, voiceProcessing.data.parsedFoods, voiceRecording.state.error, useGPT5]);
 
   // Handle voice processing completion
   useEffect(() => {
@@ -688,7 +817,7 @@ Check console for detailed logs.`,
                     style={[styles.retryButton, styles.retryButtonPrimary]}
                     onPress={async () => {
                       // Retry processing with existing transcript
-                      const success = await voiceProcessing.actions.retryProcessing();
+                      const success = await voiceProcessing.actions.retryProcessing(useGPT5);
                       if (success) {
                         // The useEffect will handle state transition to reviewing
                         console.log('🔄 Retry successful, waiting for state update');
@@ -718,13 +847,51 @@ Check console for detailed logs.`,
           {/* Status Info - Development Only */}
           {voiceState === 'ready' && !voiceProcessing.data.transcript && (
             <View style={styles.testContainer}>
+              {/* AI Model Selection */}
+              <TouchableOpacity
+                style={[
+                  styles.modelToggle,
+                  { backgroundColor: useGPT5 ? colors.success : colors.blue50 }
+                ]}
+                onPress={() => setUseGPT5(!useGPT5)}
+              >
+                <MaterialIcons 
+                  name={useGPT5 ? "auto-awesome" : "psychology"} 
+                  size={24} 
+                  color={useGPT5 ? colors.white : colors.primary} 
+                />
+                <View style={styles.modelToggleContent}>
+                  <Text style={[
+                    styles.modelToggleTitle, 
+                    { color: useGPT5 ? colors.white : colors.primary }
+                  ]}>
+                    {useGPT5 ? '🚀 GPT-5-nano Enhanced' : '📚 GPT-4o Legacy'}
+                  </Text>
+                  <Text style={[
+                    styles.modelToggleSubtitle, 
+                    { color: useGPT5 ? colors.white : colors.textSecondary }
+                  ]}>
+                    {useGPT5 
+                      ? 'Advanced reasoning with smart modal logic' 
+                      : 'Reliable 2-step parsing (Primary)'
+                    }
+                  </Text>
+                </View>
+                <Text style={[
+                  styles.modelToggleAction,
+                  { color: useGPT5 ? colors.white : colors.primary }
+                ]}>
+                  Tap to switch
+                </Text>
+              </TouchableOpacity>
+              
               <View style={[styles.testContainer, { backgroundColor: colors.green50, borderColor: colors.success, marginBottom: spacing.md }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
                   <MaterialIcons name="auto-awesome" size={24} color={colors.success} />
-                  <Text style={[styles.statusTitle, { marginLeft: spacing.sm, marginBottom: 0 }]}>🔬 O3 Enhanced Mode Active</Text>
+                  <Text style={[styles.statusTitle, { marginLeft: spacing.sm, marginBottom: 0 }]}>🔬 Dual Fallback System</Text>
                 </View>
                 <Text style={styles.statusSubtitle}>
-                  Using O3 rules-based parsing + Gemini 2.5 Flash comparison
+                  Primary method with automatic fallback + Gemini comparison
                 </Text>
               </View>
               
@@ -928,6 +1095,32 @@ const styles = StyleSheet.create({
     color: colors.gray600,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  modelToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: 12,
+    marginBottom: spacing.md,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  modelToggleContent: {
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
+  modelToggleTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  modelToggleSubtitle: {
+    fontSize: 12,
+  },
+  modelToggleAction: {
+    fontSize: 11,
+    fontWeight: '500',
+    textAlign: 'right',
   },
 });
 

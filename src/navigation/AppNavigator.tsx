@@ -7,7 +7,6 @@ import { useUserStore } from '../stores/userStore';
 import { RootStackParamList, TabParamList } from '../types';
 import { colors, fonts } from '../constants/theme';
 import { CustomBottomTab } from '../components/ui/CustomBottomTab';
-import useRevenueCat from '../hooks/useRevenueCat';
 
 // Import screens (we'll create these next)
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
@@ -142,42 +141,6 @@ function AuthGate() {
 // Main App Navigator Component
 export default function AppNavigator() {
   const { profile, isOnboardingComplete } = useUserStore();
-  const { state: revenueCatState, actions: revenueCatActions } = useRevenueCat();
-  
-  // Initialize RevenueCat when profile is available - using stable dependencies
-  useEffect(() => {
-    console.log('🔍 AppNavigator useEffect triggered:', {
-      hasProfile: !!profile,
-      profileId: profile?.id,
-      isInitialized: revenueCatState.isInitialized,
-      isLoading: revenueCatState.isLoading,
-      error: revenueCatState.error,
-    });
-    
-    // Only initialize if we have a profile and RevenueCat isn't already initialized or loading
-    if (profile?.id && !revenueCatState.isInitialized && !revenueCatState.isLoading) {
-      // Don't initialize if there's a persistent API key error
-      if (revenueCatState.error && revenueCatState.error.includes('Invalid API key')) {
-        console.log('⏭️ Skipping RevenueCat initialization due to API key error');
-        return;
-      }
-      
-      console.log('🚀 Initializing RevenueCat in AppNavigator...');
-      
-      // Use profile ID for RevenueCat user identification
-      revenueCatActions.initializeRevenueCat(profile.id).catch((error) => {
-        console.error('❌ Failed to initialize RevenueCat:', error);
-        // Don't block app startup if RevenueCat fails
-      });
-    } else {
-      console.log('⏭️ Skipping RevenueCat initialization:', {
-        reason: !profile?.id ? 'No profile ID' : 
-                revenueCatState.isInitialized ? 'Already initialized' :
-                revenueCatState.isLoading ? 'Currently loading' : 
-                revenueCatState.error?.includes('Invalid API key') ? 'API key error' : 'Unknown'
-      });
-    }
-  }, [profile?.id, revenueCatState.isInitialized, revenueCatState.isLoading, revenueCatState.error]); // Include error in dependencies
   
   // Use a key that changes when auth state changes to force navigation reset
   const navKey = `${!!profile}-${isOnboardingComplete}`;
