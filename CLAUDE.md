@@ -34,12 +34,49 @@ The app uses Zustand stores with persistence:
 - `userStore.ts` - User profile, BMR/calorie calculations, onboarding state
 - `foodStore.ts` - Food items, daily logs, nutrition tracking
 
-#### 2. Navigation Structure
+#### 2. RevenueCat Context Provider Pattern
+The app uses a React Context Provider for RevenueCat subscription management to ensure single state instance across all components:
+
+**Key Files:**
+- `src/contexts/RevenueCatContext.tsx` - Context provider and hook
+- `src/hooks/useRevenueCat.ts` - Core RevenueCat logic (single instance)
+
+**Architecture:**
+```
+App.tsx
+├── RevenueCatProvider (single useRevenueCat hook instance)
+│   ├── Context provides: { state, actions }
+│   └── Handles: Initialization, listeners, state management
+│
+└── All Child Components
+    ├── useRevenueCatContext() - Shared state access
+    ├── VoiceScreen, SettingsScreen, PaywallScreen
+    └── usePaywall hook
+```
+
+**Usage Pattern:**
+```typescript
+// ✅ CORRECT - Use context in components
+import { useRevenueCatContext } from '../contexts/RevenueCatContext';
+const { state, actions } = useRevenueCatContext();
+
+// ❌ WRONG - Don't use direct hook (creates separate instance)
+import useRevenueCat from '../hooks/useRevenueCat';
+const { state, actions } = useRevenueCat();
+```
+
+**Benefits:**
+- **Single Source of Truth**: All components share same subscription state
+- **Automatic Initialization**: No manual retry buttons needed
+- **Consistent Updates**: State changes propagate to all components
+- **Prevents Race Conditions**: Only one initialization process
+
+#### 3. Navigation Structure
 - **Root Stack**: Conditional rendering based on onboarding completion
 - **Tab Navigator**: Main app with Home, Voice, History, Settings tabs
 - Navigation types defined in `src/types/index.ts`
 
-#### 3. Component Organization
+#### 4. Component Organization
 ```
 src/
 ├── components/
@@ -57,7 +94,7 @@ src/
 └── utils/              # Utility functions
 ```
 
-#### 4. Design System
+#### 5. Design System
 - Centralized theme in `src/constants/theme.ts`
 - Consistent color palette, typography, spacing, shadows
 - Component-specific styling constants
@@ -81,6 +118,13 @@ src/
 - All user data persisted via AsyncStorage
 - Zustand middleware handles serialization
 - Food logs organized by date (YYYY-MM-DD format)
+
+#### Subscription Management
+- **FREE Tier**: 10 voice recordings per month
+- **PRO Tier**: 300 voice recordings per month
+- Monthly limits reset on the 1st of each month
+- Subscription state managed via RevenueCat context provider
+- Real-time limit enforcement with usage progress tracking
 
 ### Environment Variables
 
@@ -127,7 +171,6 @@ extra: {
 
 #### Troubleshooting Environment Variables
 
-- Use the "🔧 Test Environment" button in the Voice screen to debug variable loading
 - Check console logs for detailed environment variable debugging information
 - Ensure `.env` file is in the project root directory
 - Verify both `OPENAI_API_KEY` and `EXPO_PUBLIC_OPENAI_API_KEY` are present with identical values

@@ -64,9 +64,6 @@ export const PricingCard: React.FC<PricingCardProps> = ({
   };
 
   const formatRecordingLimit = () => {
-    if (plan.monthlyRecordingLimit === null) {
-      return 'Unlimited recordings';
-    }
     return `${plan.monthlyRecordingLimit} recordings per month`;
   };
 

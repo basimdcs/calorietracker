@@ -72,15 +72,15 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   };
 
   const formatUsageText = () => {
-    if (!usageInfo || usageInfo.recordingsLimit === null) {
-      return 'Unlimited recordings';
+    if (!usageInfo) {
+      return 'No usage data available';
     }
     
     return `${usageInfo.recordingsUsed} / ${usageInfo.recordingsLimit} recordings used`;
   };
 
   const getUsagePercentage = () => {
-    if (!usageInfo || usageInfo.recordingsLimit === null) return 0;
+    if (!usageInfo || !usageInfo.recordingsLimit) return 0;
     return Math.min(100, (usageInfo.recordingsUsed / usageInfo.recordingsLimit) * 100);
   };
 

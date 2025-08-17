@@ -60,7 +60,7 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({
           await actions.refreshCustomerInfo();
           Alert.alert(
             'Purchase Successful!',
-            'Welcome to CalorieTracker Pro! You now have unlimited voice recordings.',
+            'Welcome to CalorieTracker Pro! You now have 300 voice recordings per month.',
             [{ text: 'OK', onPress: onPurchaseCompleted }]
           );
           break;
@@ -132,7 +132,7 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({
           await actions.refreshCustomerInfo();
           Alert.alert(
             'Purchase Successful!',
-            'Welcome to CalorieTracker Pro! You now have unlimited voice recordings.',
+            'Welcome to CalorieTracker Pro! You now have 300 voice recordings per month.',
             [{ text: 'OK', onPress: onPurchaseCompleted }]
           );
           break;
@@ -218,7 +218,7 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({
         <View style={styles.successContainer}>
           <Text style={styles.successTitle}>You're All Set! 🎉</Text>
           <Text style={styles.successMessage}>
-            You already have CalorieTracker Pro with unlimited voice recordings.
+            You already have CalorieTracker Pro with 300 voice recordings per month.
           </Text>
           <Button
             title="Continue"
@@ -236,11 +236,11 @@ export const PaywallScreen: React.FC<PaywallScreenProps> = ({
       <View style={styles.contentContainer}>
         <Text style={styles.title}>Upgrade to Pro</Text>
         <Text style={styles.subtitle}>
-          Get unlimited voice recordings and premium features
+          Get 300 voice recordings per month and premium features
         </Text>
         
         <View style={styles.featuresContainer}>
-          <Text style={styles.featureItem}>✨ Unlimited voice recordings</Text>
+          <Text style={styles.featureItem}>✨ 300 voice recordings per month</Text>
           <Text style={styles.featureItem}>📊 Advanced nutrition insights</Text>
           <Text style={styles.featureItem}>📈 Detailed progress tracking</Text>
           <Text style={styles.featureItem}>💾 Export your data</Text>

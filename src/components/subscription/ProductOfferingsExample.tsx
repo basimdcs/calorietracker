@@ -131,7 +131,7 @@ export const ProductOfferingsExample: React.FC = () => {
             <Text style={styles.packagePrice}>{monthlyPackage.product.priceString}</Text>
           </View>
           <Text style={styles.packageDescription}>
-            Unlimited recordings, advanced features
+            300 recordings per month, advanced features
           </Text>
           <TouchableOpacity 
             style={styles.purchaseButton}

@@ -79,10 +79,6 @@ const SettingsScreen: React.FC = () => {
           // In a real app, you'd copy to clipboard here
           console.log('Debug info:', debugInfo);
         }},
-        { text: 'Retry Initialization', onPress: () => {
-          revenueCatActions.resetInitialization();
-          revenueCatActions.initializeRevenueCat(profile?.id);
-        }},
         { text: 'Close' }
       ]
     );

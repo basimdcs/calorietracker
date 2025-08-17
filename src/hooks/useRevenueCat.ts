@@ -21,8 +21,8 @@ export interface SubscriptionStatus {
 
 export interface UsageInfo {
   recordingsUsed: number;
-  recordingsLimit: number | null; // null means unlimited
-  recordingsRemaining: number | null;
+  recordingsLimit: number; // Monthly recording limit
+  recordingsRemaining: number;
   resetDate: Date;
 }
 
@@ -53,7 +53,7 @@ export interface RevenueCatActions {
 
 const DEFAULT_USAGE_LIMITS = {
   FREE: 10,
-  PRO: null, // unlimited for Pro tier
+  PRO: 300, // 300 recordings per month for Pro tier
 };
 
 const useRevenueCat = () => {
@@ -121,7 +121,7 @@ const useRevenueCat = () => {
     return {
       recordingsUsed: currentUsage,
       recordingsLimit: limit,
-      recordingsRemaining: limit ? Math.max(0, limit - currentUsage) : null,
+      recordingsRemaining: Math.max(0, limit - currentUsage),
       resetDate,
     };
   }, []);

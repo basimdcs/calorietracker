@@ -17,8 +17,6 @@ export const UsageProgressBar: React.FC<UsageProgressBarProps> = ({
   style,
 }) => {
   const getProgressColor = () => {
-    if (usageStats.monthlyLimit === null) return colors.success; // Unlimited
-    
     const percentage = usageStats.usagePercentage;
     if (percentage >= 90) return colors.error;
     if (percentage >= 75) return colors.warning;
@@ -26,18 +24,10 @@ export const UsageProgressBar: React.FC<UsageProgressBarProps> = ({
   };
 
   const formatUsageText = () => {
-    if (usageStats.monthlyLimit === null) {
-      return `${usageStats.recordingsUsed} recordings used`;
-    }
-    
     return `${usageStats.recordingsUsed} / ${usageStats.monthlyLimit} recordings used`;
   };
 
   const formatRemainingText = () => {
-    if (usageStats.monthlyLimit === null) {
-      return 'Unlimited';
-    }
-    
     if (usageStats.recordingsRemaining === 0) {
       return 'Limit reached';
     }

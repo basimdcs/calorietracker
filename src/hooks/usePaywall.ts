@@ -282,7 +282,7 @@ export const usePaywall = () => {
       onSuccess: () => {
         Alert.alert(
           'Purchase Successful!',
-          'Welcome to CalorieTracker Pro! You now have unlimited voice recordings.',
+          'Welcome to CalorieTracker Pro! You now have 300 voice recordings per month.',
         );
       },
       onError: (error) => {
@@ -305,7 +305,7 @@ export const usePaywall = () => {
         if (needsPaywall(options.requiredEntitlement)) {
           Alert.alert(
             'Purchase Successful!',
-            'Welcome to CalorieTracker Pro! You now have unlimited voice recordings.',
+            'Welcome to CalorieTracker Pro! You now have 300 voice recordings per month.',
           );
         }
       },

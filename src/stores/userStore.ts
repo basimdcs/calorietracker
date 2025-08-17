@@ -141,15 +141,15 @@ export const useUserStore = create<UserState>()(
         // Define monthly limits based on subscription tier (updated to match requirements)
         const monthlyLimits = {
           FREE: 10,
-          PRO: null, // unlimited
+          PRO: 300, // 300 recordings per month
         };
         
         const monthlyLimit = monthlyLimits[subscriptionTier];
         const recordingsUsed = monthlyRecordingUsage;
-        const recordingsRemaining = monthlyLimit ? Math.max(0, monthlyLimit - recordingsUsed) : null;
+        const recordingsRemaining = Math.max(0, monthlyLimit - recordingsUsed);
         
-        // Calculate usage percentage (0 for unlimited plans)
-        const usagePercentage = monthlyLimit ? Math.min(100, (recordingsUsed / monthlyLimit) * 100) : 0;
+        // Calculate usage percentage
+        const usagePercentage = Math.min(100, (recordingsUsed / monthlyLimit) * 100);
         
         // Calculate reset date (first day of next month)
         const now = new Date();

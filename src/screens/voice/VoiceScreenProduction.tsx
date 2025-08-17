@@ -65,43 +65,6 @@ const VoiceScreenProduction: React.FC = () => {
     }
   };
 
-  // Temporary test function to force paywall (remove in production)
-  const testPaywall = useCallback(async () => {
-    console.log('🧪 Testing paywall...');
-    
-    // Check RevenueCat initialization status before calling paywall
-    console.log('🔍 Pre-paywall RevenueCat status:', {
-      isInitialized: revenueCatState.isInitialized,
-      isLoading: revenueCatState.isLoading,
-      error: revenueCatState.error,
-      tier: revenueCatState.subscriptionStatus.tier
-    });
-    
-    if (!revenueCatState.isInitialized) {
-      Alert.alert(
-        'RevenueCat Not Ready', 
-        'RevenueCat is not initialized yet. Please try again in a moment.',
-        [
-          {
-            text: 'Retry Initialize',
-            onPress: async () => {
-              console.log('🔄 Manual RevenueCat initialization...');
-              await revenueCatActions.initializeRevenueCat();
-              
-              // Wait a moment then try paywall again
-              setTimeout(() => testPaywall(), 1000);
-            }
-          },
-          { text: 'Cancel' }
-        ]
-      );
-      return;
-    }
-    
-    await presentPaywallIfNeededWithAlert({
-      requiredEntitlement: 'pro',
-    });
-  }, [presentPaywallIfNeededWithAlert, revenueCatState, revenueCatActions]);
 
   // RevenueCat debug test function
   const testRevenueCatDebug = useCallback(async () => {
@@ -260,19 +223,29 @@ Products: com.basimdcs.calorietracker.Monthly, com.basimdcs.calorietracker.Annua
   const handleStartRecording = useCallback(async () => {
     const usageStats = getCurrentUsageStats();
     
-    if (usageStats.monthlyLimit !== null && usageStats.recordingsRemaining !== null && usageStats.recordingsRemaining <= 0) {
-      Alert.alert(
-        'Recording Limit Reached',
-        `You've reached your monthly limit of ${usageStats.monthlyLimit} recordings. Upgrade to PRO for unlimited recordings!`,
-        [
-          { text: 'Maybe Later', style: 'cancel' },
-          { text: 'Upgrade to Pro', onPress: async () => {
-            await presentPaywallIfNeededWithAlert({
-              requiredEntitlement: 'pro',
-            });
-          }}
-        ]
-      );
+    if (usageStats.recordingsRemaining !== null && usageStats.recordingsRemaining <= 0) {
+      const currentTier = revenueCatState.subscriptionStatus.tier;
+      
+      if (currentTier === 'FREE') {
+        Alert.alert(
+          'Recording Limit Reached',
+          `You've reached your monthly limit of ${usageStats.monthlyLimit} recordings. Upgrade to PRO for 300 recordings per month!`,
+          [
+            { text: 'Maybe Later', style: 'cancel' },
+            { text: 'Upgrade to Pro', onPress: async () => {
+              await presentPaywallIfNeededWithAlert({
+                requiredEntitlement: 'pro',
+              });
+            }}
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Recording Limit Reached',
+          `You've reached your monthly limit of ${usageStats.monthlyLimit} recordings. Your limit will reset next month.`,
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
       return;
     }
     
@@ -906,27 +879,6 @@ Check console for detailed logs.`,
                 Compare GPT-4 vs Gemini with full Arabic meal description
               </Text>
               
-              <TouchableOpacity
-                style={[styles.testButton, styles.testButtonPrimary]}
-                onPress={testPaywall}
-              >
-                <MaterialIcons name="payment" size={20} color={colors.white} />
-                <Text style={[styles.testButtonText, styles.testButtonTextPrimary]}>🧪 Test RevenueCat Paywall</Text>
-              </TouchableOpacity>
-              <Text style={styles.testDescription}>
-                Test the RevenueCat paywall (remove in production)
-              </Text>
-
-              <TouchableOpacity
-                style={[styles.testButton, { backgroundColor: colors.warning }]}
-                onPress={testRevenueCatDebug}
-              >
-                <MaterialIcons name="bug-report" size={20} color={colors.white} />
-                <Text style={[styles.testButtonText, styles.testButtonTextPrimary]}>🔧 RevenueCat Debug</Text>
-              </TouchableOpacity>
-              <Text style={styles.testDescription}>
-                Debug RevenueCat initialization and configuration issues
-              </Text>
             </View>
           )}
 

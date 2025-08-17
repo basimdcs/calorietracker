@@ -279,15 +279,15 @@ export interface SubscriptionPlan {
   name: string;
   monthlyPrice: number;
   currency: string;
-  monthlyRecordingLimit: number | null; // null means unlimited
+  monthlyRecordingLimit: number; // Monthly recording limit
   features: string[];
   popular?: boolean;
 }
 
 export interface UsageStats {
   recordingsUsed: number;
-  recordingsRemaining: number | null; // null means unlimited
-  monthlyLimit: number | null; // null means unlimited
+  recordingsRemaining: number; // Recordings remaining this month
+  monthlyLimit: number; // Monthly recording limit
   resetDate: Date | string;
   usagePercentage: number; // 0-100
 }
@@ -311,9 +311,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Pro',
     monthlyPrice: 99,
     currency: 'EGP',
-    monthlyRecordingLimit: null,
+    monthlyRecordingLimit: 300,
     features: [
-      'Unlimited voice recordings',
+      '300 voice recordings per month',
       'Extended food database',
       'Advanced nutrition insights',
       'Detailed progress tracking',
