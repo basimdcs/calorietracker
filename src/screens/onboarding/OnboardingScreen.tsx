@@ -7,12 +7,23 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
+  Dimensions,
+  PanResponder,
+  TextInput,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { Button, Card, Input } from '../../components/ui';
+import { Button, Card, Input, BrandProgressIndicator } from '../../components/ui';
 import { useUserStore } from '../../stores/userStore';
 import { UserProfile, ACTIVITY_LEVELS, GOALS, ActivityLevel, Goal } from '../../types';
 import { colors, fonts, spacing, layout, borderRadius, shadows } from '../../constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialIcons } from '@expo/vector-icons';
+import WelcomeScreen from './WelcomeScreen';
+import CalorieEditor from '../../components/ui/CalorieEditor';
+
+// No external slider - we'll use a custom implementation
 
 interface OnboardingData {
   name: string;
@@ -25,7 +36,7 @@ interface OnboardingData {
 }
 
 const OnboardingScreen: React.FC = () => {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0); // Start with welcome screen
   const [data, setData] = useState<OnboardingData>({
     name: '',
     age: '',
@@ -35,6 +46,9 @@ const OnboardingScreen: React.FC = () => {
     activityLevel: 'moderately-active',
     goal: 'maintain',
   });
+  const [showCalorieEditor, setShowCalorieEditor] = useState(false);
+  const [customCalories, setCustomCalories] = useState<number | null>(null);
+  const [showCustomEditor, setShowCustomEditor] = useState(false);
 
   const { setProfile } = useUserStore();
 
@@ -44,6 +58,8 @@ const OnboardingScreen: React.FC = () => {
 
   const validateStep = (currentStep: number): boolean => {
     switch (currentStep) {
+      case 0:
+        return true; // Welcome screen - always valid
       case 1:
         const nameValid = data.name.trim() !== '';
         const ageNum = parseInt(data.age);
@@ -56,7 +72,11 @@ const OnboardingScreen: React.FC = () => {
         const weightValid = data.weight !== '' && !isNaN(weightNum) && weightNum >= 20 && weightNum <= 300;
         return heightValid && weightValid;
       case 3:
-        return true; // Activity level and goal have defaults
+        return true; // Activity level has defaults
+      case 4:
+        return true; // Goal selection has defaults
+      case 5:
+        return true; // Confirmation screen
       default:
         return false;
     }
@@ -64,7 +84,7 @@ const OnboardingScreen: React.FC = () => {
 
   const nextStep = () => {
     if (validateStep(step)) {
-      if (step < 3) {
+      if (step < 5) {
         setStep(step + 1);
       } else {
         completeOnboarding();
@@ -120,12 +140,15 @@ const OnboardingScreen: React.FC = () => {
   };
 
   const prevStep = () => {
-    if (step > 1) {
+    if (step > 0) {
       setStep(step - 1);
     }
   };
 
   const completeOnboarding = () => {
+    const bmr = calculateBMR();
+    const dailyCalories = customCalories || calculateDailyCalories();
+    
     const profile: UserProfile = {
       id: Date.now().toString(),
       name: data.name,
@@ -135,6 +158,9 @@ const OnboardingScreen: React.FC = () => {
       weight: parseFloat(data.weight),
       activityLevel: data.activityLevel,
       goal: data.goal,
+      bmr: Math.round(bmr),
+      dailyCalorieGoal: dailyCalories,
+      customCalorieGoal: customCalories || undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -144,7 +170,7 @@ const OnboardingScreen: React.FC = () => {
 
   const renderStep1 = () => (
     <Card style={styles.stepCard}>
-      <Text style={styles.stepTitle}>Tell us about yourself</Text>
+      <Text style={styles.stepTitle}>👋 Tell us about yourself</Text>
       <Text style={styles.stepSubtitle}>Basic information to get started</Text>
       
       <Input
@@ -153,6 +179,8 @@ const OnboardingScreen: React.FC = () => {
         onChangeText={(text) => updateData('name', text)}
         placeholder="e.g., John Doe"
         style={styles.input}
+        returnKeyType="next"
+        onSubmitEditing={() => Keyboard.dismiss()}
       />
       
       <Input
@@ -162,6 +190,8 @@ const OnboardingScreen: React.FC = () => {
         placeholder="e.g., 25"
         keyboardType="numeric"
         style={styles.input}
+        returnKeyType="done"
+        onSubmitEditing={() => Keyboard.dismiss()}
       />
 
       <Text style={styles.label}>Gender</Text>
@@ -170,7 +200,7 @@ const OnboardingScreen: React.FC = () => {
           style={[styles.optionButton, data.gender === 'male' && styles.selectedButton]}
           onPress={() => updateData('gender', 'male')}
         >
-          <Text style={[styles.optionText, data.gender === 'male' && styles.selectedText]}>
+          <Text style={[styles.optionText, data.gender === 'male' && styles.selectedButtonText]}>
             Male
           </Text>
         </TouchableOpacity>
@@ -178,7 +208,7 @@ const OnboardingScreen: React.FC = () => {
           style={[styles.optionButton, data.gender === 'female' && styles.selectedButton]}
           onPress={() => updateData('gender', 'female')}
         >
-          <Text style={[styles.optionText, data.gender === 'female' && styles.selectedText]}>
+          <Text style={[styles.optionText, data.gender === 'female' && styles.selectedButtonText]}>
             Female
           </Text>
         </TouchableOpacity>
@@ -188,7 +218,7 @@ const OnboardingScreen: React.FC = () => {
 
   const renderStep2 = () => (
     <Card style={styles.stepCard}>
-      <Text style={styles.stepTitle}>Physical Details</Text>
+      <Text style={styles.stepTitle}>📏 Physical Details</Text>
       <Text style={styles.stepSubtitle}>Help us calculate your daily needs</Text>
       
       <Input
@@ -198,6 +228,8 @@ const OnboardingScreen: React.FC = () => {
         placeholder="e.g., 175"
         keyboardType="numeric"
         style={styles.input}
+        returnKeyType="next"
+        onSubmitEditing={() => Keyboard.dismiss()}
       />
       
       <Input
@@ -207,16 +239,17 @@ const OnboardingScreen: React.FC = () => {
         placeholder="e.g., 70"
         keyboardType="numeric"
         style={styles.input}
+        returnKeyType="done"
+        onSubmitEditing={() => Keyboard.dismiss()}
       />
     </Card>
   );
 
   const renderStep3 = () => (
     <Card style={styles.stepCard}>
-      <Text style={styles.stepTitle}>Activity & Goals</Text>
-      <Text style={styles.stepSubtitle}>Set your activity level and weight goal</Text>
+      <Text style={styles.stepTitle}>🏃‍♂️ Activity Level</Text>
+      <Text style={styles.stepSubtitle}>How active are you during the week?</Text>
       
-      <Text style={styles.label}>Activity Level</Text>
       {ACTIVITY_LEVELS.map((level) => (
         <TouchableOpacity
           key={level.value}
@@ -226,11 +259,17 @@ const OnboardingScreen: React.FC = () => {
           <Text style={[styles.optionCardTitle, data.activityLevel === level.value && styles.selectedText]}>
             {level.label}
           </Text>
-          <Text style={styles.optionCardDesc}>{level.description}</Text>
+          <Text style={[styles.optionCardDesc, data.activityLevel === level.value && styles.selectedDescText]}>{level.description}</Text>
         </TouchableOpacity>
       ))}
+    </Card>
+  );
 
-      <Text style={[styles.label, { marginTop: spacing.lg }]}>Goal</Text>
+  const renderStep4 = () => (
+    <Card style={styles.stepCard}>
+      <Text style={styles.stepTitle}>🎯 Weight Goal</Text>
+      <Text style={styles.stepSubtitle}>What's your main fitness goal?</Text>
+      
       {GOALS.map((goal) => (
         <TouchableOpacity
           key={goal.value}
@@ -240,51 +279,289 @@ const OnboardingScreen: React.FC = () => {
           <Text style={[styles.optionCardTitle, data.goal === goal.value && styles.selectedText]}>
             {goal.label}
           </Text>
-          <Text style={styles.optionCardDesc}>{goal.description}</Text>
+          <Text style={[styles.optionCardDesc, data.goal === goal.value && styles.selectedDescText]}>{goal.description}</Text>
         </TouchableOpacity>
       ))}
     </Card>
   );
 
+  const calculateBMR = () => {
+    const { weight, height, age, gender } = data;
+    const weightNum = parseFloat(weight) || 70;
+    const heightNum = parseFloat(height) || 170;
+    const ageNum = parseInt(age) || 25;
+    
+    if (isNaN(weightNum) || isNaN(heightNum) || isNaN(ageNum)) {
+      return 1500; // Fallback BMR
+    }
+    
+    if (gender === 'male') {
+      return (10 * weightNum) + (6.25 * heightNum) - (5 * ageNum) + 5;
+    } else {
+      return (10 * weightNum) + (6.25 * heightNum) - (5 * ageNum) - 161;
+    }
+  };
+
+  const calculateTDEE = () => {
+    const bmr = calculateBMR();
+    const activityMultipliers = {
+      sedentary: 1.2,
+      'lightly-active': 1.375,
+      'moderately-active': 1.55,
+      'very-active': 1.725,
+      'extra-active': 1.9,
+    };
+    const multiplier = activityMultipliers[data.activityLevel] || 1.55;
+    return bmr * multiplier;
+  };
+
+  const calculateDailyCalories = () => {
+    const tdee = calculateTDEE();
+    switch (data.goal) {
+      case 'lose':
+        return Math.round(tdee - 500);
+      case 'gain':
+        return Math.round(tdee + 300);
+      case 'maintain':
+      default:
+        return Math.round(tdee);
+    }
+  };
+
+  const renderStep5 = () => {
+    const bmr = Math.round(calculateBMR());
+    const tdee = Math.round(calculateTDEE());
+    const recommendedCalories = calculateDailyCalories();
+    const currentCalories = customCalories || recommendedCalories;
+
+    // Calculate deficit/surplus for display
+    const getDeficitSurplus = () => {
+      const difference = tdee - currentCalories;
+      if (difference > 0) {
+        return { type: 'deficit', amount: Math.abs(difference) };
+      } else if (difference < 0) {
+        return { type: 'surplus', amount: Math.abs(difference) };
+      } else {
+        return { type: 'maintenance', amount: 0 };
+      }
+    };
+
+    const getWeeklyWeightChange = () => {
+      const { type, amount } = getDeficitSurplus();
+      const weeklyChange = (amount * 7) / 3500; // 3500 calories = 1 pound
+      
+      if (type === 'deficit') {
+        return -weeklyChange;
+      } else if (type === 'surplus') {
+        return weeklyChange;
+      } else {
+        return 0;
+      }
+    };
+
+    const { type, amount } = getDeficitSurplus();
+    const weeklyChange = getWeeklyWeightChange();
+
+    return (
+      <Card style={styles.compactStepCard}>
+        <Text style={styles.compactStepTitle}>🔥 Your Daily Target</Text>
+        <Text style={styles.compactStepSubtitle}>
+          {showCustomEditor ? 'Adjust your target' : 'Ready to start tracking!'}
+        </Text>
+        
+        {!showCustomEditor ? (
+          // Compact Summary View
+          <>
+            {/* Compact Calorie Target Display */}
+            <View style={styles.compactCalorieTargetContainer}>
+              <Text style={styles.compactCalorieTargetNumber}>{currentCalories.toLocaleString()}</Text>
+              <Text style={styles.compactCalorieTargetLabel}>calories/day</Text>
+              {customCalories && (
+                <Text style={styles.compactCustomLabel}>✨ Custom</Text>
+              )}
+            </View>
+
+            {/* Compact Summary Stats */}
+            <View style={styles.compactStatsContainer}>
+              <View style={styles.compactStatItem}>
+                <Text style={styles.compactStatValue}>{bmr}</Text>
+                <Text style={styles.compactStatLabel}>BMR</Text>
+              </View>
+              <View style={styles.compactStatItem}>
+                <Text style={styles.compactStatValue}>{tdee}</Text>
+                <Text style={styles.compactStatLabel}>TDEE</Text>
+              </View>
+              <View style={styles.compactStatItem}>
+                <Text style={styles.compactStatValue}>
+                  {data.goal === 'lose' ? 'Lose' : data.goal === 'gain' ? 'Gain' : 'Maintain'}
+                </Text>
+                <Text style={styles.compactStatLabel}>Goal</Text>
+              </View>
+            </View>
+
+            {/* Compact Customize Button */}
+            <TouchableOpacity 
+              style={styles.compactCustomizeButton}
+              onPress={() => setShowCustomEditor(true)}
+            >
+              <MaterialIcons name="tune" size={16} color={colors.brandOuterSkin} />
+              <Text style={styles.compactCustomizeButtonText}>
+                {customCalories ? 'Edit' : 'Customize'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          // Custom Editor View
+          <>
+            {/* Free-Form Calorie Input */}
+            <View style={styles.compactCalorieContainer}>
+              <Text style={styles.compactCalorieLabel}>Enter your daily calorie target:</Text>
+              
+              {/* Manual Input */}
+              <View style={styles.manualInputContainer}>
+                <TextInput
+                  style={styles.calorieInput}
+                  value={Math.round(currentCalories).toString()}
+                  onChangeText={(text) => {
+                    // Allow any number input, validate on blur/submit
+                    const numValue = parseInt(text) || 0;
+                    setCustomCalories(numValue);
+                  }}
+                  onBlur={() => {
+                    // Very gentle validation - only prevent extreme values
+                    if (currentCalories < 800) {
+                      setCustomCalories(800);
+                    } else if (currentCalories > 6000) {
+                      setCustomCalories(6000);
+                    }
+                  }}
+                  keyboardType="numeric"
+                  selectTextOnFocus
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  placeholder="e.g., 2000"
+                />
+                <Text style={styles.caloriesUnit}>calories</Text>
+              </View>
+
+              <Text style={styles.rangeHint}>💡 Recommended: 1,200 - 4,000 calories</Text>
+              <Text style={styles.freeFormHint}>Enter any value between 800 - 6,000 that fits your goals</Text>
+            </View>
+
+            {/* Compact Impact Display */}
+            <View style={styles.compactImpactContainer}>
+              <View style={styles.compactImpactRow}>
+                <View style={styles.compactImpactItem}>
+                  <Text style={styles.compactImpactLabel}>Daily {type}:</Text>
+                  <Text style={[
+                    styles.compactImpactValue,
+                    { color: type === 'deficit' ? colors.secondary : 
+                             type === 'surplus' ? colors.brandOuterSkin : colors.gray600 }
+                  ]}>
+                    {amount > 0 ? `${amount.toLocaleString()} cal` : 'Balanced'}
+                  </Text>
+                </View>
+                
+                <View style={styles.compactImpactItem}>
+                  <Text style={styles.compactImpactLabel}>Weekly change:</Text>
+                  <Text style={[
+                    styles.compactImpactValue,
+                    { color: weeklyChange < 0 ? colors.secondary : 
+                             weeklyChange > 0 ? colors.brandOuterSkin : colors.gray600 }
+                  ]}>
+                    {weeklyChange !== 0 
+                      ? `${weeklyChange > 0 ? '+' : ''}${weeklyChange.toFixed(1)} lbs`
+                      : 'Maintain'
+                    }
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Reset Button */}
+            {customCalories && customCalories !== recommendedCalories && (
+              <TouchableOpacity 
+                style={styles.editorResetButton} 
+                onPress={() => setCustomCalories(null)}
+              >
+                <MaterialIcons name="refresh" size={18} color={colors.brandOuterSkin} />
+                <Text style={styles.editorResetButtonText}>Reset to Recommended</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Back to Summary */}
+            <TouchableOpacity 
+              style={styles.backToSummaryButton}
+              onPress={() => setShowCustomEditor(false)}
+            >
+              <MaterialIcons name="check" size={18} color={colors.white} />
+              <Text style={styles.backToSummaryButtonText}>Done Customizing</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </Card>
+    );
+  };
+
+  // Handle welcome screen
+  if (step === 0) {
+    return <WelcomeScreen onContinue={() => setStep(1)} />;
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <LinearGradient
-            colors={[colors.primaryLight, colors.primary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.headerGradient}
-          >
-            <Text style={styles.title}>Set up your profile</Text>
-            <Text style={styles.subtitle}>Personalize your goals in a minute</Text>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${(step / 3) * 100}%` }]} />
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Small Banner */}
+          <View style={styles.smallBanner}>
+            <View style={styles.smallBannerContent}>
+              <Text style={styles.smallBannerTitle}>Profile Setup</Text>
+              <Text style={styles.smallBannerStep}>Step {step} of 5</Text>
             </View>
-            <Text style={styles.stepCaption}>Step {step} of 3</Text>
-          </LinearGradient>
-        </View>
+            <BrandProgressIndicator 
+              progress={((step - 1) / 4) * 100} 
+              height={3}
+              style={styles.smallProgressIndicator}
+            />
+          </View>
 
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
-      </ScrollView>
+          {step === 1 && renderStep1()}
+          {step === 2 && renderStep2()}
+          {step === 3 && renderStep3()}
+          {step === 4 && renderStep4()}
+          {step === 5 && renderStep5()}
+        </ScrollView>
 
-      <View style={styles.footer}>
-        {step > 1 && (
+        <View style={styles.footer}>
+          {step > 1 && (
+            <Button
+              title="Back"
+              onPress={prevStep}
+              variant="outline"
+              style={styles.backButton}
+            />
+          )}
           <Button
-            title="Back"
-            onPress={prevStep}
-            variant="outline"
-            style={styles.backButton}
+            title={
+              step === 0 ? "Get Started" :
+              step === 1 ? "Continue" :
+              step === 2 ? "Continue" : 
+              step === 3 ? "Continue" :
+              step === 4 ? "Set My Goals" :
+              step === 5 ? "Complete Setup" : "Continue"
+            }
+            onPress={nextStep}
+            style={styles.nextButton}
           />
-        )}
-        <Button
-          title={step === 3 ? "Complete Setup" : "Next"}
-          onPress={nextStep}
-          style={styles.nextButton}
-        />
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -294,77 +571,71 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
   },
-  header: {
-    paddingHorizontal: layout.screenPadding,
+  smallBanner: {
+    backgroundColor: colors.brandFlesh + '15',
+    marginHorizontal: layout.screenPadding,
+    marginTop: spacing.md,
     marginBottom: spacing.lg,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.brandOuterSkin + '20',
   },
-  headerGradient: {
-    borderRadius: borderRadius['2xl'],
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
-    ...shadows.lg,
+  smallBannerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
-  title: {
-    fontSize: fonts['2xl'],
-    fontWeight: fonts.bold,
-    color: colors.textOnPrimary,
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
+  smallBannerTitle: {
     fontSize: fonts.base,
-    color: colors.textOnPrimary,
-    opacity: 0.9,
-    marginBottom: spacing.md,
+    fontWeight: fonts.semibold,
+    color: colors.textPrimary,
   },
-  progressTrack: {
-    height: 8,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.white,
-  },
-  stepCaption: {
-    color: colors.textOnPrimary,
-    opacity: 0.9,
-    marginTop: spacing.sm,
+  smallBannerStep: {
     fontSize: fonts.sm,
-    textAlign: 'right',
+    color: colors.textSecondary,
+    fontWeight: fonts.medium,
+  },
+  smallProgressIndicator: {
+    // No additional styling needed
   },
   stepCard: {
     marginHorizontal: layout.screenPadding,
     marginBottom: spacing.lg,
     backgroundColor: colors.surface,
     borderRadius: borderRadius['2xl'],
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    padding: spacing.lg,
-    ...shadows.md,
+    borderWidth: 0,
+    padding: spacing.xl,
+    ...shadows.lg,
   },
   stepTitle: {
     fontSize: fonts['2xl'],
     fontWeight: fonts.bold,
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+    letterSpacing: -0.5,
   },
   stepSubtitle: {
-    fontSize: fonts.base,
+    fontSize: fonts.lg,
     color: colors.textSecondary,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
+    lineHeight: 24,
   },
   input: {
     marginBottom: spacing.md,
   },
   label: {
-    fontSize: fonts.base,
-    fontWeight: fonts.medium,
+    fontSize: fonts.lg,
+    fontWeight: fonts.semibold,
     color: colors.textPrimary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -373,17 +644,18 @@ const styles = StyleSheet.create({
   },
   optionButton: {
     flex: 1,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1.5,
     borderColor: colors.gray200,
     backgroundColor: colors.backgroundSecondary,
     alignItems: 'center',
   },
   selectedButton: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
+    backgroundColor: colors.brandOuterSkin,
+    borderColor: colors.brandLeaf,
+    borderWidth: 2,
   },
   optionText: {
     fontSize: fonts.base,
@@ -391,31 +663,42 @@ const styles = StyleSheet.create({
     fontWeight: fonts.medium,
   },
   selectedText: {
-    color: colors.textOnPrimary,
-    fontWeight: fonts.semibold,
+    color: colors.brandOuterSkin,
+    fontWeight: fonts.bold,
+  },
+  selectedDescText: {
+    color: colors.brandLeaf,
+    fontWeight: fonts.medium,
+  },
+  selectedButtonText: {
+    color: colors.white,
+    fontWeight: fonts.bold,
   },
   optionCard: {
     padding: spacing.md,
     borderRadius: borderRadius.lg,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.gray200,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSecondary,
     ...shadows.sm,
     marginBottom: spacing.sm,
   },
   selectedCard: {
-    backgroundColor: colors.primary + '15',
-    borderColor: colors.primary,
+    backgroundColor: colors.white,
+    borderColor: colors.brandOuterSkin,
+    borderWidth: 2,
+    ...shadows.md,
   },
   optionCardTitle: {
     fontSize: fonts.base,
-    fontWeight: fonts.medium,
+    fontWeight: fonts.semibold,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   optionCardDesc: {
     fontSize: fonts.sm,
     color: colors.textSecondary,
+    lineHeight: 18,
   },
   footer: {
     flexDirection: 'row',
@@ -428,6 +711,372 @@ const styles = StyleSheet.create({
   },
   nextButton: {
     flex: 2,
+  },
+  // Confirmation screen styles
+  calorieTargetContainer: {
+    alignItems: 'center',
+    backgroundColor: colors.brandFlesh + '20',
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    marginVertical: spacing.lg,
+  },
+  calorieTargetNumber: {
+    fontSize: fonts['4xl'],
+    fontWeight: fonts.bold,
+    color: colors.brandOuterSkin,
+    marginBottom: spacing.xs,
+  },
+  calorieTargetLabel: {
+    fontSize: fonts.base,
+    color: colors.textSecondary,
+    fontWeight: fonts.medium,
+  },
+  customLabel: {
+    fontSize: fonts.sm,
+    color: colors.brandOuterSkin,
+    fontWeight: fonts.semibold,
+    marginTop: spacing.xs,
+  },
+  breakdownContainer: {
+    backgroundColor: colors.gray50,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginVertical: spacing.md,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  breakdownLabel: {
+    fontSize: fonts.sm,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  breakdownValue: {
+    fontSize: fonts.sm,
+    fontWeight: fonts.semibold,
+    color: colors.textPrimary,
+  },
+  editTargetButton: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.brandOuterSkin + '10',
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.brandOuterSkin + '30',
+    alignItems: 'center',
+  },
+  editTargetText: {
+    fontSize: fonts.sm,
+    color: colors.brandOuterSkin,
+    fontWeight: fonts.medium,
+  },
+  // New integrated editor styles
+  customizeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.brandFlesh + '20',
+    borderRadius: borderRadius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.brandOuterSkin + '40',
+    gap: spacing.sm,
+  },
+  customizeButtonText: {
+    fontSize: fonts.base,
+    color: colors.brandOuterSkin,
+    fontWeight: fonts.semibold,
+  },
+  // Editor view styles
+  editorTargetContainer: {
+    alignItems: 'center',
+    backgroundColor: colors.brandFlesh + '15',
+    borderRadius: borderRadius.xl,
+    paddingVertical: spacing.xl,
+    marginVertical: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.brandOuterSkin + '20',
+  },
+  editorTargetNumber: {
+    fontSize: 42,
+    fontWeight: fonts.bold,
+    color: colors.brandOuterSkin,
+    marginBottom: spacing.sm,
+    letterSpacing: -1,
+  },
+  editorTargetLabel: {
+    fontSize: fonts.base,
+    color: colors.textSecondary,
+    fontWeight: fonts.medium,
+  },
+  // Compact Editor Styles
+  compactCalorieContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  compactCalorieLabel: {
+    fontSize: fonts.base,
+    color: colors.textPrimary,
+    fontWeight: fonts.medium,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  manualInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  calorieInput: {
+    fontSize: fonts['2xl'],
+    fontWeight: fonts.bold,
+    color: colors.brandOuterSkin,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderWidth: 2,
+    borderColor: colors.brandOuterSkin + '40',
+    minWidth: 140,
+    textAlign: 'center',
+    ...shadows.sm,
+  },
+  caloriesUnit: {
+    fontSize: fonts.base,
+    color: colors.textSecondary,
+    fontWeight: fonts.medium,
+  },
+  rangeHint: {
+    fontSize: fonts.xs,
+    color: colors.brandOuterSkin,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+    fontWeight: fonts.medium,
+  },
+  freeFormHint: {
+    fontSize: fonts.xs,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  // Compact Impact Styles
+  compactImpactContainer: {
+    backgroundColor: colors.gray50,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  compactImpactRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  compactImpactItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  compactImpactLabel: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+    fontWeight: fonts.medium,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  compactImpactValue: {
+    fontSize: fonts.sm,
+    fontWeight: fonts.bold,
+    textAlign: 'center',
+  },
+  // Impact display styles
+  editorImpactContainer: {
+    marginBottom: spacing.lg,
+  },
+  editorImpactTitle: {
+    fontSize: fonts.lg,
+    fontWeight: fonts.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  editorImpactCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    ...shadows.sm,
+  },
+  editorImpactRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  editorImpactLabel: {
+    fontSize: fonts.base,
+    color: colors.textSecondary,
+    fontWeight: fonts.medium,
+  },
+  editorImpactValue: {
+    fontSize: fonts.base,
+    fontWeight: fonts.bold,
+  },
+  // Action buttons
+  editorResetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.gray100,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  editorResetButtonText: {
+    fontSize: fonts.sm,
+    color: colors.brandOuterSkin,
+    fontWeight: fonts.medium,
+  },
+  backToSummaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.brandOuterSkin,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    ...shadows.md,
+  },
+  backToSummaryButtonText: {
+    fontSize: fonts.base,
+    color: colors.white,
+    fontWeight: fonts.semibold,
+  },
+  
+  // Compact styles for step 5
+  compactHeader: {
+    paddingHorizontal: layout.screenPadding,
+    marginBottom: spacing.md, // Reduced from lg
+  },
+  compactHeaderGradient: {
+    borderRadius: borderRadius.xl, // Reduced from 2xl
+    paddingVertical: spacing.lg, // Reduced from xl
+    paddingHorizontal: spacing.lg,
+    ...shadows.md, // Reduced from lg
+  },
+  compactTitle: {
+    fontSize: fonts.xl, // Reduced from 2xl
+    fontWeight: fonts.bold,
+    color: colors.textOnPrimary,
+    marginBottom: spacing.xs,
+  },
+  compactSubtitle: {
+    fontSize: fonts.sm, // Reduced from base
+    color: colors.textOnPrimary,
+    opacity: 0.9,
+    marginBottom: spacing.sm, // Reduced from md
+  },
+  compactStepCard: {
+    marginHorizontal: layout.screenPadding,
+    marginBottom: spacing.md, // Reduced from lg
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl, // Reduced from 2xl
+    borderWidth: 0,
+    padding: spacing.lg, // Reduced from xl
+    ...shadows.md, // Reduced from lg
+  },
+  compactStepTitle: {
+    fontSize: fonts.xl, // Reduced from 2xl
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs, // Reduced from sm
+    letterSpacing: -0.5,
+  },
+  compactStepSubtitle: {
+    fontSize: fonts.base, // Reduced from lg
+    color: colors.textSecondary,
+    marginBottom: spacing.lg, // Reduced from xl
+    lineHeight: 20, // Reduced from 24
+  },
+  compactCalorieTargetContainer: {
+    alignItems: 'center',
+    backgroundColor: colors.brandFlesh + '20',
+    borderRadius: borderRadius.md, // Reduced from lg
+    paddingVertical: spacing.lg, // Reduced from xl
+    paddingHorizontal: spacing.md, // Reduced from lg
+    marginVertical: spacing.md, // Reduced from lg
+  },
+  compactCalorieTargetNumber: {
+    fontSize: fonts['3xl'], // Reduced from 4xl
+    fontWeight: fonts.bold,
+    color: colors.brandOuterSkin,
+    marginBottom: spacing.xs,
+  },
+  compactCalorieTargetLabel: {
+    fontSize: fonts.sm, // Reduced from base
+    color: colors.textSecondary,
+    fontWeight: fonts.medium,
+  },
+  compactCustomLabel: {
+    fontSize: fonts.xs, // Reduced from sm
+    color: colors.brandOuterSkin,
+    fontWeight: fonts.semibold,
+    marginTop: spacing.xs,
+  },
+  compactStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: colors.gray50,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm, // Reduced from md
+    marginVertical: spacing.sm, // Reduced from md
+  },
+  compactStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  compactStatValue: {
+    fontSize: fonts.base, // Reduced from lg
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  compactStatLabel: {
+    fontSize: fonts.xs, // Reduced from sm
+    color: colors.textSecondary,
+    fontWeight: fonts.medium,
+  },
+  compactCustomizeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md, // Reduced from lg
+    paddingVertical: spacing.sm, // Reduced from md
+    paddingHorizontal: spacing.md, // Reduced from lg
+    backgroundColor: colors.brandFlesh + '20',
+    borderRadius: borderRadius.md, // Reduced from lg
+    borderWidth: 1,
+    borderColor: colors.brandOuterSkin + '40',
+    gap: spacing.xs, // Reduced from sm
+  },
+  compactCustomizeButtonText: {
+    fontSize: fonts.sm, // Reduced from base
+    color: colors.brandOuterSkin,
+    fontWeight: fonts.semibold,
   },
 });
 

@@ -162,16 +162,25 @@ export const DailyView: React.FC<DailyViewProps> = ({
         <Text style={styles.sectionTitle}>Macronutrients</Text>
         <View style={styles.macroGrid}>
           <View style={styles.macroCard}>
-            <Text style={styles.macroLabel} numberOfLines={1}>Protein</Text>
-            <Text style={styles.macroValue} numberOfLines={1}>{Math.round(dailyLog?.totalNutrition.protein || 0)}g</Text>
+            <View style={[styles.macroIconContainer, { backgroundColor: colors.nutritionProtein + '20' }]}>
+              <MaterialIcons name="sports-gymnastics" size={24} color={colors.nutritionProtein} />
+            </View>
+            <Text style={styles.macroLabel}>Protein</Text>
+            <Text style={styles.macroValue}>{Math.round(dailyLog?.totalNutrition.protein || 0)}g</Text>
           </View>
           <View style={styles.macroCard}>
-            <Text style={styles.macroLabel} numberOfLines={1}>Carbs</Text>
-            <Text style={styles.macroValue} numberOfLines={1}>{Math.round(dailyLog?.totalNutrition.carbs || 0)}g</Text>
+            <View style={[styles.macroIconContainer, { backgroundColor: colors.nutritionCarbs + '20' }]}>
+              <MaterialIcons name="grain" size={24} color={colors.nutritionCarbs} />
+            </View>
+            <Text style={styles.macroLabel}>Carbs</Text>
+            <Text style={styles.macroValue}>{Math.round(dailyLog?.totalNutrition.carbs || 0)}g</Text>
           </View>
           <View style={styles.macroCard}>
-            <Text style={styles.macroLabel} numberOfLines={1}>Fats</Text>
-            <Text style={styles.macroValue} numberOfLines={1}>{Math.round(dailyLog?.totalNutrition.fat || 0)}g</Text>
+            <View style={[styles.macroIconContainer, { backgroundColor: colors.nutritionFat + '20' }]}>
+              <MaterialIcons name="opacity" size={24} color={colors.nutritionFat} />
+            </View>
+            <Text style={styles.macroLabel}>Fat</Text>
+            <Text style={styles.macroValue}>{Math.round(dailyLog?.totalNutrition.fat || 0)}g</Text>
           </View>
         </View>
       </View>
@@ -224,7 +233,7 @@ const styles = StyleSheet.create({
   },
   dateTitle: {
     fontSize: fonts.lg,
-    fontWeight: 'bold',
+    fontFamily: fonts.heading,
     color: colors.textPrimary,
     marginLeft: spacing.sm,
   },
@@ -236,7 +245,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     borderRadius: 28,
     alignItems: 'center',
-    shadowColor: '#7C3AED',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.25,
     shadowRadius: 20,
@@ -272,7 +281,7 @@ const styles = StyleSheet.create({
   },
   caloriesNumber: {
     fontSize: fonts['4xl'],
-    fontWeight: 'bold',
+    fontFamily: fonts.heading,
     color: colors.white,
     lineHeight: fonts['4xl'] * 1.1,
   },
@@ -303,7 +312,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: fonts.xl,
-    fontWeight: fonts.semibold,
+    fontFamily: fonts.heading,
     color: colors.textPrimary,
     marginBottom: spacing.md,
   },
@@ -313,21 +322,38 @@ const styles = StyleSheet.create({
   },
   macroCard: {
     flex: 1,
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: colors.white,
     padding: spacing.md,
-    borderRadius: 16,
+    borderRadius: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  macroIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   macroLabel: {
     fontSize: fonts.sm,
-    color: colors.textSecondary,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
-    fontWeight: '500',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   macroValue: {
-    fontSize: fonts['2xl'],
-    fontWeight: 'bold',
+    fontSize: fonts.lg,
+    fontWeight: '700',
     color: colors.textPrimary,
+    textAlign: 'center',
   },
   foodSection: {
     paddingHorizontal: spacing.lg,

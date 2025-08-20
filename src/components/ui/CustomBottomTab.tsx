@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts, spacing } from '../../constants/theme';
+import { colors, fonts, spacing, shadows } from '../../constants/theme';
 
 interface TabItem {
   key: string;
@@ -26,9 +26,9 @@ const tabs: TabItem[] = [
   },
   {
     key: 'Voice',
-    title: 'Record',
-    icon: 'mic',
-    activeIcon: 'mic',
+    title: 'Add',
+    icon: 'add',
+    activeIcon: 'add',
   },
   {
     key: 'History',
@@ -74,29 +74,6 @@ export const CustomBottomTab: React.FC<CustomBottomTabProps> = ({
         const tab = tabs.find(t => t.key === route.name);
         if (!tab) return null;
 
-        // Special styling for Record button (Voice screen)
-        if (tab.key === 'Voice') {
-          return (
-            <TouchableOpacity
-              key={route.key}
-              accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
-              accessibilityLabel={options.tabBarAccessibilityLabel}
-              testID={options.tabBarTestID}
-              onPress={onPress}
-              style={styles.recordTab}
-            >
-              <View style={styles.recordButton}>
-                <MaterialIcons
-                  name="mic"
-                  size={28}
-                  color={colors.white}
-                />
-              </View>
-              <Text style={styles.recordLabel}>{tab.title}</Text>
-            </TouchableOpacity>
-          );
-        }
 
         return (
           <TouchableOpacity
@@ -111,13 +88,14 @@ export const CustomBottomTab: React.FC<CustomBottomTabProps> = ({
             <View style={styles.tabContent}>
               <MaterialIcons
                 name={isFocused ? tab.activeIcon || tab.icon : tab.icon}
-                size={24}
-                color={isFocused ? colors.primary : colors.textSecondary}
+                size={tab.key === 'Voice' ? 28 : 24}
+                color={isFocused ? colors.primary : colors.gray600}
+                style={tab.key === 'Voice' ? { fontWeight: 'bold' } : undefined}
               />
               <Text
                 style={[
                   styles.tabLabel,
-                  { color: isFocused ? colors.primary : colors.textSecondary },
+                  { color: isFocused ? colors.primary : colors.gray600 },
                 ]}
               >
                 {tab.title}
@@ -133,15 +111,11 @@ export const CustomBottomTab: React.FC<CustomBottomTabProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.gray200,
     paddingTop: spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    ...shadows.md,
   },
   tab: {
     flex: 1,
@@ -154,32 +128,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: fonts.xs,
-    fontWeight: '500' as const,
+    fontWeight: '700' as const,
     marginTop: spacing.xs,
-  },
-  recordTab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: spacing.xs,
-  },
-  recordButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  recordLabel: {
-    fontSize: fonts.xs,
-    fontWeight: '500' as const,
-    color: colors.primary,
   },
 }); 

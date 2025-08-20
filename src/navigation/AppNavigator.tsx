@@ -15,6 +15,8 @@ import VoiceScreen from '../screens/voice/VoiceScreenProduction';
 import HistoryScreen from '../screens/history/HistoryScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import ProfileEditScreen from '../screens/settings/ProfileEditScreen';
+import ActivityLevelEditScreen from '../screens/settings/ActivityLevelEditScreen';
+import WeightGoalEditScreen from '../screens/settings/WeightGoalEditScreen';
 import NotificationsScreen from '../screens/settings/NotificationsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -123,6 +125,20 @@ function AuthGate() {
       <Stack.Screen 
         name="ProfileEdit" 
         component={ProfileEditScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="ActivityLevelEdit" 
+        component={ActivityLevelEditScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="WeightGoalEdit" 
+        component={WeightGoalEditScreen}
         options={{
           headerShown: false,
         }}

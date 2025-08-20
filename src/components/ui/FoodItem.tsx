@@ -82,7 +82,7 @@ export const FoodItem: React.FC<FoodItemProps> = ({
               style={styles.deleteButton}
               onPress={() => onDelete(food.id)}
             >
-              <MaterialIcons name="delete" size={20} color="#ef4444" />
+              <MaterialIcons name="delete" size={20} color={colors.error} />
             </TouchableOpacity>
           )}
         </View>
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#f0f4f2',
+    backgroundColor: colors.primary50,
     padding: spacing.md,
     borderRadius: 12,
     marginBottom: spacing.sm,
@@ -118,36 +118,36 @@ const styles = StyleSheet.create({
   name: {
     fontSize: fonts.base,
     fontWeight: '600',
-    color: '#111714',
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   quantity: {
     fontSize: fonts.sm,
-    color: '#648772',
+    color: colors.textSecondary,
     marginBottom: spacing.xs,
   },
   calories: {
     fontSize: fonts.sm,
-    color: '#111714',
+    color: colors.textPrimary,
     fontWeight: '500',
     marginBottom: spacing.xs,
   },
   macros: {
     fontSize: fonts.xs,
-    color: '#648772',
+    color: colors.textSecondary,
   },
   actionsContainer: {
     alignItems: 'flex-end',
   },
   time: {
     fontSize: fonts.xs,
-    color: '#648772',
+    color: colors.textSecondary,
     marginBottom: spacing.xs,
   },
   deleteButton: {
     padding: spacing.xs,
     borderRadius: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: `${colors.error}15`,
   },
 });
 

@@ -99,13 +99,14 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontSize: fonts.sm,
-    color: '#648772',
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
     marginBottom: spacing.xs,
   },
   headerTitle: {
     fontSize: fonts.lg,
-    fontWeight: 'bold',
-    color: '#111714',
+    fontFamily: fonts.heading,
+    color: colors.textPrimary,
   },
   menuButton: {
     padding: spacing.sm,
@@ -119,7 +120,7 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#111714',
+    backgroundColor: colors.textPrimary,
   },
   scrollView: {
     flex: 1,

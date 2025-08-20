@@ -15,8 +15,8 @@ export interface VoiceProcessingData {
 }
 
 export interface VoiceProcessingActions {
-  processRecording: (audioUri: string, useGPT5?: boolean) => Promise<boolean>;
-  retryProcessing: (useGPT5?: boolean) => Promise<boolean>;
+  processRecording: (audioUri: string, useGPT5?: boolean, useGPT4oTranscription?: boolean) => Promise<boolean>;
+  retryProcessing: (useGPT5?: boolean, useGPT4oTranscription?: boolean) => Promise<boolean>;
   clearTranscript: () => void;
   clearError: () => void;
   reset: () => void;
@@ -35,17 +35,17 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
   const [progress, setProgress] = useState<number | undefined>(undefined);
   const [lastAudioUri, setLastAudioUri] = useState<string | null>(null);
 
-  const processRecording = useCallback(async (audioUri: string, useGPT5?: boolean): Promise<boolean> => {
+  const processRecording = useCallback(async (audioUri: string, useGPT5?: boolean, useGPT4oTranscription?: boolean): Promise<boolean> => {
     try {
       setError(null);
       setState('transcribing');
       setProgress(0);
       setLastAudioUri(audioUri);
       
-      console.log('🎯 Starting transcription for URI:', audioUri);
+      console.log('🎯 Starting transcription for URI:', audioUri, 'Method:', useGPT4oTranscription ? 'GPT-4o' : 'Whisper');
       
-      // Transcribe audio
-      const transcriptionResult = await openAIService.transcribeAudio(audioUri);
+      // Transcribe audio with method selection
+      const transcriptionResult = await openAIService.transcribeAudio(audioUri, useGPT4oTranscription);
       setTranscript(transcriptionResult);
       setProgress(50);
       
@@ -122,7 +122,7 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
     }
   }, []);
 
-  const retryProcessing = useCallback(async (useGPT5?: boolean): Promise<boolean> => {
+  const retryProcessing = useCallback(async (useGPT5?: boolean, useGPT4oTranscription?: boolean): Promise<boolean> => {
     if (!transcript.trim()) {
       console.log('⚠️ No transcript available for retry');
       return false;

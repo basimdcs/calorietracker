@@ -1,14 +1,17 @@
 import OpenAI from 'openai';
 import { env } from '../config/env';
 import { ParsedFoodItem, VOICE_PROCESSING_CONSTANTS } from '../types';
+import { getFoodIcon } from '../utils/foodIcons';
 
 /**
- * OpenAI Service - Updated to use Speech-to-Text API
+ * OpenAI Service - Updated to use GPT-4o Transcribe
  * 
- * This service now uses OpenAI's Speech-to-Text API (https://platform.openai.com/docs/guides/speech-to-text)
- * instead of the legacy Whisper API. The new API provides:
+ * This service now uses OpenAI's new GPT-4o transcribe model 
+ * (https://platform.openai.com/docs/models/gpt-4o-transcribe)
+ * instead of the legacy Whisper API. The new model provides:
  * - Better accuracy for Arabic/Egyptian Arabic
- * - Word-level timestamps
+ * - Log probabilities for confidence scoring
+ * - Token usage statistics
  * - Improved performance and cost efficiency
  * - Better handling of dialects and accents
  */
@@ -36,6 +39,21 @@ export interface FoodItem {
 
 interface TranscriptionResponse {
   text: string;
+  logprobs?: Array<{
+    token: string;
+    logprob: number;
+    bytes: number[];
+    top_logprobs: Array<{
+      token: string;
+      logprob: number;
+      bytes: number[];
+    }>;
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 interface NutritionCalculationResponse {
@@ -125,25 +143,76 @@ class OpenAIService {
     console.log('🔍 OpenAI Client Initialization Debug:', debugInfo);
   }
 
-  async transcribeAudio(audioUri: string): Promise<string> {
+  async transcribeAudio(audioUri: string, useGPT4o: boolean = false): Promise<string> {
     try {
-      console.log('🎤 Starting Speech-to-Text transcription for:', audioUri);
+      console.log('🎤 Starting transcription for:', audioUri, 'Method:', useGPT4o ? 'GPT-4o' : 'Whisper');
       
       if (!this.isValidApiKey()) {
         throw new Error('OpenAI API key is not configured');
       }
       
-      const formData = this.createTranscriptionFormData(audioUri);
-      const response = await this.sendTranscriptionRequest(formData);
+      // For debugging, let's compare both models when possible
+      if (__DEV__ && !useGPT4o) {
+        try {
+          console.log('🔬 DEVELOPMENT MODE: Testing both transcription models...');
+          const whisperStart = Date.now();
+          const whisperResult = await this.transcribeWithWhisper(audioUri);
+          const whisperTime = Date.now() - whisperStart;
+          
+          const gpt4oStart = Date.now();
+          const gpt4oResult = await this.transcribeWithGPT4o(audioUri);
+          const gpt4oTime = Date.now() - gpt4oStart;
+          
+          console.log('📊 TRANSCRIPTION COMPARISON:');
+          console.log('━'.repeat(50));
+          console.log(`🎵 Whisper (${whisperTime}ms): "${whisperResult}"`);
+          console.log(`🤖 GPT-4o (${gpt4oTime}ms): "${gpt4oResult}"`);
+          console.log('━'.repeat(50));
+          
+          if (whisperResult !== gpt4oResult) {
+            console.log('⚠️ TRANSCRIPTION DIFFERENCES DETECTED:');
+            console.log(`Length difference: ${Math.abs(whisperResult.length - gpt4oResult.length)} characters`);
+            console.log('Whisper unique words:', whisperResult.split(' ').filter(w => !gpt4oResult.includes(w)));
+            console.log('GPT-4o unique words:', gpt4oResult.split(' ').filter(w => !whisperResult.includes(w)));
+          } else {
+            console.log('✅ Both models produced identical results');
+          }
+          
+          // Return the primary choice (Whisper for this case)
+          return whisperResult;
+        } catch (comparisonError) {
+          console.log('⚠️ Comparison failed, falling back to single model:', comparisonError);
+          return await this.transcribeWithWhisper(audioUri);
+        }
+      }
       
-      return this.handleTranscriptionResponse(response);
+      // Normal operation - use selected model
+      if (useGPT4o) {
+        return await this.transcribeWithGPT4o(audioUri);
+      } else {
+        return await this.transcribeWithWhisper(audioUri);
+      }
     } catch (error) {
       console.error('❌ Error transcribing audio:', error);
       throw this.createTranscriptionError(error);
     }
   }
 
-  private createTranscriptionFormData(audioUri: string): FormData {
+  private async transcribeWithWhisper(audioUri: string): Promise<string> {
+    console.log('🎵 Using GPT-4o Transcribe model for transcription...');
+    const formData = this.createWhisperFormData(audioUri);
+    const response = await this.sendTranscriptionRequest(formData);
+    return this.handleTranscriptionResponse(response);
+  }
+
+  private async transcribeWithGPT4o(audioUri: string): Promise<string> {
+    console.log('🤖 Using GPT-4o for transcription...');
+    const formData = this.createGPT4oFormData(audioUri);
+    const response = await this.sendGPT4oTranscriptionRequest(formData);
+    return this.handleTranscriptionResponse(response);
+  }
+
+  private createWhisperFormData(audioUri: string): FormData {
     const formData = new FormData();
 
     // @ts-ignore - React Native FormData expects this object structure
@@ -153,17 +222,40 @@ class OpenAIService {
       type: 'audio/m4a',
     });
 
-    // Use the new Speech-to-Text API
-    formData.append('model', 'whisper-1');
-    formData.append('language', 'ar');
-    formData.append('response_format', 'text');
-    formData.append('timestamp_granularities', 'word');
+    // Updated to use new GPT-4o transcribe model
+    formData.append('model', 'gpt-4o-transcribe');
+    formData.append('response_format', 'json');
+    // Add logprobs for better confidence scoring (only works with json format)
+    formData.append('include', JSON.stringify(['logprobs']));
+    // Language hint to guide transcription (Arabic primary with English support)
+    formData.append('language', 'ar'); // Model will auto-detect mixed Arabic/English speech
+    
+    return formData;
+  }
 
+  private createGPT4oFormData(audioUri: string): FormData {
+    const formData = new FormData();
+
+    // @ts-ignore - React Native FormData expects this object structure
+    formData.append('file', {
+      uri: audioUri,
+      name: 'audio.m4a',
+      type: 'audio/m4a',
+    });
+
+    // GPT-4o transcribe model for consistency
+    formData.append('model', 'gpt-4o-transcribe');
+    formData.append('response_format', 'json');
+    // Add logprobs for better confidence scoring
+    formData.append('include', JSON.stringify(['logprobs']));
+    // Language hint to guide transcription (Arabic primary with English support)
+    formData.append('language', 'ar'); // Model will auto-detect mixed Arabic/English speech
+    
     return formData;
   }
 
   private async sendTranscriptionRequest(formData: FormData): Promise<Response> {
-    console.log('📤 Sending Speech-to-Text request to OpenAI...');
+    console.log('📤 Sending GPT-4o Transcribe request to OpenAI...');
 
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -174,7 +266,23 @@ class OpenAIService {
       body: formData,
     });
 
-    console.log('📥 OpenAI Speech-to-Text response status:', response.status);
+    console.log('📥 GPT-4o Transcribe response status:', response.status);
+    return response;
+  }
+
+  private async sendGPT4oTranscriptionRequest(formData: FormData): Promise<Response> {
+    console.log('📤 Sending GPT-4o Audio request to OpenAI...');
+
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'multipart/form-data',
+      },
+      body: formData,
+    });
+
+    console.log('📥 GPT-4o Audio response status:', response.status);
     return response;
   }
 
@@ -185,7 +293,21 @@ class OpenAIService {
       throw this.createApiError(response.status, errorText);
     }
 
-    const transcriptionText = await response.text();
+    const jsonResponse: TranscriptionResponse = await response.json();
+    const transcriptionText = jsonResponse.text || '';
+    
+    // Log usage statistics if available
+    if (jsonResponse.usage) {
+      console.log('📊 Token usage:', jsonResponse.usage);
+    }
+    
+    // Calculate confidence from logprobs if available
+    if (jsonResponse.logprobs && jsonResponse.logprobs.length > 0) {
+      const avgLogprob = jsonResponse.logprobs.reduce((sum, item) => sum + item.logprob, 0) / jsonResponse.logprobs.length;
+      const confidence = Math.exp(avgLogprob);
+      console.log('🎯 Transcription confidence:', Math.round(confidence * 100) + '%');
+    }
+
     const cleanedText = transcriptionText.trim();
     console.log('✅ Transcription result:', cleanedText);
     
@@ -195,6 +317,7 @@ class OpenAIService {
     
     return cleanedText;
   }
+
 
   private createApiError(status: number, errorText: string): Error {
     switch (status) {
@@ -242,7 +365,87 @@ class OpenAIService {
       console.log('API Key present:', OPENAI_API_KEY ? 'Yes' : 'No');
       console.log('API Key starts with:', OPENAI_API_KEY.substring(0, 10) + '...');
 
-      // Choose method based on parameter
+      // In development mode, run both approaches for comparison
+      if (__DEV__ && !useGPT5) {
+        try {
+          console.log('🔬 DEVELOPMENT MODE: Running both GPT-4o and GPT-5-nano for comparison...');
+          console.log('═'.repeat(80));
+          
+          const gpt4oStart = Date.now();
+          const gpt4oResults = await this.parseFoodFromTextLegacy(text);
+          const gpt4oTime = Date.now() - gpt4oStart;
+          
+          const gpt5Start = Date.now();
+          const gpt5Results = await this.parseFoodFromTextO3(text);
+          const gpt5Time = Date.now() - gpt5Start;
+          
+          console.log('📊 FOOD PARSING COMPARISON RESULTS:');
+          console.log('━'.repeat(60));
+          console.log(`📚 GPT-4o Legacy (${gpt4oTime}ms): Found ${gpt4oResults.length} items`);
+          console.log(`🚀 GPT-5-nano Enhanced (${gpt5Time}ms): Found ${gpt5Results.length} items`);
+          console.log('━'.repeat(60));
+          
+          // Detailed comparison of results
+          console.log('\n🔍 DETAILED FOOD ITEM COMPARISON:');
+          
+          console.log('\n📚 GPT-4o Legacy Results:');
+          gpt4oResults.forEach((food, index) => {
+            console.log(`  ${index + 1}. ${food.name}`);
+            console.log(`     Quantity: ${food.quantity} ${food.unit}`);
+            console.log(`     Calories: ${food.calories}, P: ${food.protein}g, C: ${food.carbs}g, F: ${food.fat}g`);
+            console.log(`     Cooking: ${food.cookingMethod || 'Not specified'}`);
+            console.log(`     Confidence: ${food.confidence}`);
+            console.log(`     Needs: Qty=${food.needsQuantity}, Cook=${food.needsCookingMethod}`);
+            if (food.nutritionNotes) console.log(`     Notes: ${food.nutritionNotes}`);
+          });
+          
+          console.log('\n🚀 GPT-5-nano Enhanced Results:');
+          gpt5Results.forEach((food, index) => {
+            console.log(`  ${index + 1}. ${food.name}`);
+            console.log(`     Quantity: ${food.quantity} ${food.unit}`);
+            console.log(`     Calories: ${food.calories}, P: ${food.protein}g, C: ${food.carbs}g, F: ${food.fat}g`);
+            console.log(`     Cooking: ${food.cookingMethod || 'Not specified'}`);
+            console.log(`     Confidence: ${food.confidence}`);
+            console.log(`     Needs: Qty=${food.needsQuantity}, Cook=${food.needsCookingMethod}`);
+            if (food.nutritionNotes) console.log(`     Notes: ${food.nutritionNotes}`);
+          });
+          
+          // Calculate and compare totals
+          const gpt4oTotals = gpt4oResults.reduce((acc, food) => ({
+            calories: acc.calories + (food.calories || 0),
+            protein: acc.protein + (food.protein || 0),
+            carbs: acc.carbs + (food.carbs || 0),
+            fat: acc.fat + (food.fat || 0)
+          }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+          
+          const gpt5Totals = gpt5Results.reduce((acc, food) => ({
+            calories: acc.calories + (food.calories || 0),
+            protein: acc.protein + (food.protein || 0),
+            carbs: acc.carbs + (food.carbs || 0),
+            fat: acc.fat + (food.fat || 0)
+          }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+          
+          console.log('\n🧮 TOTALS COMPARISON:');
+          console.log(`📚 GPT-4o Totals: ${gpt4oTotals.calories} cal, ${gpt4oTotals.protein}g protein, ${gpt4oTotals.carbs}g carbs, ${gpt4oTotals.fat}g fat`);
+          console.log(`🚀 GPT-5-nano Totals: ${gpt5Totals.calories} cal, ${gpt5Totals.protein}g protein, ${gpt5Totals.carbs}g carbs, ${gpt5Totals.fat}g fat`);
+          
+          const calorieDiff = Math.abs(gpt4oTotals.calories - gpt5Totals.calories);
+          const proteinDiff = Math.abs(gpt4oTotals.protein - gpt5Totals.protein);
+          
+          console.log(`📊 Differences: ${calorieDiff} calories, ${proteinDiff.toFixed(1)}g protein`);
+          console.log('═'.repeat(80));
+          
+          // Return the primary choice (GPT-4o for this case)
+          return gpt4oResults;
+          
+        } catch (comparisonError) {
+          console.log('⚠️ Comparison failed, falling back to single model:', comparisonError);
+          console.log('📚 Using GPT-4o Legacy Approach (Primary)...');
+          return await this.parseFoodFromTextLegacy(text);
+        }
+      }
+
+      // Normal operation - use selected method
       if (useGPT5) {
         console.log('🚀 Using GPT-5-nano Enhanced Approach...');
         return await this.parseFoodFromTextO3(text);
@@ -349,28 +552,50 @@ If you're unsure about a word, try to infer from context that this is about food
     return englishText || '';
   }
 
-  // Step 1: Parse food items and quantities from Arabic/Egyptian Arabic text
+  // Step 1: Parse food items and quantities from multilingual text (Arabic/English)
   private async parseFoodAndQuantity(text: string): Promise<{name: string, quantity: number, unit: string}[]> {
     const client = this.initializeClient();
     
-    const prompt = `Parse this Arabic/Egyptian Arabic food text and extract food items with their quantities. Convert portions to grams with smart defaults.
+    const prompt = `You are analyzing a transcription that may contain errors or mixed languages. Think systematically:
 
-          Text: ${text}
-          
-          EXTRACTION WITH SMART LOGIC:
-          - Food items with accurate Arabic/Egyptian context
-          - Quantities in grams (use realistic Egyptian portion sizes)
-          - Apply intelligent defaults for common Egyptian foods
-          - Account for regional serving sizes and preparation methods
-          
-          SMART QUANTITY LOGIC:
-          - Use standard Egyptian portions: "كوب رز" = 200g, "رغيف عيش" = 90g, "علبة زبادي" = 150g
-          - Convert vague amounts intelligently: "شوية" = 50-100g depending on food type
-          - Apply realistic portions for whole items: "فرخة" = 1200g gross (800g edible)
-          
-          Return JSON: [{"name": "food item", "quantity": number_in_grams, "unit": "grams"}]
-          
-          Provide accurate, contextually appropriate portions for Egyptian cuisine.`;
+Text: ${text}
+
+REASONING FRAMEWORK:
+1. LANGUAGE ANALYSIS
+   - Identify primary language(s) present (Arabic, English, mixed)
+   - For Arabic text: account for dialectal variations and transcription ambiguities
+   - Recognize quantity expressions: Arabic fractions (نص, ربع, تلت), numbers, portion words
+   - If quantity words are present, assume food context and interpret other words as food items
+
+2. ITEM IDENTIFICATION
+   - Distinguish consumables (foods/beverages) from non-consumables
+   - Apply contextual reasoning: foods typically measured in grams, liquids in ml
+   - Consider cultural and regional food contexts
+   - If text contains quantity words (نص, ربع, etc.), strongly favor food interpretations for ambiguous terms
+   - Use phonetic matching to identify likely food items even from garbled transcription
+
+3. QUANTITY REASONING FOR CALORIE CALCULATION
+   - OBJECTIVE: Determine the actual edible weight of food for accurate calorie counting
+   - Extract explicit quantities and convert to appropriate units
+   - For fractional/partial terms: calculate realistic edible portions based on typical food weights
+   - Consider edible vs total weight: remove bones, skin, peels, inedible parts from calculations
+   - For missing quantities: estimate realistic serving sizes that people actually consume
+   - Apply nutritional reasoning: portion sizes should align with typical caloric intake patterns
+
+4. ERROR CORRECTION & PHONETIC ANALYSIS
+   - Aggressively correct obvious transcription errors using phonetic similarity
+   - For unrecognized words, consider if they sound like common food terms
+   - Apply contextual food knowledge: if text contains food-related context, interpret ambiguous words as food items
+   - Consider common Arabic transcription patterns: missing prefixes (شوية→مشوية), character substitutions (خ→ح, ر→خ)
+   - When in doubt between nonsense and food, choose food interpretation if context supports it
+
+5. OUTPUT PREPARATION
+   - Use "grams" for solid foods, "ml" for liquids
+   - Return empty array if no consumable items are clearly identifiable
+   - Ensure quantities reflect realistic edible weights suitable for accurate calorie calculation
+   - Verify portion sizes make nutritional sense for typical human consumption
+
+Return JSON only: [{"name": "item name", "quantity": number, "unit": "grams or ml"}]`;
     
     console.log('📤 STEP 1 REQUEST - Full prompt:', prompt);
     
@@ -379,7 +604,7 @@ If you're unsure about a word, try to infer from context that this is about food
       messages: [
         {
           role: 'system',
-          content: 'You are an expert at parsing Arabic/Egyptian food descriptions. Extract food items with quantities and convert to grams.'
+          content: 'You are an expert at parsing food descriptions in Arabic, English, or mixed languages. Extract food items with quantities and convert to grams.'
         },
         {
           role: 'user',
@@ -387,7 +612,7 @@ If you're unsure about a word, try to infer from context that this is about food
         }
       ],
       temperature: 0.1,
-      max_completion_tokens: 500,
+      max_completion_tokens: 800,
     });
 
     const content = response.choices[0]?.message?.content;
@@ -403,26 +628,49 @@ If you're unsure about a word, try to infer from context that this is about food
 
   // Step 2: Get calories based on food and quantity
   private async calculateCalories(foods: {name: string, quantity: number, unit: string}[]): Promise<ParsedFoodItem[]> {
+    // If no foods were parsed, return empty array instead of calling AI
+    if (!foods || foods.length === 0) {
+      console.log('❌ No foods to calculate calories for, returning empty array');
+      return [];
+    }
+
     const client = this.initializeClient();
     
     const foodsList = foods.map(f => `- ${f.name}: ${f.quantity}g`).join('\n');
     
-    const prompt = `Calculate calories, protein, carbs, and fat for these Egyptian/Arabic food items with nutrition analysis. Return ONLY JSON, no explanations:
+    const prompt = `Calculate nutrition values for these food/beverage items using systematic reasoning. Return ONLY JSON, no explanations:
 
-          Foods with quantities:
-          ${foodsList}
-          
-          NUTRITION CALCULATION:
-          - Use Egyptian/regional nutrition databases when applicable
-          - Account for local cooking methods and ingredients (oil, ghee, spices)
-          - Apply realistic macro distributions for Middle Eastern cuisine
-          - Consider portion sizes typical in Egyptian diet
-          - Use accurate values for local food brands (مراعي, جهينة, etc.)
-          
-          Return ONLY this JSON format:
-          [{"name": "food name", "calories": number, "protein": number, "carbs": number, "fat": number, "quantity": number, "cookingMethod": "inferred method if applicable"}]
-          
-          Ensure nutrition values are accurate for Egyptian food context.`;
+Foods with quantities:
+${foodsList}
+
+SYSTEMATIC NUTRITION ANALYSIS:
+1. FOOD CLASSIFICATION
+   - Categorize each item by type (protein source, grain, vegetable, dairy, beverage, etc.)
+   - Identify processing level (raw, cooked, processed, branded)
+   - Determine appropriate nutrition database context (regional vs international)
+
+2. COOKING METHOD IMPACT
+   - Analyze how preparation affects nutrition (if cooking method mentioned/implied)
+   - Apply systematic reasoning for cooking losses/additions
+   - Consider oil, seasoning, and preparation additions
+
+3. PORTION VALIDATION
+   - Verify quantities are realistic for the food type
+   - Apply contextual knowledge of typical serving sizes
+   - Consider cultural and regional portion norms
+
+4. MACRO CALCULATION REASONING
+   - Use food category patterns to estimate macro distributions
+   - Apply systematic validation: protein ≤ 40g/100g for most foods, realistic calorie density
+   - Ensure macro calories align with total calories (4-4-9 rule)
+
+5. BRAND/REGIONAL SPECIFICITY
+   - Apply regional food characteristics when applicable
+   - Use brand-specific data for processed foods when identifiable
+   - Consider local preparation methods and ingredients
+
+Return ONLY this JSON format:
+[{"name": "food name", "calories": number, "protein": number, "carbs": number, "fat": number, "quantity": number, "cookingMethod": "inferred method if applicable"}]`;
     
     console.log('📤 STEP 2 REQUEST - Full prompt:', prompt);
     
@@ -431,7 +679,7 @@ If you're unsure about a word, try to infer from context that this is about food
       messages: [
         {
           role: 'system',
-          content: 'You are an expert nutritionist specializing in Arabic/Egyptian cuisine. Calculate accurate nutrition values for food items.'
+          content: 'You are an expert nutritionist specializing in Middle Eastern, international, and fast food cuisine. Calculate accurate nutrition values for food items.'
         },
         {
           role: 'user',
@@ -488,6 +736,7 @@ If you're unsure about a word, try to infer from context that this is about food
         suggestedCookingMethods: smartNeedsCookingMethod ? ['Grilled', 'Fried', 'Baked', 'Boiled'] : [],
         isNutritionComplete: true,
         nutritionNotes: 'Legacy method with smart modal logic',
+        icon: getFoodIcon(name),
       };
     }).filter((item: ParsedFoodItem) => item.calories > 0); // Remove items with no calories
   }
@@ -637,23 +886,36 @@ If you're unsure about a word, try to infer from context that this is about food
     
     const response = await client.responses.create({
       model: 'gpt-5-nano',
-      instructions: `Parse Arabic/Egyptian food text into JSON format with smart modal flags.
+      instructions: `Analyze transcription systematically for food extraction and modal logic. Think methodically:
 
-TASK: Extract foods and convert to edible grams. Set needsQuantity and needsCookingMethod flags intelligently.
+SYSTEMATIC ANALYSIS FRAMEWORK:
+1. LANGUAGE & ERROR ANALYSIS
+   - Process mixed language input (Arabic/English/Egyptian dialect)
+   - Aggressively correct transcription errors using phonetic similarity and food context
+   - Apply contextual reasoning: if quantity words present (نص, ربع), interpret ambiguous words as food
+   - Use phonetic matching for common Arabic food terms even from garbled transcription
 
-QUANTITY CONVERSION:
-- نص=0.5, ربع=0.25, نص كيلو=500g, ربع كيلو=250g
-- Standard portions: كوب رز=200g, رغيف عيش=90g, علبة زبادي=150g
-- Whole items: estimate edible portion (chicken: 800g edible from 1200g gross)
+2. QUANTITY REASONING FOR CALORIE ACCURACY
+   - OBJECTIVE: Calculate actual edible weight for precise calorie counting
+   - Recognize fractional/partial expressions across languages
+   - Apply mathematical reasoning to realistic food weights (not arbitrary portions)
+   - Distinguish between explicit quantities and vague descriptions
+   - Convert to accurate edible gram estimates, accounting for bones/waste/inedible parts
+   - Ensure portions align with typical consumption and nutritional requirements
 
-MODAL FLAGS (BE CONSERVATIVE):
-needsQuantity=TRUE ONLY for: "شوية", "كتير", "بعض", "قليل" (vague amounts)
-needsQuantity=FALSE for: "واحد", "كوب", "علبة", "رغيف", "١٥٠ جرام" (clear portions)
+3. MODAL LOGIC (CONSERVATIVE APPROACH)
+   - needsQuantity: TRUE only for genuinely vague/ambiguous amounts
+   - needsCookingMethod: TRUE only for proteins without clear preparation method
+   - Consider cultural context and typical usage patterns
 
-needsCookingMethod=TRUE ONLY for: raw proteins without cooking method mentioned
-needsCookingMethod=FALSE for: dairy, fruits, beverages, processed foods, foods with cooking method already mentioned
+4. FOOD CONTEXT REASONING FOR CALORIE CALCULATION
+   - OBJECTIVE: Ensure weights are suitable for accurate nutritional analysis
+   - Apply regional food knowledge and realistic portion norms
+   - Distinguish whole items from partial portions using actual food weights
+   - Account for edible vs gross weight: subtract bones, peels, shells, inedible parts
+   - Verify portions make sense for calorie counting and typical human consumption patterns
 
-Return ONLY JSON array - no explanations, be fast and concise.`,
+Return ONLY JSON array with systematic reasoning applied.`,
       input: `Text: ${text}
 Return the JSON with foods array only.`
     });
@@ -725,22 +987,30 @@ Return the JSON with foods array only.`
     
     const response = await client.responses.create({
       model: 'gpt-5-nano',
-      instructions: `Calculate nutrition for Arabic/Egyptian foods. Return accurate calories, protein, carbs, fat.
+      instructions: `Apply systematic nutrition analysis for multi-cultural food context. Use methodical approach:
 
-TASK: Use food name + grams + cooking method to calculate precise nutrition values.
+SYSTEMATIC NUTRITION FRAMEWORK:
+1. FOOD CLASSIFICATION & CONTEXT
+   - Categorize by food type and processing level
+   - Apply regional/cultural food knowledge when relevant
+   - Consider preparation method impact on nutrition
 
-NUTRITION RULES:
-- Use Egyptian food database values where applicable
-- Apply cooking multipliers: fried +40% calories, grilled +10%, boiled/raw unchanged
-- Validate: protein ≤35g/100g (≤40g for lean meat), fat ≤30g/100g (≤60g nuts, ≤45g fried)
-- Check: calories ≈ 4*(P+C)+9*F within ±10%
+2. COOKING METHOD ANALYSIS
+   - Systematically assess cooking impact on macro/calorie content
+   - Apply reasoning for oil additions, moisture changes, etc.
+   - Use proportional adjustments rather than fixed multipliers
 
-FOOD-SPECIFIC:
-- فرخة = whole roasted chicken, meat+skin, edible portion
-- Egyptian rice/bread: account for typical oil/ghee preparation
-- Local brands (مراعي, جهينة): use accurate fat content
+3. MACRO VALIDATION LOGIC
+   - Apply biological limits and food category patterns
+   - Cross-validate using calorie-macro relationships
+   - Ensure realistic nutrient density for food type
 
-Return ONLY JSON - be fast and precise, no explanations needed.`,
+4. PORTION & QUALITY ASSESSMENT  
+   - Verify portions align with typical consumption
+   - Apply confidence scoring based on data certainty
+   - Flag unusual values for review
+
+Return ONLY JSON with systematic validation applied.`,
       input: `Foods (edible grams from Step 1):
 ${foodsInput}
 Return the JSON with foods array and total object.`
@@ -808,7 +1078,8 @@ Return the JSON with foods array and total object.`
           s2Food.nutrition_basis,
           ...s1Food.assumptions,
           s2Food.quality.notes
-        ].filter(Boolean).join('; ')
+        ].filter(Boolean).join('; '),
+        icon: getFoodIcon(s2Food.name),
       };
     });
   }

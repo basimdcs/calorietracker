@@ -10,13 +10,12 @@ interface UserState {
   updateProfile: (updates: Partial<UserProfile>) => void;
   resetProfile: () => void;
   completeOnboarding: () => void;
-  // Usage tracking (will be connected to RevenueCat)
-  monthlyRecordingUsage: number;
-  incrementRecordingUsage: () => void;
-  resetMonthlyUsage: () => void;
-  getMonthlyUsage: () => number;
-  getUsageStats: () => UsageStats;
-  upgradeSubscription: (tier: SubscriptionTier) => void;
+  // Subscription sync from RevenueCat
+  syncSubscriptionFromRevenueCat: (tier: SubscriptionTier, isActive: boolean) => void;
+  // Goal management functions
+  updateCalorieGoal: (newGoal: number, isCustom?: boolean) => void;
+  updateWeightGoal: (newGoal: 'lose' | 'maintain' | 'gain', weeklyTarget?: number) => void;
+  recalculateGoals: () => void;
 }
 
 // BMR calculation using Mifflin-St Jeor Equation
@@ -55,19 +54,12 @@ const calculateDailyCalories = (profile: UserProfile): number => {
   }
 };
 
-// Helper to check if we need to reset monthly usage
-const isNewMonth = (lastUsageDate: Date | string): boolean => {
-  const now = new Date();
-  const lastDate = new Date(lastUsageDate);
-  return now.getMonth() !== lastDate.getMonth() || now.getFullYear() !== lastDate.getFullYear();
-};
 
 export const useUserStore = create<UserState>()(
   persist(
     (set, get) => ({
       profile: null,
-      isOnboardingComplete: false,
-      monthlyRecordingUsage: 0,
+      isOnboardingComplete: false, // Temporarily set to false to test onboarding
 
       setProfile: (profile: UserProfile) => {
         console.log('userStore: Setting profile for', profile.name);
@@ -108,8 +100,7 @@ export const useUserStore = create<UserState>()(
         console.log('userStore: Resetting profile...');
         set({ 
           profile: null, 
-          isOnboardingComplete: false,
-          monthlyRecordingUsage: 0
+          isOnboardingComplete: false
         });
         console.log('userStore: Profile reset complete');
       },
@@ -118,78 +109,88 @@ export const useUserStore = create<UserState>()(
         set({ isOnboardingComplete: true });
       },
 
-      // Simplified usage tracking (RevenueCat will handle limits)
-      incrementRecordingUsage: () => {
-        const currentUsage = get().monthlyRecordingUsage;
-        set({ monthlyRecordingUsage: currentUsage + 1 });
-        console.log(`userStore: Recording usage incremented to ${currentUsage + 1}`);
-      },
+      // Sync subscription status from RevenueCat
+      syncSubscriptionFromRevenueCat: (tier: SubscriptionTier, isActive: boolean) => {
+        const currentProfile = get().profile;
+        if (!currentProfile) {
+          console.log('userStore: No profile to sync subscription to');
+          return;
+        }
 
-      resetMonthlyUsage: () => {
-        set({ monthlyRecordingUsage: 0 });
-        console.log('userStore: Monthly usage reset');
-      },
-
-      getMonthlyUsage: () => {
-        return get().monthlyRecordingUsage;
-      },
-
-      getUsageStats: (): UsageStats => {
-        const { profile, monthlyRecordingUsage } = get();
-        const subscriptionTier = profile?.subscriptionTier || 'FREE';
-        
-        // Define monthly limits based on subscription tier (updated to match requirements)
-        const monthlyLimits = {
-          FREE: 10,
-          PRO: 300, // 300 recordings per month
+        const updatedProfile: UserProfile = {
+          ...currentProfile,
+          subscriptionTier: tier,
+          subscriptionStatus: isActive ? 'active' : 'inactive',
+          subscriptionStartDate: isActive ? (currentProfile.subscriptionStartDate || new Date().toISOString()) : undefined,
+          updatedAt: new Date().toISOString(),
         };
-        
-        const monthlyLimit = monthlyLimits[subscriptionTier];
-        const recordingsUsed = monthlyRecordingUsage;
-        const recordingsRemaining = Math.max(0, monthlyLimit - recordingsUsed);
-        
-        // Calculate usage percentage
-        const usagePercentage = Math.min(100, (recordingsUsed / monthlyLimit) * 100);
-        
-        // Calculate reset date (first day of next month)
-        const now = new Date();
-        const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        
-        return {
-          recordingsUsed,
-          recordingsRemaining,
-          monthlyLimit,
-          resetDate: resetDate.toISOString(),
-          usagePercentage,
-        };
+
+        set({ profile: updatedProfile });
+        console.log(`userStore: Subscription synced from RevenueCat - ${tier} (${isActive ? 'active' : 'inactive'})`);
       },
 
-      upgradeSubscription: (tier: SubscriptionTier) => {
+      // Goal management functions
+      updateCalorieGoal: (newGoal: number, isCustom = true) => {
         const currentProfile = get().profile;
         if (!currentProfile) return;
 
         const updatedProfile: UserProfile = {
           ...currentProfile,
-          subscriptionTier: tier,
-          subscriptionStatus: 'active',
-          subscriptionStartDate: new Date().toISOString(),
+          dailyCalorieGoal: newGoal,
+          customCalorieGoal: isCustom ? newGoal : undefined,
           updatedAt: new Date().toISOString(),
         };
 
         set({ profile: updatedProfile });
-        console.log(`userStore: Subscription upgraded to ${tier}`);
+        console.log(`userStore: Calorie goal updated to ${newGoal} (custom: ${isCustom})`);
+      },
+
+      updateWeightGoal: (newGoal: 'lose' | 'maintain' | 'gain', weeklyTarget = 1.0) => {
+        const currentProfile = get().profile;
+        if (!currentProfile) return;
+
+        const updatedProfile: UserProfile = {
+          ...currentProfile,
+          goal: newGoal,
+          weeklyWeightGoal: weeklyTarget,
+          updatedAt: new Date().toISOString(),
+        };
+
+        // Recalculate daily calories if not using custom goal
+        if (!updatedProfile.customCalorieGoal) {
+          const bmr = calculateBMR(updatedProfile);
+          const tdee = bmr * activityMultipliers[updatedProfile.activityLevel];
+          updatedProfile.bmr = bmr;
+          updatedProfile.dailyCalorieGoal = calculateDailyCalories(updatedProfile);
+        }
+
+        set({ profile: updatedProfile });
+        console.log(`userStore: Weight goal updated to ${newGoal} with ${weeklyTarget} lbs/week target`);
+      },
+
+      recalculateGoals: () => {
+        const currentProfile = get().profile;
+        if (!currentProfile) return;
+
+        const bmr = calculateBMR(currentProfile);
+        const tdee = bmr * activityMultipliers[currentProfile.activityLevel];
+        
+        const updatedProfile: UserProfile = {
+          ...currentProfile,
+          bmr,
+          // Only recalculate daily calorie goal if not using custom goal
+          dailyCalorieGoal: currentProfile.customCalorieGoal || calculateDailyCalories(currentProfile),
+          updatedAt: new Date().toISOString(),
+        };
+
+        set({ profile: updatedProfile });
+        console.log('userStore: Goals recalculated based on current profile');
       },
     }),
     {
       name: 'user-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      onRehydrateStorage: () => (state) => {
-        // Ensure monthlyRecordingUsage is initialized
-        if (state && typeof state.monthlyRecordingUsage !== 'number') {
-          state.monthlyRecordingUsage = 0;
-        }
-      },
-      version: 3, // Increment version for RevenueCat migration
+      version: 4, // Increment version for RevenueCat usage migration
     }
   )
 ); 

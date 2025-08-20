@@ -15,6 +15,8 @@ import { FoodReviewNew } from '../../components/ui/FoodReview/FoodReviewNew';
 import { TranscriptDisplay } from '../../components/voice/TranscriptDisplay';
 import { VoiceInstructions } from '../../components/voice/VoiceInstructions';
 import { RecordingButton } from '../../components/voice/RecordingButton';
+import { ProcessingStatus } from '../../components/voice/ProcessingStatus';
+import { TranscriptionMethodSwitch } from '../../components/ui/TranscriptionMethodSwitch';
 import { UsageProgressBar } from '../../components/ui/UsageProgressBar';
 import { useFoodStore } from '../../stores/foodStore';
 import { useUserStore } from '../../stores/userStore';
@@ -33,9 +35,10 @@ const VoiceScreenProduction: React.FC = () => {
   const [voiceState, setVoiceState] = useState<VoiceState>('ready');
   const [parsedFoods, setParsedFoods] = useState<ParsedFoodItem[]>([]);
   const [useGPT5, setUseGPT5] = useState(false);
+  const [useGPT4oTranscription, setUseGPT4oTranscription] = useState(false);
   
   const { addFoodItem, logFood, updateCurrentDate } = useFoodStore();
-  const { incrementRecordingUsage, getUsageStats, profile } = useUserStore();
+  const { profile } = useUserStore();
   const { state: revenueCatState, actions: revenueCatActions } = useRevenueCatContext();
   const { presentPaywallIfNeededWithAlert } = usePaywall();
   
@@ -46,23 +49,17 @@ const VoiceScreenProduction: React.FC = () => {
   // Derive current error from hooks
   const currentError = voiceRecording.state.error || voiceProcessing.data.error;
 
-  // Get usage stats - use RevenueCat if available, fallback to userStore
+  // Get usage stats from RevenueCat (single source of truth)
   const getCurrentUsageStats = () => {
-    if (revenueCatState.isInitialized && !revenueCatState.error) {
-      // Use RevenueCat usage info if available
-      return {
-        recordingsUsed: revenueCatState.usageInfo.recordingsUsed,
-        recordingsRemaining: revenueCatState.usageInfo.recordingsRemaining,
-        monthlyLimit: revenueCatState.usageInfo.recordingsLimit,
-        resetDate: revenueCatState.usageInfo.resetDate.toISOString(),
-        usagePercentage: revenueCatState.usageInfo.recordingsLimit 
-          ? Math.min(100, (revenueCatState.usageInfo.recordingsUsed / revenueCatState.usageInfo.recordingsLimit) * 100) 
-          : 0,
-      };
-    } else {
-      // Fallback to userStore
-      return getUsageStats();
-    }
+    return {
+      recordingsUsed: revenueCatState.usageInfo.recordingsUsed,
+      recordingsRemaining: revenueCatState.usageInfo.recordingsRemaining,
+      monthlyLimit: revenueCatState.usageInfo.recordingsLimit,
+      resetDate: revenueCatState.usageInfo.resetDate.toISOString(),
+      usagePercentage: revenueCatState.usageInfo.recordingsLimit 
+        ? Math.min(100, (revenueCatState.usageInfo.recordingsUsed / revenueCatState.usageInfo.recordingsLimit) * 100) 
+        : 0,
+    };
   };
 
 
@@ -263,7 +260,7 @@ Products: com.basimdcs.calorietracker.Monthly, com.basimdcs.calorietracker.Annua
     
     if (audioUri) {
       setVoiceState('processing');
-      const success = await voiceProcessing.actions.processRecording(audioUri, useGPT5);
+      const success = await voiceProcessing.actions.processRecording(audioUri, useGPT5, useGPT4oTranscription);
       
       if (success) {
         console.log('🎉 Processing successful, parsed foods:', voiceProcessing.data.parsedFoods);
@@ -281,7 +278,7 @@ Products: com.basimdcs.calorietracker.Monthly, com.basimdcs.calorietracker.Annua
         );
       }
     }
-  }, [voiceRecording.actions, voiceProcessing.actions, voiceProcessing.data.parsedFoods, voiceRecording.state.error, useGPT5]);
+  }, [voiceRecording.actions, voiceProcessing.actions, voiceProcessing.data.parsedFoods, voiceRecording.state.error, useGPT5, useGPT4oTranscription]);
 
   // Handle voice processing completion
   useEffect(() => {
@@ -399,12 +396,8 @@ Products: com.basimdcs.calorietracker.Monthly, com.basimdcs.calorietracker.Annua
 
       console.log('✅ All foods logged successfully');
 
-      // Increment recording usage after successful food logging
-      incrementRecordingUsage();
-      // Also update RevenueCat usage if initialized
-      if (revenueCatState.isInitialized) {
-        revenueCatActions.updateUsageCount(1);
-      }
+      // Update RevenueCat usage count (single source of truth)
+      revenueCatActions.updateUsageCount(1);
       console.log('📊 Recording usage incremented after successful food logging');
 
       // Reset state
@@ -418,7 +411,7 @@ Products: com.basimdcs.calorietracker.Monthly, com.basimdcs.calorietracker.Annua
       console.error('❌ Failed to log foods:', error);
       Alert.alert('Error', 'Failed to save food items. Please try again.');
     }
-  }, [parsedFoods, addFoodItem, logFood, voiceProcessing.actions, incrementRecordingUsage, updateCurrentDate, revenueCatState.isInitialized, revenueCatActions]);
+  }, [parsedFoods, addFoodItem, logFood, voiceProcessing.actions, updateCurrentDate, revenueCatActions]);
 
   const handleCancel = useCallback(() => {
     // Cancel recording if in progress
@@ -737,35 +730,14 @@ Check console for detailed logs.`,
             disabled={!voiceRecording.state.isInitialized || voiceState === 'processing' || voiceProcessing.data.state === 'transcribing' || voiceProcessing.data.state === 'parsing'}
           />
 
-          {/* Processing Status */}
+          {/* Enhanced Processing Status */}
           {(voiceProcessing.data.state === 'transcribing' || voiceProcessing.data.state === 'parsing') && (
-            <View style={styles.statusCard}>
-              <MaterialIcons 
-                name={voiceProcessing.data.state === 'transcribing' ? 'hearing' : 'psychology'} 
-                size={24} 
-                color={colors.primary} 
-                style={styles.statusIcon}
-              />
-              <View style={styles.statusContent}>
-                <Text style={styles.statusText}>
-                  {voiceProcessing.data.state === 'transcribing' && '🎯 Converting speech to text...'}
-                  {voiceProcessing.data.state === 'parsing' && '🤖 Analyzing food items...'}
-                </Text>
-                {voiceProcessing.data.progress !== undefined && (
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      <View 
-                        style={[
-                          styles.progressFill, 
-                          { width: `${voiceProcessing.data.progress}%` }
-                        ]} 
-                      />
-                    </View>
-                    <Text style={styles.progressText}>{voiceProcessing.data.progress}%</Text>
-                  </View>
-                )}
-              </View>
-            </View>
+            <ProcessingStatus
+              state={voiceProcessing.data.state}
+              progress={voiceProcessing.data.progress || 0}
+              transcriptionMethod={useGPT4oTranscription ? 'gpt4o' : 'whisper'}
+              parsingMethod={useGPT5 ? 'gpt5' : 'gpt4o'}
+            />
           )}
 
           {/* Error Display */}
@@ -790,7 +762,7 @@ Check console for detailed logs.`,
                     style={[styles.retryButton, styles.retryButtonPrimary]}
                     onPress={async () => {
                       // Retry processing with existing transcript
-                      const success = await voiceProcessing.actions.retryProcessing(useGPT5);
+                      const success = await voiceProcessing.actions.retryProcessing(useGPT5, useGPT4oTranscription);
                       if (success) {
                         // The useEffect will handle state transition to reviewing
                         console.log('🔄 Retry successful, waiting for state update');
@@ -817,9 +789,16 @@ Check console for detailed logs.`,
             compact={!!voiceProcessing.data.transcript}
           />
 
-          {/* Status Info - Development Only */}
+          {/* AI Configuration - Development Only */}
           {voiceState === 'ready' && !voiceProcessing.data.transcript && (
             <View style={styles.testContainer}>
+              {/* Transcription Method Switch */}
+              <TranscriptionMethodSwitch
+                useGPT4o={useGPT4oTranscription}
+                onToggle={setUseGPT4oTranscription}
+                disabled={voiceState !== 'ready'}
+              />
+
               {/* AI Model Selection */}
               <TouchableOpacity
                 style={[
@@ -879,6 +858,39 @@ Check console for detailed logs.`,
                 Compare GPT-4 vs Gemini with full Arabic meal description
               </Text>
               
+              <TouchableOpacity
+                style={[styles.testButton, { backgroundColor: colors.orange50, borderColor: colors.warning }]}
+                onPress={async () => {
+                  try {
+                    // Show loading
+                    Alert.alert('Debug Running', 'Checking subscription status...');
+                    
+                    // Get debug info that will show in the app
+                    const debugInfo = await revenueCatActions.debugSubscriptionStatus();
+                    await revenueCatActions.refreshCustomerInfo();
+                    
+                    // Show debug results in alert
+                    Alert.alert('RevenueCat Debug Results', debugInfo, [
+                      { text: 'OK' },
+                      { text: 'Copy to Clipboard', onPress: () => {
+                        // In a real app, you'd use @react-native-clipboard/clipboard
+                        // For now, we'll just log it so you can copy from the app logs
+                        console.log('📋 DEBUG RESULTS FOR COPYING:\n', debugInfo);
+                        Alert.alert('Copied', 'Debug info logged to console for copying');
+                      }}
+                    ]);
+                  } catch (error) {
+                    Alert.alert('Debug Error', `Failed to get debug info: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                  }
+                }}
+              >
+                <MaterialIcons name="bug-report" size={20} color={colors.warning} />
+                <Text style={[styles.testButtonText, { color: colors.warning }]}>🐛 RevenueCat Debug</Text>
+              </TouchableOpacity>
+              <Text style={styles.testDescription}>
+                Debug subscription status detection and entitlements
+              </Text>
+              
             </View>
           )}
 
@@ -902,72 +914,15 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   content: {
     padding: spacing.lg,
     gap: spacing.lg,
     paddingBottom: spacing.xl,
   },
-  statusCard: {
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  statusTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  statusSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  statusIcon: {
-    color: colors.white,
-  },
-  statusContent: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statusText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    width: '100%',
-  },
-  progressBar: {
-    flex: 1,
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.white,
-    borderRadius: 2,
-  },
-  progressText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: '500',
-    minWidth: 35,
-    textAlign: 'right',
-  },
+  // Removed old status card styles - now using ProcessingStatus component
+  // Removed old progress bar styles - now using AnimatedProgressBar component
   errorCard: {
     backgroundColor: colors.white,
     padding: spacing.md,

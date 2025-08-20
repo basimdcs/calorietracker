@@ -30,6 +30,12 @@ export const useUser = () => {
   const calorieGoal = useMemo(() => {
     if (!profile) return 2000;
     
+    // If user has set a custom calorie goal, use that
+    if (profile.customCalorieGoal) {
+      return profile.customCalorieGoal;
+    }
+    
+    // Otherwise calculate based on TDEE and goal
     const goalMultipliers = {
       'lose': 0.85,    // 15% deficit
       'maintain': 1.0, // no change
@@ -38,7 +44,7 @@ export const useUser = () => {
     
     const multiplier = goalMultipliers[profile.goal] || 1.0;
     return Math.round(tdee * multiplier);
-  }, [tdee, profile?.goal]);
+  }, [tdee, profile?.goal, profile?.customCalorieGoal]);
 
   const userStats = useMemo(() => {
     if (!profile) return null;

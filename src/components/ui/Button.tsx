@@ -60,7 +60,7 @@ export const Button: React.FC<ButtonProps> = ({
   const getTextStyle = () => {
     const baseTextStyle = {
       fontSize: size === 'small' ? fonts.sm : size === 'large' ? fonts.lg : fonts.base,
-      fontWeight: fonts.medium,
+      fontFamily: fonts.heading, // Use Inter Medium for buttons
     };
 
     switch (variant) {
@@ -102,7 +102,7 @@ export const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'outline' || variant === 'ghost' ? colors.primary : colors.white}
+          color={variant === 'outline' || variant === 'ghost' ? colors.primary : colors.textOnPrimary}
         />
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

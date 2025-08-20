@@ -16,11 +16,7 @@ import { Button, Card, Input } from '../../components/ui';
 import { useUserStore } from '../../stores/userStore';
 import { 
   UserProfile, 
-  Gender, 
-  ActivityLevel, 
-  Goal, 
-  ACTIVITY_LEVELS, 
-  GOALS 
+  Gender
 } from '../../types';
 
 const ProfileEditScreen: React.FC = () => {
@@ -33,13 +29,9 @@ const ProfileEditScreen: React.FC = () => {
     gender: profile?.gender || 'male',
     height: profile?.height || 0,
     weight: profile?.weight || 0,
-    activityLevel: profile?.activityLevel || 'sedentary',
-    goal: profile?.goal || 'maintain',
   });
 
   const [showGenderPicker, setShowGenderPicker] = useState(false);
-  const [showActivityPicker, setShowActivityPicker] = useState(false);
-  const [showGoalPicker, setShowGoalPicker] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validateForm = (): boolean => {
@@ -78,8 +70,6 @@ const ProfileEditScreen: React.FC = () => {
       gender: formData.gender!,
       height: formData.height!,
       weight: formData.weight!,
-      activityLevel: formData.activityLevel!,
-      goal: formData.goal!,
       updatedAt: new Date(),
     };
 
@@ -137,103 +127,6 @@ const ProfileEditScreen: React.FC = () => {
     </Modal>
   );
 
-  const renderActivityPicker = () => (
-    <Modal
-      visible={showActivityPicker}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setShowActivityPicker(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Activity Level</Text>
-            <TouchableOpacity onPress={() => setShowActivityPicker(false)}>
-              <MaterialIcons name="close" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-          
-          {ACTIVITY_LEVELS.map((level) => (
-            <TouchableOpacity
-              key={level.value}
-              style={[
-                styles.pickerItem,
-                formData.activityLevel === level.value && styles.selectedPickerItem,
-              ]}
-              onPress={() => {
-                setFormData({ ...formData, activityLevel: level.value });
-                setShowActivityPicker(false);
-              }}
-            >
-              <View style={styles.pickerItemContent}>
-                <Text style={[
-                  styles.pickerItemText,
-                  formData.activityLevel === level.value && styles.selectedPickerItemText,
-                ]}>
-                  {level.label}
-                </Text>
-                <Text style={styles.pickerItemDescription}>
-                  {level.description}
-                </Text>
-              </View>
-              {formData.activityLevel === level.value && (
-                <MaterialIcons name="check" size={20} color={colors.primary} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    </Modal>
-  );
-
-  const renderGoalPicker = () => (
-    <Modal
-      visible={showGoalPicker}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setShowGoalPicker(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Goal</Text>
-            <TouchableOpacity onPress={() => setShowGoalPicker(false)}>
-              <MaterialIcons name="close" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-          
-          {GOALS.map((goal) => (
-            <TouchableOpacity
-              key={goal.value}
-              style={[
-                styles.pickerItem,
-                formData.goal === goal.value && styles.selectedPickerItem,
-              ]}
-              onPress={() => {
-                setFormData({ ...formData, goal: goal.value });
-                setShowGoalPicker(false);
-              }}
-            >
-              <View style={styles.pickerItemContent}>
-                <Text style={[
-                  styles.pickerItemText,
-                  formData.goal === goal.value && styles.selectedPickerItemText,
-                ]}>
-                  {goal.label}
-                </Text>
-                <Text style={styles.pickerItemDescription}>
-                  {goal.description}
-                </Text>
-              </View>
-              {formData.goal === goal.value && (
-                <MaterialIcons name="check" size={20} color={colors.primary} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    </Modal>
-  );
 
   if (!profile) {
     return (
@@ -324,47 +217,6 @@ const ProfileEditScreen: React.FC = () => {
               </Card>
             </View>
 
-            {/* Activity & Goals */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Activity & Goals</Text>
-              <Card style={styles.card}>
-                <View>
-                  <Text style={styles.inputLabel}>Activity Level</Text>
-                  <TouchableOpacity
-                    style={styles.pickerButton}
-                    onPress={() => setShowActivityPicker(true)}
-                  >
-                    <View style={styles.pickerButtonContent}>
-                      <Text style={styles.pickerButtonText}>
-                        {ACTIVITY_LEVELS.find(level => level.value === formData.activityLevel)?.label || 'Select'}
-                      </Text>
-                      <Text style={styles.pickerButtonDescription}>
-                        {ACTIVITY_LEVELS.find(level => level.value === formData.activityLevel)?.description || ''}
-                      </Text>
-                    </View>
-                    <MaterialIcons name="expand-more" size={24} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.inputSpacing}>
-                  <Text style={styles.inputLabel}>Goal</Text>
-                  <TouchableOpacity
-                    style={styles.pickerButton}
-                    onPress={() => setShowGoalPicker(true)}
-                  >
-                    <View style={styles.pickerButtonContent}>
-                      <Text style={styles.pickerButtonText}>
-                        {GOALS.find(goal => goal.value === formData.goal)?.label || 'Select'}
-                      </Text>
-                      <Text style={styles.pickerButtonDescription}>
-                        {GOALS.find(goal => goal.value === formData.goal)?.description || ''}
-                      </Text>
-                    </View>
-                    <MaterialIcons name="expand-more" size={24} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-              </Card>
-            </View>
 
           </View>
         </ScrollView>
@@ -387,8 +239,6 @@ const ProfileEditScreen: React.FC = () => {
 
         {/* Modal Pickers */}
         {renderGenderPicker()}
-        {renderActivityPicker()}
-        {renderGoalPicker()}
       </View>
     </SafeAreaView>
   );

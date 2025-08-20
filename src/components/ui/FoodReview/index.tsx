@@ -201,19 +201,19 @@ export const FoodReview: React.FC<FoodReviewProps> = ({
         </View>
 
         <View style={styles.nutritionBadges}>
-          <View style={[styles.badge, { backgroundColor: '#FEE2E2' }]}>
+          <View style={[styles.badge, { backgroundColor: colors.nutritionProtein }]}>
             <Text style={styles.badgeIcon}>🔥</Text>
             <Text style={styles.badgeText}>{Math.round(food.calories)} cal</Text>
           </View>
-          <View style={[styles.badge, { backgroundColor: '#FEE2E2' }]}>
+          <View style={[styles.badge, { backgroundColor: colors.nutritionProtein }]}>
             <Text style={styles.badgeIcon}>🥩</Text>
             <Text style={styles.badgeText}>{Math.round(food.protein * 10) / 10}g</Text>
           </View>
-          <View style={[styles.badge, { backgroundColor: '#F3E8FF' }]}>
+          <View style={[styles.badge, { backgroundColor: colors.nutritionCarbs }]}>
             <Text style={styles.badgeIcon}>🍞</Text>
             <Text style={styles.badgeText}>{Math.round(food.carbs * 10) / 10}g</Text>
           </View>
-          <View style={[styles.badge, { backgroundColor: '#D1FAE5' }]}>
+          <View style={[styles.badge, { backgroundColor: colors.nutritionFat }]}>
             <Text style={styles.badgeIcon}>🥑</Text>
             <Text style={styles.badgeText}>{Math.round(food.fat * 10) / 10}g</Text>
           </View>

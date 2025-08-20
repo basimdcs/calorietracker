@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LoggedFood } from '../../../types';
-import { colors, fonts, spacing } from '../../../constants/theme';
+import { colors, fonts, spacing, shadows } from '../../../constants/theme';
 import { Card } from '../Card';
 import { useFoodStore } from '../../../stores/foodStore';
 
@@ -86,17 +86,17 @@ export const MealItem: React.FC<MealItemProps> = ({
   };
 
   const getMealTypeColor = (mealType: string) => {
-    switch (mealType) {
+    switch (mealType.toLowerCase()) {
       case 'breakfast':
-        return '#FEF3C7';
+        return colors.mealBreakfast;
       case 'lunch':
-        return '#DBEAFE';
+        return colors.mealLunch;
       case 'dinner':
-        return '#E0E7FF';
+        return colors.mealDinner;
       case 'snacks':
-        return '#D1FAE5';
+        return colors.mealSnacks;
       default:
-        return '#F3F4F6';
+        return colors.surfaceSecondary;
     }
   };
 
@@ -231,11 +231,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     padding: spacing.md,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+    ...shadows.sm,
   },
   mealHeader: {
     flexDirection: 'row',
@@ -280,7 +276,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   editableQuantity: {
-    backgroundColor: colors.blue50,
+    backgroundColor: colors.primary50,
     color: colors.primary,
     borderWidth: 1,
     borderColor: colors.primary,
@@ -328,16 +324,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: spacing.xl,
     width: '80%',
     maxWidth: 300,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+    ...shadows.xl,
   },
   modalTitle: {
     fontSize: fonts.lg,
@@ -401,6 +393,6 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: fonts.sm,
     fontWeight: '500' as const,
-    color: colors.white,
+    color: colors.textOnPrimary,
   },
 }); 

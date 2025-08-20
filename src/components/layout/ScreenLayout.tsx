@@ -28,7 +28,7 @@ export const ScreenLayout: React.FC<ScreenLayoutProps> = ({
   onRefresh,
   style,
   contentStyle,
-  backgroundColor = '#F8FAFC',
+  backgroundColor = colors.background,
 }) => {
   const content = (
     <View style={[styles.content, contentStyle]}>

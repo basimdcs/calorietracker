@@ -30,7 +30,7 @@ export const CaloriesWidget: React.FC<CaloriesWidgetProps> = ({
 
   return (
     <LinearGradient
-      colors={['#818CF8', '#6366F1']}
+      colors={colors.gradients.calorie}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.container}
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     borderRadius: 24,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
@@ -94,8 +94,8 @@ const styles = StyleSheet.create({
   title: {
     fontSize: fonts.sm,
     fontWeight: '500',
-    color: '#111714',
-    opacity: 0.8,
+    color: colors.textOnPrimary,
+    opacity: 0.9,
     marginBottom: spacing.xl,
     textAlign: 'center',
   },
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   },
   caloriesNumber: {
     fontSize: fonts['4xl'],
-    fontWeight: 'bold',
+    fontFamily: fonts.heading,
     color: colors.white,
     lineHeight: fonts['4xl'] * 1.1,
   },
@@ -130,14 +130,14 @@ const styles = StyleSheet.create({
   },
   remainingCalories: {
     fontSize: fonts.sm,
-    color: '#111714',
-    opacity: 0.8,
+    color: colors.textOnPrimary,
+    opacity: 0.9,
     textAlign: 'center',
     marginTop: spacing.xs,
   },
   remainingNumber: {
     fontWeight: '600',
-    color: '#111714',
+    color: colors.textOnPrimary,
     opacity: 1,
   },
 });

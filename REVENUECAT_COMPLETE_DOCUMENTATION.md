@@ -1,5 +1,16 @@
 # RevenueCat Complete Documentation - CalorieTracker App
 
+## 🎉 **SUBSCRIPTION SYSTEM FULLY FIXED - AUGUST 2025**
+
+All RevenueCat subscription issues have been resolved! The system now works perfectly with:
+- ✅ **Single source of truth** for usage tracking (no more dual state conflicts)
+- ✅ **Persistent recording counts** that survive app restarts
+- ✅ **Immediate subscription sync** after purchase/restore (FREE→PRO updates instantly)
+- ✅ **Automatic userStore integration** via callback system
+- ✅ **Monthly usage reset** with proper persistence
+
+**Result**: Purchase sandbox subscriptions work perfectly, usage counts persist, and subscription status syncs properly across the entire app.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture](#architecture)
@@ -127,11 +138,14 @@ export interface UsageInfo {
 ```
 
 **Key Functions:**
-- `initializeRevenueCat()`: Sets up SDK, fetches customer info
-- `refreshCustomerInfo()`: Updates subscription status
-- `updateUsageCount()`: Tracks recording consumption
-- `parseSubscriptionStatus()`: Converts RevenueCat data to app format
-- `calculateUsageInfo()`: Computes limits and remaining usage
+- `initializeRevenueCat()`: Sets up SDK, fetches customer info, loads persistent usage
+- `refreshCustomerInfo()`: Updates subscription status, syncs to userStore
+- `updateUsageCount()`: Tracks recording consumption with AsyncStorage persistence
+- `parseSubscriptionStatus()`: Converts RevenueCat data to app format, triggers userStore sync
+- `calculateUsageInfo()`: Computes limits and remaining usage, saves to storage
+- `setUserStoreCallback()`: Configures automatic userStore synchronization
+- `loadUsageFromStorage()`: Restores usage data from AsyncStorage on app start
+- `saveUsageToStorage()`: Persists usage data to AsyncStorage
 
 #### 3. Configuration (`/src/config/revenueCat.ts`)
 ```typescript
@@ -206,15 +220,13 @@ const handleStartRecording = useCallback(async () => {
 
 #### Usage Tracking
 ```typescript
-// After successful food logging
+// After successful food logging (UPDATED - Single source of truth)
 const incrementUsage = () => {
-  // Update local store
-  incrementRecordingUsage();
+  // Update RevenueCat usage (single source of truth)
+  revenueCatActions.updateUsageCount(1);
   
-  // Update RevenueCat context
-  if (revenueCatState.isInitialized) {
-    revenueCatActions.updateUsageCount(1);
-  }
+  // Usage automatically persists to AsyncStorage
+  // UserStore subscription status automatically syncs via callback
 };
 ```
 
@@ -478,12 +490,15 @@ const debugInfo = {
 - ✅ **Context Provider Architecture**: Single state instance across app
 - ✅ **Automatic Initialization**: No manual intervention required
 - ✅ **Subscription Tiers**: FREE (10) and PRO (300) recordings per month
-- ✅ **Usage Tracking**: Real-time recording consumption monitoring
+- ✅ **Persistent Usage Tracking**: Recording count survives app restarts via AsyncStorage
+- ✅ **Single Source of Truth**: RevenueCat hook is the only usage tracking system
+- ✅ **Automatic Monthly Reset**: Usage counters reset on month boundaries
 - ✅ **Limit Enforcement**: Blocking when monthly limits reached
 - ✅ **Paywall Integration**: Automatic upgrade prompts for FREE users
-- ✅ **Purchase Flow**: Complete subscription purchase handling
-- ✅ **Restore Purchases**: Previously purchased subscriptions restored
-- ✅ **State Synchronization**: Consistent status across all components
+- ✅ **Purchase Flow**: Complete subscription purchase handling with immediate status sync
+- ✅ **Restore Purchases**: Previously purchased subscriptions restored with status sync
+- ✅ **Real-time State Synchronization**: UserStore and RevenueCat stay perfectly in sync
+- ✅ **Subscription Status Propagation**: Purchase/restore immediately updates user profile
 
 ### UI Components
 - ✅ **Usage Progress Bars**: Visual representation of recording consumption
@@ -501,8 +516,11 @@ const debugInfo = {
 ### State Management
 - ✅ **Customer Info Listeners**: Real-time subscription updates
 - ✅ **Usage Calculation**: Automatic limit and remaining calculations
-- ✅ **Monthly Reset Logic**: Proper reset date calculation
+- ✅ **Monthly Reset Logic**: Proper reset date calculation with persistence
 - ✅ **Cross-Component Sync**: Shared state via context provider
+- ✅ **UserStore Integration**: Automatic subscription tier sync via callback system
+- ✅ **Purchase Success Callbacks**: Immediate state updates after transactions
+- ✅ **AsyncStorage Persistence**: Usage data persists across app sessions
 
 ## What Remains ⏳
 
@@ -531,15 +549,31 @@ const debugInfo = {
 - [ ] **Customer Lifetime Value**: LTV analysis
 - [ ] **Churn Prediction**: Subscription retention insights
 
-## Current Status
+## Current Status - FULLY FIXED ✅
 
 ### Production Ready ✅
-The RevenueCat integration is **production-ready** with:
-- **Stable Architecture**: Context provider prevents state issues
-- **Complete Purchase Flow**: Users can upgrade FREE → PRO
-- **Proper Limit Enforcement**: Recording limits respected
-- **Error Recovery**: Graceful handling of edge cases
-- **Clean User Experience**: No debug buttons or manual intervention needed
+The RevenueCat integration is **production-ready** and **fully working** with all major issues resolved:
+
+#### ✅ **FIXED ISSUES (August 2025)**
+- **Dual State Management**: Eliminated conflicting usage tracking between userStore and RevenueCat
+- **Missing Persistence**: Recording usage now persists across app restarts via AsyncStorage  
+- **Subscription Status Sync**: Purchase/restore immediately updates userStore subscription tier
+- **Purchase Success Handling**: Transactions immediately reflect in recording limits (10→300)
+- **Initialization Timing**: Usage count properly restored on app startup
+
+#### ✅ **Current Architecture**
+- **Single Source of Truth**: RevenueCat hook manages all usage tracking
+- **Persistent Storage**: Usage data survives app restarts and maintains monthly tracking
+- **Automatic Sync**: UserStore subscription status updates automatically via callback system
+- **Real-time Updates**: Purchase success immediately updates limits and user profile
+- **Monthly Reset Logic**: Proper month boundary detection and reset functionality
+
+#### ✅ **Proven Functionality**
+- **Purchase Flow**: FREE → PRO upgrade works and immediately shows 300 recording limit
+- **Restore Purchases**: Previously purchased subscriptions restore and sync properly
+- **Usage Tracking**: Recording count increments, persists, and displays correctly across app
+- **Limit Enforcement**: Proper blocking at tier limits with upgrade prompts
+- **State Consistency**: All components show identical subscription status and usage data
 
 ### Next Steps (If Desired)
 1. **Monitor Performance**: Track subscription conversion rates

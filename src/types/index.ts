@@ -14,8 +14,10 @@ export interface UserProfile {
   goal: Goal;
   bmr?: number; // calculated
   dailyCalorieGoal?: number; // calculated
+  customCalorieGoal?: number; // user-set custom calorie goal
+  weeklyWeightGoal?: number; // target lbs per week (positive for gain, negative for loss)
   subscriptionTier?: SubscriptionTier;
-  subscriptionStatus?: 'active' | 'expired' | 'cancelled';
+  subscriptionStatus?: 'active' | 'inactive' | 'expired' | 'cancelled';
   subscriptionStartDate?: Date | string;
   subscriptionEndDate?: Date | string;
   recordingsUsedThisMonth?: number;
@@ -72,6 +74,7 @@ export interface ParsedFoodItem {
   suggestedCookingMethods?: string[]; // Array of suggested cooking methods
   isNutritionComplete?: boolean; // Flag to indicate if nutrition calculation is complete
   nutritionNotes?: string; // Additional notes about nutrition calculation
+  icon?: string; // Material icon name for the food item
 }
 
 export interface LoggedFood {
@@ -108,6 +111,8 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Main: undefined;
   ProfileEdit: undefined;
+  ActivityLevelEdit: undefined;
+  WeightGoalEdit: undefined;
   Notifications: undefined;
 };
 

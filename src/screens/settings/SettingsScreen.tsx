@@ -14,7 +14,6 @@ import { colors, fonts, spacing } from '../../constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useUserStore } from '../../stores/userStore';
 import { useUser } from '../../hooks/useUser';
-import { UserProfile } from '../../types';
 import { useRevenueCatContext } from '../../contexts/RevenueCatContext';
 import { usePaywall } from '../../hooks/usePaywall';
 
@@ -23,10 +22,9 @@ const SettingsScreen: React.FC = () => {
   const { 
     profile, 
     resetProfile,
-    getUsageStats,
   } = useUserStore();
   const { userStats } = useUser();
-  const { state: revenueCatState } = useRevenueCatContext();
+  const { state: revenueCatState, actions: revenueCatActions } = useRevenueCatContext();
   const { presentPaywallIfNeededWithAlert } = usePaywall();
 
   const handleUpgradeWithPaywall = async () => {
@@ -53,42 +51,44 @@ const SettingsScreen: React.FC = () => {
       
       Alert.alert(title, message, [
         { text: 'OK' },
-        revenueCatState.error?.includes('TestFlight') ? { 
+        ...(revenueCatState.error?.includes('TestFlight') ? [{ 
           text: 'Debug Info', 
           onPress: () => showRevenueCatDebugInfo() 
-        } : undefined
-      ].filter(Boolean));
+        }] : [])
+      ]);
     }
   };
 
-  const showRevenueCatDebugInfo = () => {
-    const debugInfo = [
-      `• Initialized: ${revenueCatState.isInitialized}`,
-      `• Loading: ${revenueCatState.isLoading}`,
-      `• Error: ${revenueCatState.error || 'None'}`,
-      `• Subscription Tier: ${revenueCatState.subscriptionStatus.tier}`,
-      `• Build Environment: ${process.env.NODE_ENV}`,
-      `• Has Customer Info: ${!!revenueCatState.customerInfo}`,
-    ].join('\n');
-
-    Alert.alert(
-      'RevenueCat Debug Info',
-      debugInfo,
-      [
-        { text: 'Copy to Clipboard', onPress: () => {
-          // In a real app, you'd copy to clipboard here
-          console.log('Debug info:', debugInfo);
-        }},
-        { text: 'Close' }
-      ]
-    );
+  const showRevenueCatDebugInfo = async () => {
+    try {
+      const debugInfo = await revenueCatActions.debugSubscriptionStatus();
+      
+      Alert.alert(
+        'Enhanced RevenueCat Debug Info',
+        debugInfo,
+        [
+          { text: 'Force Refresh', onPress: async () => {
+            try {
+              await revenueCatActions.forceRefreshSubscriptionStatus();
+              Alert.alert('Success', 'Subscription status refreshed! Check if Pro status is now recognized.');
+            } catch (error) {
+              Alert.alert('Error', `Failed to refresh: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          }},
+          { text: 'Copy to Clipboard', onPress: () => {
+            console.log('Enhanced Debug info:', debugInfo);
+          }},
+          { text: 'Close' }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Debug Error', `Failed to get debug info: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const handleManageSubscription = () => {
     Alert.alert('Subscription Management', 'This would open subscription management in the App Store.');
   };
-
-  const { actions: revenueCatActions } = useRevenueCatContext();
   
   const handleRestorePurchases = async () => {
     if (revenueCatState.isInitialized) {
@@ -126,7 +126,16 @@ const SettingsScreen: React.FC = () => {
   };
 
 
-  const usageStats = getUsageStats();
+  // Get usage stats from RevenueCat (single source of truth)
+  const usageStats = {
+    recordingsUsed: revenueCatState.usageInfo.recordingsUsed,
+    recordingsRemaining: revenueCatState.usageInfo.recordingsRemaining,
+    monthlyLimit: revenueCatState.usageInfo.recordingsLimit,
+    resetDate: revenueCatState.usageInfo.resetDate.toISOString(),
+    usagePercentage: revenueCatState.usageInfo.recordingsLimit 
+      ? Math.min(100, (revenueCatState.usageInfo.recordingsUsed / revenueCatState.usageInfo.recordingsLimit) * 100) 
+      : 0,
+  };
 
   if (!profile) {
     return (
@@ -158,52 +167,84 @@ const SettingsScreen: React.FC = () => {
             
             {/* Pro Banner */}
             {(!revenueCatState.subscriptionStatus.isActive || revenueCatState.subscriptionStatus.tier === 'FREE') && (
-              <View style={styles.section}>
                 <LinearGradient
-                  colors={[colors.primary, '#45A049']}
+                  colors={['#667eea', '#764ba2']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.proBanner}
+                  style={styles.proBannerCard}
                 >
-                  <View style={styles.proBannerContent}>
-                    <View style={styles.proIconContainer}>
-                      <MaterialIcons name="auto-awesome" size={32} color={colors.white} />
+                  <View style={styles.sparkleContainer}>
+                    <View style={styles.sparkle1} />
+                    <View style={styles.sparkle2} />
+                    <View style={styles.sparkle3} />
+                  </View>
+                  
+                  <View style={styles.proHeader}>
+                    <View style={styles.proIconBadge}>
+                      <MaterialIcons name="auto-awesome" size={24} color="#FFD700" />
                     </View>
-                    <View style={styles.proBannerText}>
-                      <Text style={styles.proBannerTitle}>Unlock Kam Calorie Pro</Text>
-                      <Text style={styles.proBannerSubtitle}>
-                        300 recordings/month • Advanced insights • Priority support
-                      </Text>
+                    <View style={styles.proTitleSection}>
+                      <Text style={styles.proTitle}>Upgrade to Pro</Text>
+                      <Text style={styles.proSubtitle}>Unlock your full potential</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.proFeatures}>
+                    <View style={styles.proFeatureRow}>
+                      <View style={styles.checkIconContainer}>
+                        <MaterialIcons name="check" size={14} color={colors.white} />
+                      </View>
+                      <Text style={styles.proFeatureText}>300 voice recordings monthly</Text>
+                    </View>
+                    <View style={styles.proFeatureRow}>
+                      <View style={styles.checkIconContainer}>
+                        <MaterialIcons name="check" size={14} color={colors.white} />
+                      </View>
+                      <Text style={styles.proFeatureText}>Advanced nutrition insights</Text>
+                    </View>
+                    <View style={styles.proFeatureRow}>
+                      <View style={styles.checkIconContainer}>
+                        <MaterialIcons name="check" size={14} color={colors.white} />
+                      </View>
+                      <Text style={styles.proFeatureText}>Priority customer support</Text>
                     </View>
                   </View>
                   
                   <TouchableOpacity 
-                    style={styles.proUpgradeButton}
+                    style={styles.upgradeButton}
                     onPress={handleUpgradeWithPaywall}
-                    activeOpacity={0.8}
+                    activeOpacity={0.9}
                   >
-                    <Text style={styles.proUpgradeButtonText}>Get Pro</Text>
-                    <MaterialIcons name="arrow-forward" size={20} color={colors.primary} />
+                    <LinearGradient
+                      colors={['#FFD700', '#FFA500']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.upgradeButtonGradient}
+                    >
+                      <Text style={styles.upgradeButtonText}>Get Pro Now</Text>
+                      <MaterialIcons name="arrow-forward" size={20} color="#2D1B69" />
+                    </LinearGradient>
                   </TouchableOpacity>
-                  
-                  {/* Usage Progress */}
-                  <View style={styles.usageProgressContainer}>
-                    <View style={styles.usageProgressHeader}>
-                      <Text style={styles.usageProgressLabel}>Monthly Usage</Text>
-                      <Text style={styles.usageProgressText}>
-                        {usageStats.recordingsUsed} / {usageStats.monthlyLimit || '∞'}
-                      </Text>
-                    </View>
-                    <View style={styles.usageProgressBar}>
-                      <View 
-                        style={[
-                          styles.usageProgressFill,
-                          { width: `${Math.min(100, usageStats.usagePercentage)}%` }
-                        ]} 
-                      />
-                    </View>
-                  </View>
                 </LinearGradient>
+            )}
+              
+            {/* Usage Progress */}
+            {(!revenueCatState.subscriptionStatus.isActive || revenueCatState.subscriptionStatus.tier === 'FREE') && (
+              <View style={styles.usageProgressContainer}>
+                <View style={styles.usageProgressHeader}>
+                  <Text style={styles.usageProgressLabel}>Monthly Usage</Text>
+                  <Text style={styles.usageProgressText}>
+                    {usageStats.recordingsUsed} / {usageStats.monthlyLimit || '∞'}
+                  </Text>
+                </View>
+                <View style={styles.usageProgressBar}>
+                  <View 
+                    style={[
+                      styles.usageProgressFill,
+                      { width: `${Math.min(100, usageStats.usagePercentage)}%` }
+                    ]} 
+                  />
+                </View>
               </View>
             )}
             
@@ -244,47 +285,97 @@ const SettingsScreen: React.FC = () => {
 
             {/* Profile Overview */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Profile Overview</Text>
+              <Text style={styles.sectionTitle}>👤 Profile</Text>
               
-              {/* Combined Profile Card with Stats */}
+              {/* Basic Profile Information */}
               <TouchableOpacity 
-                style={[styles.settingsCard, styles.profileOverviewCard]}
+                style={styles.settingsCard}
                 onPress={() => navigation.navigate('ProfileEdit' as never)}
               >
                 <View style={styles.cardContent}>
                   <View style={styles.cardLeft}>
                     <View style={styles.iconContainer}>
-                      <MaterialIcons name="person" size={24} color={colors.primary} />
+                      <MaterialIcons name="person" size={24} color={colors.brandOuterSkin} />
                     </View>
                     <View style={styles.cardText}>
-                      <Text style={styles.cardTitle}>Edit Profile & Goals</Text>
+                      <Text style={styles.cardTitle}>Personal Information</Text>
                       <Text style={styles.cardSubtitle}>
-                        {profile.name || 'Not set'} • {profile.age || 'Not set'} years
+                        {profile.name || 'Not set'} • {profile.gender || 'Not set'}
                       </Text>
                       <Text style={styles.cardSubtitle}>
-                        {profile.activityLevel || 'Not set'} • {profile.goal || 'Not set'}
+                        {profile.age || '--'} years • {profile.height || '--'}cm • {profile.weight || '--'}kg
                       </Text>
                     </View>
                   </View>
                   <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
                 </View>
-                
-                {/* Inline Stats */}
-                <View style={styles.inlineStatsContainer}>
-                  <View style={styles.inlineStatItem}>
-                    <Text style={styles.inlineStatValue}>{userStats?.bmr || '--'}</Text>
-                    <Text style={styles.inlineStatLabel}>BMR</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Goal Management */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>🎯 Goals & Nutrition</Text>
+              
+              {/* Activity Level Card */}
+              <TouchableOpacity 
+                style={styles.settingsCard}
+                onPress={() => navigation.navigate('ActivityLevelEdit' as never)}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.cardLeft}>
+                    <View style={styles.iconContainer}>
+                      <MaterialIcons name="directions-run" size={24} color={colors.brandOuterSkin} />
+                    </View>
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardTitle}>Activity Level</Text>
+                      <Text style={styles.cardSubtitle}>
+                        {profile.activityLevel ? 
+                          profile.activityLevel.split('-').map(word => 
+                            word.charAt(0).toUpperCase() + word.slice(1)
+                          ).join(' ') : 'Not set'}
+                      </Text>
+                      <Text style={styles.cardSubtitle}>
+                        Affects your daily calorie calculation
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.inlineStatDivider} />
-                  <View style={styles.inlineStatItem}>
-                    <Text style={styles.inlineStatValue}>{userStats?.tdee || '--'}</Text>
-                    <Text style={styles.inlineStatLabel}>TDEE</Text>
+                  <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Weight Goal Card */}
+              <TouchableOpacity 
+                style={styles.settingsCard}
+                onPress={() => navigation.navigate('WeightGoalEdit' as never)}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.cardLeft}>
+                    <View style={styles.iconContainer}>
+                      <MaterialIcons 
+                        name={profile.goal === 'lose' ? 'trending-down' : 
+                              profile.goal === 'gain' ? 'trending-up' : 'trending-flat'} 
+                        size={24} 
+                        color={colors.brandOuterSkin} 
+                      />
+                    </View>
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardTitle}>Weight Goals & Calorie Target</Text>
+                      <Text style={styles.cardSubtitle}>
+                        {profile.goal === 'lose' ? 'Lose Weight' :
+                         profile.goal === 'gain' ? 'Gain Weight' : 'Maintain Weight'}
+                        {profile.weeklyWeightGoal && profile.goal !== 'maintain' && 
+                          ` • ${Math.abs(profile.weeklyWeightGoal).toFixed(1)} lbs/week`
+                        }
+                      </Text>
+                      <Text style={styles.cardSubtitle}>
+                        {profile.customCalorieGoal 
+                          ? `Custom: ${profile.customCalorieGoal} cal/day`
+                          : `Auto: ${userStats?.dailyCalorieGoal || userStats?.tdee || '--'} cal/day`
+                        }
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.inlineStatDivider} />
-                  <View style={styles.inlineStatItem}>
-                    <Text style={styles.inlineStatValue}>{userStats?.calorieGoal || '--'}</Text>
-                    <Text style={styles.inlineStatLabel}>Daily Goal</Text>
-                  </View>
+                  <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
                 </View>
               </TouchableOpacity>
             </View>
@@ -464,7 +555,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: fonts['2xl'],
-    fontWeight: 'bold',
+    fontFamily: fonts.heading,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
@@ -499,68 +590,146 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   // Pro Banner Styles
-  proBanner: {
+  proBannerCard: {
     borderRadius: 16,
     padding: spacing.lg,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    marginBottom: spacing.md,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
     elevation: 8,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  proBannerContent: {
+  sparkleContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  sparkle1: {
+    position: 'absolute',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    top: '15%',
+    right: '20%',
+  },
+  sparkle2: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 215, 0, 0.6)',
+    top: '70%',
+    right: '30%',
+  },
+  sparkle3: {
+    position: 'absolute',
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    top: '40%',
+    left: '15%',
+  },
+  proHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+    position: 'relative',
+    zIndex: 1,
   },
-  proIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  proIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  proBannerText: {
+  proTitleSection: {
     flex: 1,
   },
-  proBannerTitle: {
-    fontSize: fonts.xl,
-    fontWeight: 'bold',
+  proTitle: {
+    fontSize: fonts.lg,
+    fontWeight: '700',
     color: colors.white,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
-  proBannerSubtitle: {
+  proSubtitle: {
     fontSize: fonts.sm,
     color: 'rgba(255, 255, 255, 0.9)',
-    lineHeight: 20,
+    fontWeight: '500',
   },
-  proUpgradeButton: {
+  proFeatures: {
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+    position: 'relative',
+    zIndex: 1,
+  },
+  proFeatureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  checkIconContainer: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(34, 197, 94, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  proFeatureText: {
+    fontSize: fonts.sm,
+    color: colors.white,
+    fontWeight: '500',
+    flex: 1,
+  },
+  upgradeButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+    position: 'relative',
+    zIndex: 1,
+  },
+  upgradeButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.white,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    borderRadius: 12,
     gap: spacing.sm,
-    marginBottom: spacing.lg,
+  },
+  upgradeButtonText: {
+    fontSize: fonts.base,
+    fontWeight: '700',
+    color: '#2D1B69',
+  },
+  usageProgressContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  proUpgradeButtonText: {
-    fontSize: fonts.base,
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-  usageProgressContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    padding: spacing.md,
+    shadowRadius: 8,
+    elevation: 4,
   },
   usageProgressHeader: {
     flexDirection: 'row',
@@ -570,23 +739,23 @@ const styles = StyleSheet.create({
   },
   usageProgressLabel: {
     fontSize: fonts.sm,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   usageProgressText: {
     fontSize: fonts.sm,
-    color: colors.white,
+    color: colors.textPrimary,
     fontWeight: 'bold',
   },
   usageProgressBar: {
     height: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: colors.gray200,
     borderRadius: 3,
     overflow: 'hidden',
   },
   usageProgressFill: {
     height: '100%',
-    backgroundColor: colors.white,
+    backgroundColor: colors.primary,
     borderRadius: 3,
   },
   // Pro Status Card (for existing Pro users)
@@ -655,7 +824,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: colors.brandOuterSkin,
     borderRadius: 8,
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: 1 },
@@ -666,7 +835,7 @@ const styles = StyleSheet.create({
   restoreButtonText: {
     fontSize: fonts.base,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.brandOuterSkin,
   },
   // New styles for settings cards
   settingsCard: {
@@ -694,7 +863,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.primary + '20',
+    backgroundColor: colors.brandFlesh + '40',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
@@ -732,7 +901,7 @@ const styles = StyleSheet.create({
   inlineStatValue: {
     fontSize: fonts.lg,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.brandOuterSkin,
     marginBottom: 2,
   },
   inlineStatLabel: {

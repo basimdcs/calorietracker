@@ -4,12 +4,10 @@ export default {
     slug: "calorie-tracker",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./KamCalorie_Icons_iOS_v2/AppIcon_Primary.appiconset/KamCalorie_Default_AppStore_1024.png",
+    icon: "./assets/icon.png",
     userInterfaceStyle: "light",
     splash: {
-      image: "./KamCalorie_Icons_iOS_v2/AppIcon_Primary.appiconset/KamCalorie_Default_AppStore_1024.png",
-      resizeMode: "contain",
-      backgroundColor: "#4CAF50"
+      backgroundColor: "#ffffff"
     },
     assetBundlePatterns: [
       "**/*"
@@ -18,15 +16,6 @@ export default {
       supportsTablet: true,
       bundleIdentifier: "com.basimdcs.calorietracker",
       buildNumber: "20",
-      icon: {
-        "20x20": "./KamCalorie_Icons_iOS_v2/AppIcon_Primary.appiconset/KamCalorie_Default_iphone_20x20_2x.png",
-        "29x29": "./KamCalorie_Icons_iOS_v2/AppIcon_Primary.appiconset/KamCalorie_Default_iphone_29x29_2x.png",
-        "40x40": "./KamCalorie_Icons_iOS_v2/AppIcon_Primary.appiconset/KamCalorie_Default_iphone_40x40_2x.png",
-        "60x60": "./KamCalorie_Icons_iOS_v2/AppIcon_Primary.appiconset/KamCalorie_Default_iphone_60x60_2x.png",
-        "76x76": "./KamCalorie_Icons_iOS_v2/AppIcon_Primary.appiconset/KamCalorie_Default_ipad_76x76_1x.png",
-        "83.5x83.5": "./KamCalorie_Icons_iOS_v2/AppIcon_Primary.appiconset/KamCalorie_Default_ipad_83.5x83.5_2x.png",
-        "1024x1024": "./KamCalorie_Icons_iOS_v2/AppIcon_Primary.appiconset/KamCalorie_Default_AppStore_1024.png"
-      },
       infoPlist: {
         NSMicrophoneUsageDescription: "Kam Calorie needs access to your microphone to record voice descriptions of your meals for easy food logging.",
         NSCameraUsageDescription: "Kam Calorie needs access to your camera to take photos of your meals for food logging.",
@@ -37,7 +26,7 @@ export default {
     android: {
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#FFFFFF"
+        backgroundColor: "#000000"
       },
       package: "com.basimdcs.calorietracker",
       versionCode: 1,
@@ -63,6 +52,9 @@ export default {
       }
     },
     plugins: [
+      [
+        "expo-font"
+      ],
       [
         "expo-audio",
         {

@@ -32,6 +32,9 @@ interface FoodState {
   
   // Display helpers
   getDisplayQuantity: (food: LoggedFood) => { amount: number; unit: string };
+  
+  // Profile integration
+  updateCalorieGoalForAllLogs: (newCalorieGoal: number) => void;
 }
 
 // Helper function to calculate nutrition based on quantity
@@ -157,7 +160,7 @@ export const useFoodStore = create<FoodState>()(
             date: currentDate,
             foods: [loggedFood],
             totalNutrition: loggedFood.nutrition,
-            calorieGoal: 2000, // Default, should be updated from user profile
+            calorieGoal: 2000, // Will be updated by user profile sync
           };
           
           console.log('✅ Created new daily log:', newLog);
@@ -304,6 +307,15 @@ export const useFoodStore = create<FoodState>()(
             unit: unit
           };
         }
+      },
+      
+      updateCalorieGoalForAllLogs: (newCalorieGoal: number) => {
+        set((state) => ({
+          dailyLogs: state.dailyLogs.map(log => ({
+            ...log,
+            calorieGoal: newCalorieGoal
+          }))
+        }));
       },
     }),
     {

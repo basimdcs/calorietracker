@@ -11,6 +11,7 @@ import { ParsedFoodItem } from '../../types';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { Card } from '../ui/Card';
 import { nutritionService } from '../../services/nutrition';
+import { getFoodIcon } from '../../utils/foodIcons';
 
 interface FoodItemCardProps {
   food: ParsedFoodItem;
@@ -33,6 +34,9 @@ export const FoodItemCard: React.FC<FoodItemCardProps> = ({
                          food.confidence >= 0.6 ? colors.warning : colors.error;
   
   const confidenceText = nutritionService.getConfidenceDescription(food.confidence);
+  
+  // Get food-specific icon (prefer stored icon, fallback to generated)
+  const foodIcon = food.icon || getFoodIcon(food.name);
   
   const handleRemove = () => {
     Alert.alert(
@@ -59,9 +63,17 @@ export const FoodItemCard: React.FC<FoodItemCardProps> = ({
       {/* Header with food name and actions */}
       <View style={styles.header}>
         <View style={styles.foodInfo}>
-          <Text style={styles.foodName} numberOfLines={2}>
-            {food.name}
-          </Text>
+          <View style={styles.foodTitleContainer}>
+            <MaterialIcons 
+              name={foodIcon} 
+              size={24} 
+              color={colors.primary} 
+              style={styles.foodIcon}
+            />
+            <Text style={styles.foodName} numberOfLines={2}>
+              {food.name}
+            </Text>
+          </View>
           <View style={styles.foodMeta}>
             <Text style={styles.quantityText}>
               📏 {quantityText}
@@ -181,11 +193,19 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: spacing.md,
   },
+  foodTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  foodIcon: {
+    marginRight: spacing.sm,
+  },
   foodName: {
+    flex: 1,
     fontSize: fonts.lg,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
   },
   foodMeta: {
     gap: spacing.xs,
