@@ -21,6 +21,7 @@ import { UsageProgressBar } from '../../components/ui/UsageProgressBar';
 import { useFoodStore } from '../../stores/foodStore';
 import { useUserStore } from '../../stores/userStore';
 import { ParsedFoodItem } from '../../types';
+import { ParsedFoodItemWithConfidence } from '../../types/aiTypes';
 import { useVoiceRecording } from '../../hooks/useVoiceRecording';
 import { useVoiceProcessing } from '../../hooks/useVoiceProcessing';
 import { useRevenueCatContext } from '../../contexts/RevenueCatContext';
@@ -33,7 +34,7 @@ type VoiceState = 'ready' | 'recording' | 'processing' | 'reviewing';
 
 const VoiceScreenProduction: React.FC = () => {
   const [voiceState, setVoiceState] = useState<VoiceState>('ready');
-  const [parsedFoods, setParsedFoods] = useState<ParsedFoodItem[]>([]);
+  const [parsedFoods, setParsedFoods] = useState<ParsedFoodItemWithConfidence[]>([]);
   const [useGPT5, setUseGPT5] = useState(false);
   const [useGPT4oTranscription, setUseGPT4oTranscription] = useState(false);
   
@@ -290,7 +291,7 @@ Products: com.basimdcs.calorietracker.Monthly, com.basimdcs.calorietracker.Annua
   }, [voiceProcessing.data.state, voiceProcessing.data.parsedFoods]);
 
   // Food review handlers
-  const handleUpdateFood = useCallback((index: number, updatedFood: ParsedFoodItem) => {
+  const handleUpdateFood = useCallback((index: number, updatedFood: ParsedFoodItemWithConfidence) => {
     setParsedFoods(prev => {
       const newFoods = [...prev];
       newFoods[index] = updatedFood;

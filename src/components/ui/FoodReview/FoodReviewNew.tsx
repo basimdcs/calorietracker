@@ -9,18 +9,17 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ParsedFoodItem } from '../../../types';
+import { ParsedFoodItemWithConfidence } from '../../../types/aiTypes';
 import { colors, fonts, spacing } from '../../../constants/theme';
 import { ScreenHeader } from '../../layout';
 import { Button } from '../Button';
 import { FoodItemCard } from '../../food/FoodItemCard';
-import { QuantityModal } from '../../food/QuantityModal';
-import { CookingMethodModal } from '../../food/CookingMethodModal';
-import { EditFoodModal } from '../../food/EditFoodModal';
+import { FoodDetailsModal } from '../../food/FoodDetailsModal';
 
 
 interface FoodReviewNewProps {
-  foods: ParsedFoodItem[];
-  onUpdateFood: (index: number, updatedFood: ParsedFoodItem) => void;
+  foods: ParsedFoodItemWithConfidence[];
+  onUpdateFood: (index: number, updatedFood: ParsedFoodItemWithConfidence) => void;
   onRemoveFood: (index: number) => void;
   onAddFood: () => void;
   onConfirm: () => void;
@@ -28,7 +27,7 @@ interface FoodReviewNewProps {
   isLoading?: boolean;
 }
 
-type ModalType = 'none' | 'quantity' | 'cooking' | 'edit';
+type ModalType = 'none' | 'details';
 
 interface NutritionTotals {
   calories: number;
@@ -43,65 +42,11 @@ interface ValidationResult {
   issueCount: number;
 }
 
-// Smart validation functions to override incorrect AI decisions
-function validateNeedsQuantity(food: ParsedFoodItem): boolean | null {
-  const name = food.name.toLowerCase();
-  
-  // Override AI if it incorrectly flagged these as needing quantity
-  const clearPortions = [
-    // Standard containers/servings
-    'علبة', 'كوب', 'رغيف', 'ساندوتش', 'برجر', 'وجبة', 
-    // Beverages with standard sizes
-    'ستاربوكس', 'كافيه', 'مكدونالدز', 'كنتاكي',
-    // Clear counts
-    'واحد', 'واحدة', '1 ', '2 ', '3 ', 'one', 'two'
-  ];
-  
-  if (clearPortions.some(portion => name.includes(portion))) {
-    return false; // Override AI - these don't need quantity modal
-  }
-  
-  // Override AI if it missed these vague quantities
-  const vagueQuantities = ['شوية', 'كتير', 'بعض', 'قليل', 'some', 'a little'];
-  if (vagueQuantities.some(vague => name.includes(vague))) {
-    return true; // Override AI - these need quantity modal
-  }
-  
-  return null; // No override - trust AI decision
-}
-
-function validateNeedsCookingMethod(food: ParsedFoodItem): boolean | null {
-  const name = food.name.toLowerCase();
-  
-  // Override AI if it incorrectly flagged these as needing cooking method
-  const noCookingNeeded = [
-    // Dairy products - never need cooking method
-    'زبادي', 'لبن', 'جبن', 'جبنة', 'مراعي', 'قشطة', 'yogurt', 'milk', 'cheese',
-    // Fresh fruits - never need cooking method  
-    'تفاح', 'موز', 'برتقال', 'مانجا', 'عنب', 'فراولة', 'apple', 'banana', 'orange',
-    // Beverages - never need cooking method
-    'قهوة', 'شاي', 'عصير', 'مياه', 'كابتشينو', 'ستاربوكس', 'كوكاكولا', 'coffee', 'tea', 'juice',
-    // Processed/ready foods
-    'بسكويت', 'شيبسي', 'شوكولاتة', 'حلوى', 'عيش', 'خبز', 'كرواسون'
-  ];
-  
-  if (noCookingNeeded.some(item => name.includes(item))) {
-    return false; // Override AI - these definitely don't need cooking method
-  }
-  
-  // Override AI if cooking method is already mentioned in name
-  const cookingMethods = ['مشوي', 'مقلي', 'مسلوق', 'في الفرن', 'نيء', 'grilled', 'fried', 'baked', 'boiled'];
-  if (cookingMethods.some(method => name.includes(method))) {
-    return false; // Override AI - cooking method already specified
-  }
-  
-  // Override AI if it missed foods that clearly need cooking method
-  const rawFoods = ['لحم نيء', 'فراخ نيء', 'سمك نيء', 'بيض نيء'];
-  if (rawFoods.some(raw => name.includes(raw))) {
-    return true; // Override AI - these definitely need cooking method
-  }
-  
-  return null; // No override - trust AI decision
+// Helper function to get confidence indicator
+function getConfidenceIndicator(confidence: number) {
+  if (confidence >= 0.8) return { emoji: '🟢', color: colors.success, label: 'High' };
+  if (confidence >= 0.6) return { emoji: '🟡', color: colors.warning, label: 'Medium' };
+  return { emoji: '🔴', color: colors.error, label: 'Low' };
 }
 
 export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
@@ -116,22 +61,10 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
   const [activeModal, setActiveModal] = useState<ModalType>('none');
   const [selectedFoodIndex, setSelectedFoodIndex] = useState<number | null>(null);
 
-  // Smart validation layer - override AI decisions with client-side intelligence
-  const validatedFoods = useMemo(() => {
-    return foods.map(food => {
-      const smartNeedsQuantity = validateNeedsQuantity(food);
-      const smartNeedsCookingMethod = validateNeedsCookingMethod(food);
-      
-      // Only override if AI decision seems incorrect
-      return {
-        ...food,
-        needsQuantity: smartNeedsQuantity !== null ? smartNeedsQuantity : food.needsQuantity,
-        needsCookingMethod: smartNeedsCookingMethod !== null ? smartNeedsCookingMethod : food.needsCookingMethod,
-      };
-    });
-  }, [foods]);
+  // Foods are already processed with confidence - use them directly
+  const validatedFoods = foods;
 
-  // Calculate totals and validation using validated foods
+  // Calculate totals and validation using confidence-based foods
   const { totalNutrition, hasIssues, issueCount } = useMemo((): ValidationResult => {
     const total: NutritionTotals = {
       calories: 0,
@@ -149,8 +82,8 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
       total.carbs += food.carbs || 0;
       total.fat += food.fat || 0;
 
-      // Count items that need more details (using validated flags)
-      if (food.needsQuantity || food.needsCookingMethod) {
+      // Count items that need clarification (using confidence-based flags)
+      if (food.needsQuantityModal || food.needsCookingModal) {
         issuesCount++;
       }
     });
@@ -168,23 +101,11 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
       : null;
   }, [selectedFoodIndex, validatedFoods]);
 
-  // Modal handlers
-  const handleQuantityModal = useCallback((index: number) => {
-    console.log('Opening quantity modal for index:', index);
+  // Modal handlers - unified for all food details
+  const handleFoodDetailsModal = useCallback((index: number) => {
+    console.log('Opening food details modal for index:', index);
     setSelectedFoodIndex(index);
-    setActiveModal('quantity');
-  }, []);
-
-  const handleCookingModal = useCallback((index: number) => {
-    console.log('Opening cooking modal for index:', index);
-    setSelectedFoodIndex(index);
-    setActiveModal('cooking');
-  }, []);
-
-  const handleEditModal = useCallback((index: number) => {
-    console.log('Opening edit modal for index:', index);
-    setSelectedFoodIndex(index);
-    setActiveModal('edit');
+    setActiveModal('details');
   }, []);
 
   const closeModal = useCallback(() => {
@@ -192,79 +113,10 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
     setSelectedFoodIndex(null);
   }, []);
 
-  // Update handlers
-  const handleQuantityUpdate = useCallback((quantity: number, unit: string, updatedNutrition: {
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-  }) => {
-    if (selectedFoodIndex === null || !selectedFood) {
-      console.warn('No food selected for quantity update');
-      return;
-    }
-
-    try {
-      const updatedFood: ParsedFoodItem = {
-        ...selectedFood,
-        quantity,
-        unit,
-        calories: updatedNutrition.calories,
-        protein: updatedNutrition.protein,
-        carbs: updatedNutrition.carbs,
-        fat: updatedNutrition.fat,
-        needsQuantity: false,
-      };
-
-      onUpdateFood(selectedFoodIndex, updatedFood);
-      closeModal();
-    } catch (error) {
-      console.error('Failed to update food quantity:', error);
-    }
-  }, [selectedFoodIndex, selectedFood, onUpdateFood, closeModal]);
-
-  const handleCookingUpdate = useCallback((cookingMethod: string) => {
-    if (selectedFoodIndex === null || !selectedFood) {
-      console.warn('No food selected for cooking method update');
-      return;
-    }
-
-    try {
-      // Calculate cooking method impact on calories
-      const multiplier = {
-        'Raw': 1.0,
-        'Boiled': 1.0,
-        'Steamed': 1.0,
-        'Grilled': 1.1,
-        'Baked': 1.05,
-        'Roasted': 1.1,
-        'Sautéed': 1.2,
-        'Stir-fried': 1.25,
-        'Fried': 1.4,
-        'Deep Fried': 1.8,
-        'Braised': 1.15,
-      }[cookingMethod] || 1.0;
-
-      const updatedFood: ParsedFoodItem = {
-        ...selectedFood,
-        cookingMethod,
-        calories: Math.round(selectedFood.calories * multiplier),
-        protein: Math.round((selectedFood.protein * multiplier) * 10) / 10,
-        carbs: Math.round((selectedFood.carbs * multiplier) * 10) / 10,
-        fat: Math.round((selectedFood.fat * multiplier) * 10) / 10,
-        needsCookingMethod: false,
-      };
-
-      onUpdateFood(selectedFoodIndex, updatedFood);
-      closeModal();
-    } catch (error) {
-      console.error('Failed to update cooking method:', error);
-    }
-  }, [selectedFoodIndex, selectedFood, onUpdateFood, closeModal]);
-
-  const handleEditUpdate = useCallback((updatedFood: ParsedFoodItem) => {
+  // Update handler - unified for all food details
+  const handleFoodDetailsUpdate = useCallback((updatedFood: ParsedFoodItemWithConfidence) => {
     if (selectedFoodIndex === null) {
-      console.warn('No food selected for edit update');
+      console.warn('No food selected for update');
       return;
     }
 
@@ -340,18 +192,81 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
         {/* Food Items List */}
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.foodList}>
-            {validatedFoods.map((food, index) => (
-              <FoodItemCard
-                key={index}
-                food={food}
-                index={index}
-                onEdit={handleEditModal}
-                onRemove={onRemoveFood}
-                onQuickQuantity={handleQuantityModal}
-                onQuickCooking={handleCookingModal}
-              />
-            ))}
+            {validatedFoods.map((food, index) => {
+              const confidenceIndicator = getConfidenceIndicator(food.overallConfidence);
+              const needsAttention = food.needsQuantityModal || food.needsCookingModal;
+              
+              return (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => handleFoodDetailsModal(index)}
+                  style={[
+                    styles.foodCard,
+                    needsAttention && styles.foodCardNeedsAttention
+                  ]}
+                >
+                  {/* Food Item Header */}
+                  <View style={styles.foodHeader}>
+                    <View style={styles.foodNameSection}>
+                      <Text style={styles.foodName}>{food.name}</Text>
+                      {needsAttention && (
+                        <View style={styles.attentionBadge}>
+                          <MaterialIcons name="warning" size={12} color={colors.warning} />
+                          <Text style={styles.attentionText}>Needs details</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    <View style={styles.foodActions}>
+                      <View style={styles.confidenceBadge}>
+                        <Text style={styles.confidenceEmoji}>{confidenceIndicator.emoji}</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => onRemoveFood(index)}
+                        style={styles.removeButton}
+                      >
+                        <MaterialIcons name="close" size={16} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
 
+                  {/* Nutrition Summary */}
+                  <View style={styles.nutritionRow}>
+                    <Text style={styles.nutritionText}>
+                      {food.calories} cal • {food.protein}g protein • {food.carbs}g carbs • {food.fat}g fat
+                    </Text>
+                  </View>
+
+                  {/* Quantity & Cooking Info */}
+                  <View style={styles.detailsRow}>
+                    <Text style={styles.detailsText}>
+                      {food.quantity} {food.unit} ({food.gramEquivalent}g)
+                    </Text>
+                    {food.cookingMethod && (
+                      <Text style={styles.cookingText}>• {food.cookingMethod}</Text>
+                    )}
+                  </View>
+
+                  {/* Issues Indicators */}
+                  {needsAttention && (
+                    <View style={styles.issuesRow}>
+                      {food.needsQuantityModal && (
+                        <View style={styles.issueBadge}>
+                          <MaterialIcons name="straighten" size={12} color={colors.warning} />
+                          <Text style={styles.issueText}>Quantity</Text>
+                        </View>
+                      )}
+                      {food.needsCookingModal && (
+                        <View style={styles.issueBadge}>
+                          <MaterialIcons name="restaurant" size={12} color={colors.warning} />
+                          <Text style={styles.issueText}>Cooking</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </ScrollView>
 
@@ -375,25 +290,11 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
         </View>
       </SafeAreaView>
 
-      {/* Modals - Rendered outside SafeAreaView for proper z-index */}
-      <QuantityModal
-        visible={activeModal === 'quantity'}
+      {/* Unified Food Details Modal */}
+      <FoodDetailsModal
+        visible={activeModal === 'details'}
         food={selectedFood}
-        onConfirm={handleQuantityUpdate}
-        onCancel={closeModal}
-      />
-
-      <CookingMethodModal
-        visible={activeModal === 'cooking'}
-        food={selectedFood}
-        onConfirm={handleCookingUpdate}
-        onCancel={closeModal}
-      />
-
-      <EditFoodModal
-        visible={activeModal === 'edit'}
-        food={selectedFood}
-        onConfirm={handleEditUpdate}
+        onConfirm={handleFoodDetailsUpdate}
         onCancel={closeModal}
       />
     </>
@@ -477,5 +378,126 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     flex: 2,
+  },
+  // New food card styles with confidence indicators
+  foodCard: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  foodCardNeedsAttention: {
+    borderColor: colors.warning,
+    borderWidth: 1.5,
+    backgroundColor: colors.yellow50,
+  },
+  foodHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  foodNameSection: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  foodName: {
+    fontSize: fonts.base,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  attentionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    backgroundColor: colors.warning + '20',
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  attentionText: {
+    fontSize: fonts.xs,
+    color: colors.warning,
+    fontWeight: '600',
+  },
+  foodActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  confidenceBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  confidenceEmoji: {
+    fontSize: 12,
+  },
+  removeButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.gray100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nutritionRow: {
+    marginBottom: spacing.sm,
+  },
+  nutritionText: {
+    fontSize: fonts.sm,
+    color: colors.textPrimary,
+    fontWeight: '500',
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  detailsText: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  cookingText: {
+    fontSize: fonts.xs,
+    color: colors.primary,
+    fontWeight: '500',
+    marginLeft: spacing.xs,
+  },
+  issuesRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  issueBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.warning + '15',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.warning + '30',
+  },
+  issueText: {
+    fontSize: fonts.xs,
+    color: colors.warning,
+    fontWeight: '600',
   },
 });

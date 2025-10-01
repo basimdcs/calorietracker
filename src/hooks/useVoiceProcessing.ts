@@ -1,7 +1,13 @@
 import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
-import { openAIService } from '../services/openai';
+import { openAIService, parseFoodWithConfidence } from '../services/openai';
 import { ParsedFoodItem } from '../types';
+import { ParsedFoodItemWithConfidence } from '../types/aiTypes';
+import { 
+  startTrackingSession, 
+  completeTrackingSession, 
+  trackModelCall 
+} from '../utils/modelTracking';
 
 // Voice processing states
 export type VoiceProcessingState = 'idle' | 'transcribing' | 'parsing' | 'completed' | 'error';
@@ -9,9 +15,17 @@ export type VoiceProcessingState = 'idle' | 'transcribing' | 'parsing' | 'comple
 export interface VoiceProcessingData {
   state: VoiceProcessingState;
   transcript: string;
-  parsedFoods: ParsedFoodItem[];
+  parsedFoods: ParsedFoodItemWithConfidence[];
   error: string | null;
   progress?: number;
+  sessionId?: string;
+  modelStats?: {
+    transcriptionModel: 'whisper' | 'gpt-4o-audio';
+    nutritionModel: 'gpt-4o' | 'gpt-5-nano';
+    transcriptionLatency?: number;
+    nutritionLatency?: number;
+    totalCost?: number;
+  };
 }
 
 export interface VoiceProcessingActions {
@@ -30,26 +44,70 @@ export interface UseVoiceProcessingResult {
 export const useVoiceProcessing = (): UseVoiceProcessingResult => {
   const [state, setState] = useState<VoiceProcessingState>('idle');
   const [transcript, setTranscript] = useState('');
-  const [parsedFoods, setParsedFoods] = useState<ParsedFoodItem[]>([]);
+  const [parsedFoods, setParsedFoods] = useState<ParsedFoodItemWithConfidence[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | undefined>(undefined);
   const [lastAudioUri, setLastAudioUri] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
+  const [modelStats, setModelStats] = useState<{
+    transcriptionModel: 'whisper' | 'gpt-4o-audio';
+    nutritionModel: 'gpt-4o' | 'gpt-5-nano';
+    transcriptionLatency?: number;
+    nutritionLatency?: number;
+    totalCost?: number;
+  } | undefined>(undefined);
 
   const processRecording = useCallback(async (audioUri: string, useGPT5?: boolean, useGPT4oTranscription?: boolean): Promise<boolean> => {
+    let currentSessionId: string | undefined;
+    const transcriptionModel = useGPT4oTranscription ? 'gpt-4o-audio' : 'whisper';
+    const nutritionModel = useGPT5 ? 'gpt-5-nano' : 'gpt-4o';
+    
     try {
       setError(null);
       setState('transcribing');
       setProgress(0);
       setLastAudioUri(audioUri);
       
-      console.log('🎯 Starting transcription for URI:', audioUri, 'Method:', useGPT4oTranscription ? 'GPT-4o' : 'Whisper');
+      // Initialize model stats
+      const stats = {
+        transcriptionModel,
+        nutritionModel,
+        transcriptionLatency: undefined as number | undefined,
+        nutritionLatency: undefined as number | undefined,
+        totalCost: 0
+      };
+      setModelStats(stats);
       
-      // Transcribe audio with method selection
+      // Start session tracking
+      currentSessionId = await startTrackingSession(transcriptionModel, nutritionModel);
+      setSessionId(currentSessionId);
+      
+      console.log(`🎯 Starting enhanced voice processing session ${currentSessionId}`);
+      console.log(`📊 Models: ${transcriptionModel} + ${nutritionModel}`);
+      
+      // Transcribe audio with performance tracking
+      const transcriptionStart = Date.now();
       const transcriptionResult = await openAIService.transcribeAudio(audioUri, useGPT4oTranscription);
+      const transcriptionLatency = Date.now() - transcriptionStart;
+      
+      // Track transcription performance
+      trackModelCall(transcriptionModel, transcriptionLatency, 0, 0, 0, true);
+      
+      stats.transcriptionLatency = transcriptionLatency;
+      setModelStats({ ...stats });
       setTranscript(transcriptionResult);
       setProgress(50);
       
       if (!transcriptionResult.trim()) {
+        if (currentSessionId) {
+          await completeTrackingSession(currentSessionId, {
+            final_foods_count: 0,
+            user_needed_modal: false,
+            confidence_accurate: false,
+            performance_notes: ['No speech detected in transcription']
+          });
+        }
+        
         Alert.alert(
           'No Speech Detected',
           'We couldn\'t detect any speech in your recording. Please try again.',
@@ -63,12 +121,26 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
 
       setState('parsing');
       setProgress(75);
-      console.log('🤖 Starting food parsing for text:', transcriptionResult);
+      console.log('🤖 Starting enhanced food parsing with confidence scoring...');
       
-      // Parse food items with method selection
-      const foods = await openAIService.parseFoodFromText(transcriptionResult, useGPT5);
+      // Use enhanced AI pipeline with confidence scoring
+      const nutritionStart = Date.now();
+      const enhancedFoods = await parseFoodWithConfidence(transcriptionResult, useGPT5);
+      const nutritionLatency = Date.now() - nutritionStart;
       
-      if (foods.length === 0) {
+      stats.nutritionLatency = nutritionLatency;
+      setModelStats({ ...stats });
+      
+      if (enhancedFoods.length === 0) {
+        if (currentSessionId) {
+          await completeTrackingSession(currentSessionId, {
+            final_foods_count: 0,
+            user_needed_modal: false,
+            confidence_accurate: false,
+            performance_notes: ['No food items detected in enhanced parsing']
+          });
+        }
+        
         Alert.alert(
           'No Food Detected',
           'We couldn\'t identify any food items in your description. Please try describing your meal again.',
@@ -80,15 +152,50 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
         return false;
       }
 
-      setParsedFoods(foods);
+      // Analyze confidence and modal needs
+      const needsModalItems = enhancedFoods.filter(food => food.needsQuantityModal || food.needsCookingModal);
+      const avgConfidence = enhancedFoods.reduce((sum, food) => sum + food.overallConfidence, 0) / enhancedFoods.length;
+      
+      console.log(`✅ Enhanced processing completed: ${enhancedFoods.length} foods, ${needsModalItems.length} need clarification`);
+      console.log(`📊 Average confidence: ${(avgConfidence * 100).toFixed(1)}%`);
+      
+      setParsedFoods(enhancedFoods);
       setState('completed');
       setProgress(100);
       
-      console.log('✅ Voice processing completed successfully');
+      // Complete session tracking
+      if (currentSessionId) {
+        await completeTrackingSession(currentSessionId, {
+          transcription_latency_ms: transcriptionLatency,
+          nutrition_latency_ms: nutritionLatency,
+          final_foods_count: enhancedFoods.length,
+          user_needed_modal: needsModalItems.length > 0,
+          confidence_accurate: true, // Will be updated when user interacts with modals
+          performance_notes: [
+            `${enhancedFoods.length} foods detected`,
+            `${needsModalItems.length} items need clarification`,
+            `Average confidence: ${(avgConfidence * 100).toFixed(1)}%`
+          ]
+        });
+      }
+      
       return true;
       
     } catch (err) {
-      console.error('❌ Failed to process recording:', err);
+      console.error('❌ Enhanced voice processing failed:', err);
+      
+      // Complete session with error if we have a session
+      if (currentSessionId) {
+        await completeTrackingSession(currentSessionId, {
+          final_foods_count: 0,
+          user_needed_modal: false,
+          confidence_accurate: false,
+          performance_notes: [
+            'Processing failed with error',
+            err instanceof Error ? err.message : 'Unknown error'
+          ]
+        });
+      }
       
       // Provide more specific error messages based on the error type
       let errorMessage = 'There was an error processing your recording. Please try again.';
@@ -128,17 +235,46 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
       return false;
     }
 
+    let retrySessionId: string | undefined;
+    const nutritionModel = useGPT5 ? 'gpt-5-nano' : 'gpt-4o';
+    const transcriptionModel = useGPT4oTranscription ? 'gpt-4o-audio' : 'whisper';
+
     try {
       setError(null);
       setState('parsing');
       setProgress(75);
       
-      console.log('🔄 Retrying food parsing for existing transcript:', transcript);
+      // Start new session for retry
+      retrySessionId = await startTrackingSession(transcriptionModel, nutritionModel);
+      setSessionId(retrySessionId);
       
-      // Parse food items using existing transcript with method selection
-      const foods = await openAIService.parseFoodFromText(transcript, useGPT5);
+      console.log(`🔄 Retrying enhanced food parsing for session ${retrySessionId}`);
+      console.log('📄 Using existing transcript:', transcript.substring(0, 100) + '...');
       
-      if (foods.length === 0) {
+      // Use enhanced pipeline with confidence scoring
+      const nutritionStart = Date.now();
+      const enhancedFoods = await parseFoodWithConfidence(transcript, useGPT5);
+      const nutritionLatency = Date.now() - nutritionStart;
+      
+      // Update model stats for retry
+      setModelStats({
+        transcriptionModel,
+        nutritionModel,
+        transcriptionLatency: 0, // No transcription on retry
+        nutritionLatency,
+        totalCost: 0
+      });
+      
+      if (enhancedFoods.length === 0) {
+        if (retrySessionId) {
+          await completeTrackingSession(retrySessionId, {
+            final_foods_count: 0,
+            user_needed_modal: false,
+            confidence_accurate: false,
+            performance_notes: ['Retry failed - no food items detected']
+          });
+        }
+        
         Alert.alert(
           'No Food Detected',
           'We couldn\'t identify any food items in your description. Please try describing your meal again.',
@@ -150,15 +286,45 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
         return false;
       }
 
-      setParsedFoods(foods);
+      // Analyze retry results
+      const needsModalItems = enhancedFoods.filter(food => food.needsQuantityModal || food.needsCookingModal);
+      const avgConfidence = enhancedFoods.reduce((sum, food) => sum + food.overallConfidence, 0) / enhancedFoods.length;
+
+      console.log(`✅ Enhanced retry completed: ${enhancedFoods.length} foods, ${needsModalItems.length} need clarification`);
+      
+      setParsedFoods(enhancedFoods);
       setState('completed');
       setProgress(100);
       
-      console.log('✅ Retry processing completed successfully');
+      // Complete retry session tracking
+      if (retrySessionId) {
+        await completeTrackingSession(retrySessionId, {
+          transcription_latency_ms: 0, // No transcription on retry
+          nutrition_latency_ms: nutritionLatency,
+          final_foods_count: enhancedFoods.length,
+          user_needed_modal: needsModalItems.length > 0,
+          confidence_accurate: true,
+          performance_notes: [
+            'Retry successful',
+            `${enhancedFoods.length} foods detected`,
+            `${needsModalItems.length} items need clarification`
+          ]
+        });
+      }
+      
       return true;
       
     } catch (err) {
-      console.error('❌ Failed to retry processing:', err);
+      console.error('❌ Enhanced retry processing failed:', err);
+      
+      if (retrySessionId) {
+        await completeTrackingSession(retrySessionId, {
+          final_foods_count: 0,
+          user_needed_modal: false,
+          confidence_accurate: false,
+          performance_notes: ['Retry failed with error', err instanceof Error ? err.message : 'Unknown error']
+        });
+      }
       
       let errorMessage = 'There was an error processing your recording. Please try again.';
       
@@ -196,6 +362,8 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
       setParsedFoods([]);
       setState('idle');
       setProgress(undefined);
+      setSessionId(undefined);
+      setModelStats(undefined);
     }
   }, [state]);
 
@@ -209,6 +377,8 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
     setParsedFoods([]);
     setError(null);
     setProgress(undefined);
+    setSessionId(undefined);
+    setModelStats(undefined);
   }, []);
 
   const data: VoiceProcessingData = {
@@ -217,6 +387,8 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
     parsedFoods,
     error,
     progress,
+    sessionId,
+    modelStats,
   };
 
   const actions: VoiceProcessingActions = {

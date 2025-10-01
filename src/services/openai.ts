@@ -2,6 +2,14 @@ import OpenAI from 'openai';
 import { env } from '../config/env';
 import { ParsedFoodItem, VOICE_PROCESSING_CONSTANTS } from '../types';
 import { getFoodIcon } from '../utils/foodIcons';
+import { 
+  AIQuantityDetectionResult, 
+  AINutritionResult, 
+  Step2APIResponse, 
+  Step3APIResponse,
+  ModelUsageSession,
+  ParsedFoodItemWithConfidence 
+} from '../types/aiTypes';
 
 /**
  * OpenAI Service - Updated to use GPT-4o Transcribe
@@ -1084,6 +1092,431 @@ Return the JSON with foods array and total object.`
     });
   }
 
+  // ============================================================================
+  // ENHANCED AI PIPELINE WITH CONFIDENCE SCORING
+  // ============================================================================
+
+  /**
+   * Enhanced Step 2: AI-Powered Quantity Detection with Confidence
+   * Based on ChatGPT recommendation - AI chooses grams/ml with ranges and confidence
+   */
+  async detectQuantityWithConfidence(transcript: string, useGPT5: boolean = false): Promise<AIQuantityDetectionResult> {
+    const startTime = Date.now();
+    const model = useGPT5 ? 'gpt-5-nano' : 'gpt-4o-mini';
+    
+    try {
+      console.log(`🔍 Step 2: Quantity Detection using ${model}...`);
+      
+      const client = this.initializeClient();
+      
+      const systemPrompt = `You convert free-text meal logs (Arabic incl. Egyptian dialect + mixed English) into quantified, edible amounts.
+
+OBJECTIVE
+- Infer quantities and convert to edible grams (solids) or ml (liquids) using LLM prior knowledge of typical portions, item sizes, and yields.
+- Avoid fixed numbers; when exact size is unknown, provide a plausible RANGE and a single best ESTIMATE inside that range.
+- Respect any explicit weights/sizes on the transcript. If unit is counts (slice/piece/chicken/cup/can/loaf), infer grams/ml from typical sizes for that item/category and local context.
+- If a brand/restaurant is present, adjust using typical brand sizing from general knowledge (no external search). 
+- Keep assumptions explicit and return a confidence score.
+
+CONSTRAINTS
+- Do not compute macros/calories here.
+- Never output thoughts; return JSON only.
+- Prefer narrower ranges when you're confident; widen ranges when you're not.
+- If confidence < 0.6, add a short clarification question.
+
+OUTPUT SCHEMA (JSON only):
+{
+  "items": [
+    {
+      "raw_text": string,
+      "canonical_name": string,          // normalized food name
+      "brand_or_place": string|null,     // e.g., "مراعي"
+      "quantity_spoken": number,         // numeric from speech (e.g., 2, 0.5)
+      "unit_spoken": string,             // e.g., "slice", "قطعة", "كيلو", "فرخة"
+      "normalized_unit": "g"|"ml",       // solids -> g, liquids -> ml
+      "grams_range": {"min": number, "max": number},  // edible amount range
+      "grams_estimate": number,          // single chosen value within range
+      "assumptions": [string],           // brief notes (size style, with/without skin, cooked vs raw)
+      "confidence": number,              // 0..1
+      "questions": [string]              // only if confidence < 0.6
+    }
+  ]
+}`;
+
+      const userPrompt = `TRANSCRIPT:
+${transcript}
+
+TASK:
+Infer quantities and convert to edible grams/ml using typical sizes and yields from general knowledge. Use ranges + a best estimate. Be explicit about assumptions. Return JSON matching the schema, no prose.`;
+
+      let response;
+      
+      if (useGPT5) {
+        // Use GPT-5-nano structured output
+        response = await client.responses.create({
+          model: 'gpt-5-nano',
+          instructions: systemPrompt,
+          input: userPrompt
+        });
+        
+        const result = JSON.parse(response.output_text || '{}');
+        
+        return this.processStep2Response(result, model);
+        
+      } else {
+        // Use GPT-4o-mini traditional chat
+        response = await client.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.1,
+          max_completion_tokens: 1000,
+          response_format: { type: 'json_object' }
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content) throw new Error('No response from OpenAI Step 2');
+        
+        const result = JSON.parse(content);
+        
+        return this.processStep2Response(result, model);
+      }
+      
+    } catch (error) {
+      console.error(`❌ Step 2 quantity detection failed with ${model}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Enhanced Step 3: AI Nutrition Estimation with Cooking Method Integration
+   * Based on ChatGPT recommendation - AI estimates per 100g, validates via 4-4-9
+   */
+  async calculateNutritionWithConfidence(quantityResults: AIQuantityDetectionResult, useGPT5: boolean = false): Promise<AINutritionResult> {
+    const startTime = Date.now();
+    const model = useGPT5 ? 'gpt-5-nano' : 'gpt-4o-mini';
+    
+    try {
+      console.log(`🍽️ Step 3: Nutrition Calculation using ${model}...`);
+      
+      const client = this.initializeClient();
+      
+      const systemPrompt = `You estimate nutrition from item names + edible grams.
+
+OBJECTIVE
+- For each item, infer a plausible nutrition profile per 100 g (or per 100 ml for liquids) from general food knowledge (category, cooking method implied by name, local styles).
+- Avoid fixed constants; select values within realistic category ranges (e.g., lean poultry lower fat than fried poultry; pizza higher carbs/fat than grilled meats).
+- Output both per 100g and totals, then validate with the 4-4-9 rule. If |kcal − (4P+4C+9F)| > 5%, scale macros proportionally and mark adjusted=true.
+- Include a brief source_hint (e.g., "generic pepperoni pizza", "roasted chicken, mixed meat+skin") and confidence.
+
+REALISM GUARDS (soft bounds; choose within them, but you may widen with justification):
+- Energy density typical bands (kcal/100g): vegetables 15–60, fruits 40–80, cooked grains 110–180, lean meats 100–170, fatty meats 180–320, fried items 230–400, mixed dishes 150–300, pizza 220–330, sweets 300–550, dairy 50–200, sugary beverages 30–60 per 100 ml, diet/water 0–5.
+- Macro sanity (per 100 g): protein ≤ ~40 g (most), carbs ≤ ~80 g, fat ≤ ~60 g. Use judgment; document exceptions.
+
+OUTPUT SCHEMA (JSON only):
+{
+  "items": [
+    {
+      "canonical_name": string,
+      "edible_grams": number,
+      "profile_per_100g": {
+        "protein_g": number, "carbs_g": number, "fat_g": number, "kcal": number
+      },
+      "totals": {
+        "protein_g": number, "carbs_g": number, "fat_g": number, "kcal": number
+      },
+      "validation": {
+        "kcal_from_macros": number,
+        "delta_kcal_pct": number,
+        "adjusted": boolean
+      },
+      "source_hint": string,     // short descriptor of the assumed food profile
+      "assumptions": [string],   // e.g., "grilled, skin on", "regular crust"
+      "confidence": number       // 0..1
+    }
+  ]
+}`;
+
+      // Prepare input from Step 2 results
+      const itemsInput = quantityResults.items.map(item => ({
+        canonical_name: item.canonical_name,
+        edible_grams: item.grams_estimate,
+        assumptions: item.assumptions
+      }));
+
+      const userPrompt = `INPUT:
+${JSON.stringify({ items: itemsInput }, null, 2)}
+
+TASK:
+For each item, infer a plausible nutrition profile per 100 g from general knowledge (no fixed constants), compute totals, run 4-4-9 validation, adjust if needed, and return JSON matching the schema.`;
+
+      let response;
+      
+      if (useGPT5) {
+        // Use GPT-5-nano structured output
+        response = await client.responses.create({
+          model: 'gpt-5-nano',
+          instructions: systemPrompt,
+          input: userPrompt
+        });
+        
+        const result = JSON.parse(response.output_text || '{}');
+        
+        // Track usage for GPT-5-nano
+        this.trackModelUsage(model, Date.now() - startTime, 0, result.items?.length || 0);
+        
+        return this.processStep3Response(result, model);
+        
+      } else {
+        // Use GPT-4o-mini traditional chat
+        response = await client.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.1,
+          max_completion_tokens: 1200,
+          response_format: { type: 'json_object' }
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content) throw new Error('No response from OpenAI Step 3');
+        
+        const result = JSON.parse(content);
+        
+        // Track usage for GPT-4o-mini
+        const usage = response.usage;
+        this.trackModelUsage(model, Date.now() - startTime, usage?.total_tokens || 0, result.items?.length || 0);
+        
+        return this.processStep3Response(result, model);
+      }
+      
+    } catch (error) {
+      console.error(`❌ Step 3 nutrition calculation failed with ${model}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Enhanced Combined Pipeline: Quantity Detection + Nutrition Calculation with Confidence
+   * Replaces the legacy parseFoodFromText method with AI-first confidence scoring
+   */
+  async parseFoodWithConfidence(transcript: string, useGPT5: boolean = false): Promise<ParsedFoodItemWithConfidence[]> {
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      console.log(`🚀 Enhanced AI Pipeline (${useGPT5 ? 'GPT-5-nano' : 'GPT-4o'}): Starting for "${transcript}"`);
+      
+      // Step 2: Quantity Detection with Confidence
+      const quantityResults = await this.detectQuantityWithConfidence(transcript, useGPT5);
+      
+      if (quantityResults.items.length === 0) {
+        console.log('⚠️ No food items detected in Step 2');
+        return [];
+      }
+      
+      // Step 3: Nutrition Calculation with Confidence
+      const nutritionResults = await this.calculateNutritionWithConfidence(quantityResults, useGPT5);
+      
+      // Combine results into ParsedFoodItemWithConfidence
+      const enhancedResults = this.combineResults(quantityResults, nutritionResults, useGPT5 ? 'gpt-5-nano' : 'gpt-4o');
+      
+      // Session tracking is handled externally in useVoiceProcessing hook
+      
+      console.log(`✅ Enhanced AI Pipeline completed in ${Date.now() - startTime}ms with ${enhancedResults.length} items`);
+      return enhancedResults;
+      
+    } catch (error) {
+      console.error('❌ Enhanced AI Pipeline failed:', error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // HELPER METHODS FOR ENHANCED PIPELINE
+  // ============================================================================
+
+  private processStep2Response(response: Step2APIResponse, model: string): AIQuantityDetectionResult {
+    const items = response.items?.map(item => ({
+      raw_text: item.raw_text,
+      canonical_name: item.canonical_name,
+      brand_or_place: item.brand_or_place || undefined,
+      quantity_spoken: item.quantity_spoken,
+      unit_spoken: item.unit_spoken,
+      normalized_unit: item.normalized_unit,
+      grams_range: item.grams_range,
+      grams_estimate: item.grams_estimate,
+      assumptions: item.assumptions || [],
+      confidence: item.confidence,
+      needs_clarification: item.confidence < 0.6,
+      suggested_units: this.generateSuggestedUnits(item.canonical_name, item.unit_spoken, item.grams_estimate)
+    })) || [];
+
+    const overallConfidence = items.length > 0 
+      ? items.reduce((sum, item) => sum + item.confidence, 0) / items.length 
+      : 0;
+
+    return {
+      items,
+      overall_confidence: overallConfidence,
+      processing_notes: [`Processed by ${model}`, `${items.length} items detected`]
+    };
+  }
+
+  private processStep3Response(response: Step3APIResponse, model: string): AINutritionResult {
+    const items = response.items?.map(item => ({
+      ...item,
+      detected_cooking_method: this.extractCookingMethod(item.canonical_name),
+      cooking_confidence: this.assessCookingConfidence(item.canonical_name),
+      alternative_methods: this.generateAlternativeMethods(item.canonical_name),
+      needs_cooking_clarification: this.needsCookingClarification(item.canonical_name, item.confidence)
+    })) || [];
+
+    const totalCalories = items.reduce((sum, item) => sum + item.totals.kcal, 0);
+    const overallConfidence = items.length > 0 
+      ? items.reduce((sum, item) => sum + item.confidence, 0) / items.length 
+      : 0;
+
+    return {
+      items,
+      overall_confidence: overallConfidence,
+      total_calories: Math.round(totalCalories),
+      processing_notes: [`Processed by ${model}`, `Total: ${Math.round(totalCalories)} calories`]
+    };
+  }
+
+  private combineResults(
+    quantityResults: AIQuantityDetectionResult, 
+    nutritionResults: AINutritionResult, 
+    aiModel: 'gpt-4o' | 'gpt-5-nano'
+  ): ParsedFoodItemWithConfidence[] {
+    return quantityResults.items.map((qItem, index) => {
+      const nItem = nutritionResults.items[index];
+      
+      if (!nItem) {
+        console.warn(`Missing nutrition data for item ${index}: ${qItem.canonical_name}`);
+        return null;
+      }
+
+      const overallConfidence = (qItem.confidence + nItem.confidence) / 2;
+
+      return {
+        // Core food data
+        name: nItem.canonical_name,
+        calories: Math.round(nItem.totals.kcal),
+        protein: Math.round(nItem.totals.protein_g * 10) / 10,
+        carbs: Math.round(nItem.totals.carbs_g * 10) / 10,
+        fat: Math.round(nItem.totals.fat_g * 10) / 10,
+
+        // Quantity information with confidence
+        quantity: qItem.quantity_spoken,
+        unit: qItem.unit_spoken,
+        quantityConfidence: qItem.confidence,
+        gramEquivalent: qItem.grams_estimate,
+        suggestedUnits: qItem.suggested_units,
+
+        // Cooking method information  
+        cookingMethod: nItem.detected_cooking_method,
+        cookingConfidence: nItem.cooking_confidence,
+        alternativeMethods: nItem.alternative_methods,
+
+        // Modal trigger logic
+        needsQuantityModal: qItem.confidence < 0.6,
+        needsCookingModal: nItem.needs_cooking_clarification,
+
+        // AI metadata
+        assumptions: [...qItem.assumptions, ...nItem.assumptions],
+        overallConfidence,
+        aiModel,
+
+        // User override tracking
+        userModified: false,
+        originalAIEstimate: {
+          quantity: qItem.quantity_spoken,
+          unit: qItem.unit_spoken,
+          grams: qItem.grams_estimate,
+          calories: Math.round(nItem.totals.kcal),
+          cookingMethod: nItem.detected_cooking_method
+        }
+      };
+    }).filter(Boolean) as ParsedFoodItemWithConfidence[];
+  }
+
+  // ============================================================================
+  // MODEL PERFORMANCE TRACKING (Deprecated - Moved to external modelTracking utility)
+  // ============================================================================
+  
+  // Note: Model tracking is now handled externally by the modelTracking utility
+  // This ensures consistent tracking across all services and better separation of concerns
+
+  // ============================================================================
+  // UTILITY METHODS FOR SMART UNIT AND COOKING METHOD SUGGESTIONS
+  // ============================================================================
+
+  private generateSuggestedUnits(foodName: string, originalUnit: string, gramsEstimate: number) {
+    // This will be implemented with smart unit suggestions based on food type
+    // For now, return basic units
+    return [
+      {
+        unit: 'grams',
+        label: 'grams',
+        gramsPerUnit: 1,
+        confidence: 1.0,
+        isRecommended: originalUnit === 'grams',
+        culturalContext: 'metric'
+      },
+      {
+        unit: originalUnit,
+        label: originalUnit,
+        gramsPerUnit: gramsEstimate,
+        confidence: 0.8,
+        isRecommended: true,
+        culturalContext: 'egyptian'
+      }
+    ];
+  }
+
+  private extractCookingMethod(foodName: string): string | undefined {
+    const name = foodName.toLowerCase();
+    const methods = ['grilled', 'fried', 'baked', 'boiled', 'steamed', 'raw', 'مشوي', 'مقلي', 'مسلوق'];
+    
+    for (const method of methods) {
+      if (name.includes(method)) {
+        return method;
+      }
+    }
+    
+    return undefined;
+  }
+
+  private assessCookingConfidence(foodName: string): number {
+    const detectedMethod = this.extractCookingMethod(foodName);
+    return detectedMethod ? 0.9 : 0.3;
+  }
+
+  private generateAlternativeMethods(foodName: string) {
+    // Basic implementation - will be enhanced based on food type
+    return [
+      { method: 'Grilled', arabic_name: 'مشوي', calorie_multiplier: 1.1, icon: '🔥', confidence: 0.8 },
+      { method: 'Fried', arabic_name: 'مقلي', calorie_multiplier: 1.4, icon: '🍳', confidence: 0.7 },
+      { method: 'Baked', arabic_name: 'في الفرن', calorie_multiplier: 1.05, icon: '🥖', confidence: 0.6 },
+    ];
+  }
+
+  private needsCookingClarification(foodName: string, confidence: number): boolean {
+    const hasProtein = ['chicken', 'meat', 'fish', 'فراخ', 'دجاج', 'لحم', 'لحمة', 'سمك', 'سمكة'].some(p => 
+      foodName.toLowerCase().includes(p)
+    );
+    
+    const hasCookingMethod = this.extractCookingMethod(foodName) !== undefined;
+    
+    return hasProtein && !hasCookingMethod && confidence > 0.6;
+  }
+
   // Test method to query OpenAI without context
   async testBasicQuery(query: string): Promise<string> {
     try {
@@ -1146,5 +1579,36 @@ export const parseFoodFromTextO3 = async (text: string) => {
     throw error;
   }
 };
+
+// Enhanced AI Pipeline functions with confidence scoring
+export const parseFoodWithConfidence = async (transcript: string, useGPT5: boolean = false) => {
+  try {
+    return await openAIService.parseFoodWithConfidence(transcript, useGPT5);
+  } catch (error) {
+    console.error('Enhanced AI Pipeline failed:', error);
+    throw error;
+  }
+};
+
+export const detectQuantityWithConfidence = async (transcript: string, useGPT5: boolean = false) => {
+  try {
+    return await openAIService.detectQuantityWithConfidence(transcript, useGPT5);
+  } catch (error) {
+    console.error('Quantity detection with confidence failed:', error);
+    throw error;
+  }
+};
+
+export const calculateNutritionWithConfidence = async (quantityResults: AIQuantityDetectionResult, useGPT5: boolean = false) => {
+  try {
+    return await openAIService.calculateNutritionWithConfidence(quantityResults, useGPT5);
+  } catch (error) {
+    console.error('Nutrition calculation with confidence failed:', error);
+    throw error;
+  }
+};
+
+// Model performance tracking is now handled by the external modelTracking utility
+// Import from utils/modelTracking instead
 
 export { openAIService };
