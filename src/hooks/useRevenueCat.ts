@@ -47,6 +47,7 @@ export interface RevenueCatActions {
   logoutUser: () => Promise<void>;
   resetInitialization: () => void;
   updateUsageCount: (increment?: number) => void;
+  resetUsageCount: () => Promise<void>;
   getAvailablePackages: () => PurchasesPackage[];
   getMonthlyPackage: () => PurchasesPackage | null;
   getYearlyPackage: () => PurchasesPackage | null;
@@ -615,6 +616,25 @@ const useRevenueCat = () => {
     });
   }, [calculateUsageInfo]);
 
+  // Reset usage count (for testing/debugging)
+  const resetUsageCount = useCallback(async () => {
+    try {
+      console.log('🔄 Resetting usage count to 0...');
+      await resetUsageStorage();
+
+      setState(prev => {
+        const usageInfo = calculateUsageInfo(prev.subscriptionStatus, 0);
+        console.log('✅ Usage count reset successfully');
+        return {
+          ...prev,
+          usageInfo,
+        };
+      });
+    } catch (error) {
+      console.error('❌ Failed to reset usage count:', error);
+    }
+  }, [calculateUsageInfo]);
+
   // Helper functions to easily access product packages
   const getAvailablePackages = useCallback((): PurchasesPackage[] => {
     return state.offerings?.current?.availablePackages || [];
@@ -830,6 +850,7 @@ POSSIBLE CAUSES:
     logoutUser,
     resetInitialization,
     updateUsageCount,
+    resetUsageCount,
     getAvailablePackages,
     getMonthlyPackage,
     getYearlyPackage,

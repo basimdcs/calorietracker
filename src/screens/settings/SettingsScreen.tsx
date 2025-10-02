@@ -13,16 +13,18 @@ import { useNavigation } from '@react-navigation/native';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useUserStore } from '../../stores/userStore';
+import { useFoodStore } from '../../stores/foodStore';
 import { useUser } from '../../hooks/useUser';
 import { useRevenueCatContext } from '../../contexts/RevenueCatContext';
 import { usePaywall } from '../../hooks/usePaywall';
 
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { 
-    profile, 
+  const {
+    profile,
     resetProfile,
   } = useUserStore();
+  const { clearAllData: clearFoodData } = useFoodStore();
   const { userStats } = useUser();
   const { state: revenueCatState, actions: revenueCatActions } = useRevenueCatContext();
   const { presentPaywallIfNeededWithAlert } = usePaywall();
@@ -116,8 +118,10 @@ const SettingsScreen: React.FC = () => {
         {
           text: 'Reset',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             resetProfile();
+            clearFoodData();
+            await revenueCatActions.resetUsageCount();
             Alert.alert('Success', 'Your profile has been reset.');
           }
         }

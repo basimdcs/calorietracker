@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius, shadows } from '../../constants/theme';
 import { DailyLog } from '../../types';
 import { Card } from './Card';
+import { useUserCalorieGoal } from '../../utils/calorieGoal';
 
 interface MonthlyViewProps {
   dailyLogs: DailyLog[];
@@ -23,6 +24,7 @@ interface DayCell {
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
+  const userCalorieGoal = useUserCalorieGoal();
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -65,7 +67,7 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
         dateKey,
         day,
         calories: Math.round(log?.totalNutrition.calories || 0),
-        goal: log?.calorieGoal || 2000,
+        goal: userCalorieGoal, // Single source of truth
         itemCount: log?.foods.length || 0,
         isToday: dateKey === today,
         isCurrentMonth: true,
@@ -79,7 +81,7 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
     }
 
     return weeks;
-  }, [currentMonth, logsByDate]);
+  }, [currentMonth, logsByDate, userCalorieGoal]);
 
   // Calculate monthly stats
   const monthStats = useMemo(() => {
@@ -144,8 +146,7 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
   const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <Card style={styles.container}>
+    <Card style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.titleSection}>
@@ -367,7 +368,6 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
           )}
         </View>
       </Card>
-    </ScrollView>
   );
 };
 

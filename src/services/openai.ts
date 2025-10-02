@@ -664,16 +664,24 @@ NUTRITION CALCULATION FRAMEWORK:
    - Carbs: fruits/grains high, proteins low
    - If values seem wrong: recalculate using your nutritional knowledge
 
-6. MATERIAL ICON SUGGESTION
+6. FOOD EMOJI SUGGESTION
 
-   Suggest an appropriate Material Icon for each food item:
-   - Use your knowledge of Material Icons library (Google Material Design)
-   - Choose icons that visually represent the food type
-   - Common food icons: restaurant, fastfood, local-cafe, local-pizza, bakery-dining,
-     lunch-dining, dinner-dining, set-meal, rice-bowl, ramen-dining, local-drink,
-     emoji-food-beverage, cake, apple, eco (vegetables), water-drop, coffee,
-     egg-alt, grain, soup-kitchen, phishing (fish), ice-cream, cookie
-   - Return ONLY the icon name (e.g., "local-cafe" not "MaterialIcons.local-cafe")
+   Suggest an appropriate emoji for each food item:
+   - Choose the emoji that best represents the MAIN/PRIMARY ingredient
+   - For "grilled chicken salad", use 🍗 (chicken is the main protein, not the salad)
+   - For "beef burger", use 🍔 (burger)
+   - For "fish and chips", use 🐟 (fish is the main protein)
+   - For "chicken rice bowl", use 🍗 (chicken is the main protein)
+   - Return ONLY the emoji character (e.g., "🍗" not "chicken emoji")
+
+   Common food emojis:
+   🍗 chicken/poultry, 🥩 meat/steak/beef, 🐟 fish, 🍤 shrimp, 🥚 egg,
+   🥗 salad/vegetables, 🍕 pizza, 🍔 burger, 🍟 fries, 🌮 taco, 🥙 wrap/sandwich,
+   🍝 pasta, 🍜 noodles/ramen, 🍲 soup/stew, 🍛 curry, 🍱 rice bowl,
+   🍞 bread, 🥖 baguette, 🥐 croissant, 🧀 cheese, 🥛 milk/yogurt,
+   🥓 bacon, 🍎 apple, 🍌 banana, 🍊 orange, 🍇 grapes, 🍓 strawberry,
+   ☕ coffee, 🧃 juice, 🥤 soda, 💧 water,
+   🍰 cake, 🍪 cookie, 🍫 chocolate, 🍦 ice cream, 🥜 nuts, 🍿 popcorn
 
 7. OUTPUT SCHEMA
 

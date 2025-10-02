@@ -1,154 +1,287 @@
 /**
- * Food Icon Mapping Utility
- * Maps food names to appropriate Material Icons
+ * Food Emoji Mapping Utility
+ * Maps food names to appropriate emojis
  */
-
-import { MaterialIcons } from '@expo/vector-icons';
-
-export type MaterialIconName = keyof typeof MaterialIcons.glyphMap;
 
 interface FoodCategory {
   keywords: string[];
-  icon: MaterialIconName;
-  color?: string;
+  icon: string; // Emoji character
 }
 
-// Food categories with keywords and corresponding icons
+// Food categories with keywords and corresponding emojis (PRIORITY ORDER!)
 const FOOD_CATEGORIES: FoodCategory[] = [
   // Water (most common, check first)
   {
     keywords: ['water', 'مياه', 'ماء', 'مية'],
-    icon: 'water-drop',
+    icon: '💧',
+  },
+
+  // Poultry & Chicken (HIGH PRIORITY - before salads!)
+  {
+    keywords: ['chicken', 'فرخة', 'دجاج', 'فراخ', 'poultry', 'grilled chicken', 'fried chicken', 'chicken breast', 'chicken salad', 'تشيكن', 'nuggets', 'ناجتس'],
+    icon: '🍗',
+  },
+
+  // Meat & Beef (HIGH PRIORITY)
+  {
+    keywords: ['beef', 'meat', 'لحمة', 'لحم', 'steak', 'ستيك', 'bacon', 'بيكون'],
+    icon: '🥩',
+  },
+
+  // Fish & Seafood (HIGH PRIORITY)
+  {
+    keywords: ['fish', 'سمك', 'salmon', 'سالمون', 'tuna', 'تونة', 'seafood'],
+    icon: '🐟',
+  },
+
+  // Shrimp
+  {
+    keywords: ['shrimp', 'جمبري', 'prawn'],
+    icon: '🍤',
   },
 
   // Coffee & Hot Beverages
   {
     keywords: ['coffee', 'قهوة', 'cappuccino', 'كابتشينو', 'latte', 'لاتيه', 'espresso', 'اسبريسو', 'starbucks', 'ستاربوكس', 'dancing goat', 'دانسينج'],
-    icon: 'local-cafe',
+    icon: '☕',
   },
 
   // Cold Beverages & Sodas
   {
     keywords: ['cola', 'كولا', 'كوكاكولا', 'pepsi', 'بيبسي', 'sprite', 'سبرايت', 'fanta', 'فانتا', 'soda', 'صودا'],
-    icon: 'local-drink',
+    icon: '🥤',
   },
 
   // Juices & Smoothies
   {
-    keywords: ['juice', 'عصير', 'smoothie', 'سموذي', 'orange juice', 'برتقال'],
-    icon: 'emoji-food-beverage',
+    keywords: ['juice', 'عصير', 'smoothie', 'سموذي'],
+    icon: '🧃',
   },
 
-  // Fruits
+  // Milk & Dairy Drinks
   {
-    keywords: ['apple', 'تفاح', 'banana', 'موز', 'orange', 'برتقال', 'mango', 'منجا', 'منجاويز', 'عويس', 'grape', 'عنب', 'peach', 'خوخ', 'strawberry', 'فراولة', 'fruit', 'فاكهة'],
-    icon: 'apple',
-  },
-
-  // Vegetables & Salads
-  {
-    keywords: ['vegetables', 'خضار', 'salad', 'سلطة', 'سلو', 'coleslaw', 'كول سلو', 'tomato', 'طماطم', 'cucumber', 'خيار', 'lettuce', 'خس'],
-    icon: 'eco',
-  },
-
-  // Burgers & Sandwiches
-  {
-    keywords: ['burger', 'برجر', 'همبرجر', 'sandwich', 'ساندوتش', 'بيج تيستي', 'big tasty', 'whopper'],
-    icon: 'lunch-dining',
-  },
-
-  // Poultry & Chicken
-  {
-    keywords: ['chicken', 'فرخة', 'دجاج', 'فراخ', 'poultry', 'kfc', 'تشيكن', 'nuggets', 'ناجتس'],
-    icon: 'set-meal',
-  },
-
-  // Meat & Beef
-  {
-    keywords: ['beef', 'meat', 'لحمة', 'لحم', 'steak', 'ستيك'],
-    icon: 'restaurant-menu',
-  },
-
-  // Fish & Seafood
-  {
-    keywords: ['fish', 'سمك', 'salmon', 'سالمون', 'tuna', 'تونة', 'seafood', 'shrimp', 'جمبري'],
-    icon: 'phishing',
-  },
-
-  // Rice & Grains
-  {
-    keywords: ['rice', 'رز', 'ارز', 'grain', 'quinoa', 'كينوا', 'koshari', 'كشري'],
-    icon: 'rice-bowl',
-  },
-
-  // Bread & Baked Goods
-  {
-    keywords: ['bread', 'عيش', 'خبز', 'toast', 'توست', 'croissant', 'كرواسون', 'بسكويت', 'biscuit', 'مخبوزات'],
-    icon: 'bakery-dining',
-  },
-
-  // Dairy Products
-  {
-    keywords: ['milk', 'لبن', 'حليب', 'yogurt', 'زبادي', 'cheese', 'جبن', 'جبنة', 'مراعي', 'cream', 'قشطة'],
-    icon: 'coffee',
+    keywords: ['milk', 'لبن', 'حليب', 'milkshake'],
+    icon: '🥛',
   },
 
   // Pizza
   {
     keywords: ['pizza', 'بيتزا'],
-    icon: 'local-pizza',
+    icon: '🍕',
   },
 
-  // Fast Food
+  // Burgers & Sandwiches
   {
-    keywords: ['mcdonald', 'ماكدونالدز', 'kfc', 'كنتاكي', 'burger king', 'fries', 'بطاطس'],
-    icon: 'fastfood',
+    keywords: ['burger', 'برجر', 'همبرجر', 'بيج تيستي', 'big tasty', 'whopper'],
+    icon: '🍔',
   },
 
-  // Sweets & Desserts
+  // Sandwiches & Wraps
   {
-    keywords: ['chocolate', 'شوكولاتة', 'cake', 'كيك', 'ice cream', 'آيس كريم', 'cookie', 'كوكيز', 'candy', 'حلوى', 'basbousa', 'بسبوسة', 'kunafa', 'كنافة'],
-    icon: 'cake',
+    keywords: ['sandwich', 'ساندوتش', 'wrap', 'راب', 'shawarma', 'شاورما'],
+    icon: '🥙',
   },
 
-  // Nuts & Snacks
+  // Fries
   {
-    keywords: ['nuts', 'مكسرات', 'almonds', 'لوز', 'chips', 'شيبسي', 'snack', 'سناك'],
-    icon: 'grain',
+    keywords: ['fries', 'بطاطس', 'french fries'],
+    icon: '🍟',
   },
 
-  // Eggs
+  // Hot Dog
   {
-    keywords: ['egg', 'بيض', 'بيضة', 'omelet', 'اومليت'],
-    icon: 'egg-alt',
+    keywords: ['hot dog', 'هوت دوج'],
+    icon: '🌭',
   },
 
-  // Pasta
+  // Taco
   {
-    keywords: ['pasta', 'مكرونة', 'باستا', 'spaghetti', 'اسباجيتي', 'نودلز', 'noodles', 'bolognese', 'بولونيز'],
-    icon: 'ramen-dining',
+    keywords: ['taco', 'تاكو'],
+    icon: '🌮',
+  },
+
+  // Rice & Rice Bowls
+  {
+    keywords: ['rice', 'رز', 'ارز', 'rice bowl', 'koshari', 'كشري', 'biryani', 'برياني'],
+    icon: '🍱',
+  },
+
+  // Curry & Stews
+  {
+    keywords: ['curry', 'كاري', 'stew'],
+    icon: '🍛',
+  },
+
+  // Pasta & Spaghetti
+  {
+    keywords: ['pasta', 'مكرونة', 'باستا', 'spaghetti', 'اسباجيتي', 'bolognese', 'بولونيز'],
+    icon: '🍝',
+  },
+
+  // Noodles & Ramen
+  {
+    keywords: ['noodles', 'نودلز', 'ramen', 'رامن'],
+    icon: '🍜',
   },
 
   // Soup
   {
     keywords: ['soup', 'شوربة', 'broth', 'مرق'],
-    icon: 'soup-kitchen',
+    icon: '🍲',
+  },
+
+  // Sushi
+  {
+    keywords: ['sushi', 'سوشي'],
+    icon: '🍣',
+  },
+
+  // Bread
+  {
+    keywords: ['bread', 'عيش', 'خبز', 'toast', 'توست'],
+    icon: '🍞',
+  },
+
+  // Baguette & French bread
+  {
+    keywords: ['baguette', 'باجيت'],
+    icon: '🥖',
+  },
+
+  // Croissant & Pastries
+  {
+    keywords: ['croissant', 'كرواسون', 'pastry'],
+    icon: '🥐',
+  },
+
+  // Cheese
+  {
+    keywords: ['cheese', 'جبن', 'جبنة'],
+    icon: '🧀',
+  },
+
+  // Yogurt & Dairy
+  {
+    keywords: ['yogurt', 'زبادي', 'مراعي', 'greek yogurt', 'يوجرت'],
+    icon: '🥛',
+  },
+
+  // Eggs
+  {
+    keywords: ['egg', 'بيض', 'بيضة', 'omelet', 'اومليت'],
+    icon: '🥚',
+  },
+
+  // Vegetables & Salads (AFTER proteins!)
+  {
+    keywords: ['vegetables', 'خضار', 'salad', 'سلطة', 'سلو', 'coleslaw', 'كول سلو', 'tomato', 'طماطم', 'cucumber', 'خيار', 'lettuce', 'خس'],
+    icon: '🥗',
+  },
+
+  // Fruits - Apple
+  {
+    keywords: ['apple', 'تفاح'],
+    icon: '🍎',
+  },
+
+  // Fruits - Banana
+  {
+    keywords: ['banana', 'موز'],
+    icon: '🍌',
+  },
+
+  // Fruits - Orange
+  {
+    keywords: ['orange', 'برتقال'],
+    icon: '🍊',
+  },
+
+  // Fruits - Grapes
+  {
+    keywords: ['grape', 'عنب'],
+    icon: '🍇',
+  },
+
+  // Fruits - Watermelon
+  {
+    keywords: ['watermelon', 'بطيخ'],
+    icon: '🍉',
+  },
+
+  // Fruits - Strawberry
+  {
+    keywords: ['strawberry', 'فراولة'],
+    icon: '🍓',
+  },
+
+  // Fruits - Mango
+  {
+    keywords: ['mango', 'منجا', 'منجاويز', 'عويس'],
+    icon: '🥭',
+  },
+
+  // Generic Fruits
+  {
+    keywords: ['fruit', 'فاكهة'],
+    icon: '🍎',
+  },
+
+  // Cake & Desserts
+  {
+    keywords: ['cake', 'كيك', 'basbousa', 'بسبوسة', 'kunafa', 'كنافة'],
+    icon: '🍰',
+  },
+
+  // Cookies
+  {
+    keywords: ['cookie', 'كوكيز', 'بسكويت', 'biscuit'],
+    icon: '🍪',
+  },
+
+  // Chocolate
+  {
+    keywords: ['chocolate', 'شوكولاتة', 'candy', 'حلوى'],
+    icon: '🍫',
+  },
+
+  // Ice Cream
+  {
+    keywords: ['ice cream', 'آيس كريم', 'gelato'],
+    icon: '🍦',
+  },
+
+  // Nuts
+  {
+    keywords: ['nuts', 'مكسرات', 'almonds', 'لوز', 'peanuts', 'فول سوداني'],
+    icon: '🥜',
+  },
+
+  // Chips & Snacks
+  {
+    keywords: ['chips', 'شيبسي', 'snack', 'سناك', 'popcorn', 'فشار'],
+    icon: '🍿',
+  },
+
+  // Fast Food (generic)
+  {
+    keywords: ['mcdonald', 'ماكدونالدز', 'kfc', 'كنتاكي', 'burger king', 'fast food'],
+    icon: '🍔',
   },
 ];
 
-// Default icon for unmatched foods
-const DEFAULT_FOOD_ICON: MaterialIconName = 'restaurant';
+// Default emoji for unmatched foods
+const DEFAULT_FOOD_ICON: string = '🍽️';
 
 /**
- * Get the appropriate icon for a food item based on its name
+ * Get the appropriate emoji for a food item based on its name
  */
-export function getFoodIcon(foodName: string): MaterialIconName {
+export function getFoodIcon(foodName: string): string {
   if (!foodName || typeof foodName !== 'string') {
     return DEFAULT_FOOD_ICON;
   }
-  
+
   const normalizedName = foodName.toLowerCase().trim();
-  
+
   // Find the first matching category
   for (const category of FOOD_CATEGORIES) {
     for (const keyword of category.keywords) {
@@ -157,31 +290,8 @@ export function getFoodIcon(foodName: string): MaterialIconName {
       }
     }
   }
-  
-  return DEFAULT_FOOD_ICON;
-}
 
-/**
- * Get food icon with color suggestion (optional enhancement)
- */
-export function getFoodIconWithColor(foodName: string): { icon: MaterialIconName; color?: string } {
-  const icon = getFoodIcon(foodName);
-  
-  // Optional: Return color suggestions for specific food types
-  // This can be used later if you want colored icons
-  const colorMapping: Record<MaterialIconName, string> = {
-    'eco': '#4CAF50',           // Green for fruits
-    'grass': '#8BC34A',         // Light green for vegetables  
-    'local-cafe': '#795548',    // Brown for coffee
-    'local-drink': '#2196F3',   // Blue for beverages
-    'cake': '#E91E63',          // Pink for sweets
-    'local-pizza': '#FF5722',   // Orange for pizza
-  };
-  
-  return {
-    icon,
-    color: colorMapping[icon],
-  };
+  return DEFAULT_FOOD_ICON;
 }
 
 /**

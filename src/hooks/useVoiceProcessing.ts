@@ -281,18 +281,56 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
       setError(null);
       setState('parsing');
       setProgress(75);
-      
+
       // Start new session for retry
       retrySessionId = await startTrackingSession(transcriptionModel, nutritionModel);
       setSessionId(retrySessionId);
-      
+
       console.log(`🔄 Retrying enhanced food parsing for session ${retrySessionId}`);
       console.log('📄 Using existing transcript:', transcript.substring(0, 100) + '...');
-      
+
       // Use enhanced pipeline with confidence scoring
       const nutritionStart = Date.now();
-      const enhancedFoods = await parseFoodWithConfidence(transcript, useGPT5);
+      const parsedFoodsRaw = await openAIService.parseFoodFromText(transcript, useGPT5);
       const nutritionLatency = Date.now() - nutritionStart;
+
+      // Convert ParsedFoodItem[] to ParsedFoodItemWithConfidence[]
+      const enhancedFoods: ParsedFoodItemWithConfidence[] = parsedFoodsRaw.map(food => ({
+        ...food,
+        // Add confidence fields
+        overallConfidence: food.confidence || 0.85,
+        quantityConfidence: food.confidence || 0.85,
+        cookingConfidence: food.cookingMethod ? 0.9 : 0.3,
+        // Add required fields for confidence interface
+        aiModel: (useGPT5 ? 'gpt-5-nano' : 'gpt-4o') as 'gpt-4o' | 'gpt-5-nano',
+        gramEquivalent: food.quantity || 100,
+        needsQuantityModal: food.needsQuantity || false,
+        needsCookingModal: food.needsCookingMethod || false,
+        suggestedUnits: food.suggestedQuantity?.map(q => ({
+          unit: food.unit || 'grams',
+          label: food.unit || 'grams',
+          gramsPerUnit: parseFloat(q) || 1,
+          confidence: 0.8,
+          isRecommended: parseFloat(q) === 1,
+          culturalContext: 'metric'
+        })) || [],
+        alternativeMethods: food.suggestedCookingMethods?.map(method => ({
+          method,
+          arabic_name: method,
+          calorie_multiplier: method === 'Fried' ? 1.3 : 1.0,
+          icon: method === 'Grilled' ? '🔥' : method === 'Fried' ? '🍳' : '🥘',
+          confidence: 0.7
+        })) || [],
+        assumptions: food.nutritionNotes ? [food.nutritionNotes] : [],
+        userModified: false,
+        originalAIEstimate: {
+          quantity: food.quantity || 1,
+          unit: food.unit || 'grams',
+          grams: food.quantity || 100,
+          calories: food.calories || 0,
+          cookingMethod: food.cookingMethod
+        }
+      }));
       
       // Update model stats for retry
       setModelStats({

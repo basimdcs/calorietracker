@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FoodItem, LoggedFood, DailyLog, NutritionInfo, MealType } from '../types';
+import { getUserCalorieGoal } from '../utils/calorieGoal';
 
 interface FoodState {
   foodItems: FoodItem[];
@@ -155,15 +156,19 @@ export const useFoodStore = create<FoodState>()(
           set({ dailyLogs: updatedLogs });
         } else {
           console.log('📅 Creating new daily log for date:', currentDate);
+
+          // Get user's calorie goal from single source of truth
+          const userCalorieGoal = getUserCalorieGoal();
+
           // Create new daily log
           const newLog: DailyLog = {
             date: currentDate,
             foods: [loggedFood],
             totalNutrition: loggedFood.nutrition,
-            calorieGoal: 2000, // Will be updated by user profile sync
+            calorieGoal: userCalorieGoal,
           };
-          
-          console.log('✅ Created new daily log:', newLog);
+
+          console.log('✅ Created new daily log with calorie goal:', userCalorieGoal, newLog);
           set({ dailyLogs: [...dailyLogs, newLog] });
         }
       },

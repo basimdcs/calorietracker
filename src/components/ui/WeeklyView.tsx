@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius, shadows } from '../../constants/theme';
 import { DailyLog } from '../../types';
 import { Card } from './Card';
+import { useUserCalorieGoal } from '../../utils/calorieGoal';
 
 interface WeeklyViewProps {
   dailyLogs: DailyLog[];
@@ -13,18 +13,18 @@ interface WeeklyViewProps {
 interface DayData {
   date: Date;
   dateKey: string;
-  dayName: string;
   dayShort: string;
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
   goal: number;
-  itemCount: number;
   isToday: boolean;
 }
 
 export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
+  const userCalorieGoal = useUserCalorieGoal();
+
   // Generate last 7 days data
   const weekData = useMemo((): DayData[] => {
     const today = new Date();
@@ -42,18 +42,16 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
       return {
         date,
         dateKey,
-        dayName: date.toLocaleDateString('en-US', { weekday: 'long' }),
         dayShort: date.toLocaleDateString('en-US', { weekday: 'short' }),
         calories: Math.round(log?.totalNutrition.calories || 0),
         protein: Math.round(log?.totalNutrition.protein || 0),
         carbs: Math.round(log?.totalNutrition.carbs || 0),
         fat: Math.round(log?.totalNutrition.fat || 0),
-        goal: log?.calorieGoal || 2000,
-        itemCount: log?.foods.length || 0,
+        goal: userCalorieGoal, // Single source of truth
         isToday: dateKey === today.toISOString().split('T')[0],
       };
     });
-  }, [dailyLogs]);
+  }, [dailyLogs, userCalorieGoal]);
 
   // Calculate weekly stats
   const stats = useMemo(() => {
@@ -63,12 +61,10 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
     const totalFat = weekData.reduce((sum, day) => sum + day.fat, 0);
     const daysLogged = weekData.filter(day => day.calories > 0).length;
     const avgCalories = daysLogged > 0 ? Math.round(totalCalories / daysLogged) : 0;
-    const avgGoal = weekData[0]?.goal || 2000;
 
     return {
       totalCalories,
       avgCalories,
-      avgGoal,
       totalProtein,
       totalCarbs,
       totalFat,
@@ -76,72 +72,63 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
     };
   }, [weekData]);
 
-  const maxCalories = Math.max(...weekData.map(d => d.calories), stats.avgGoal);
+  const maxCalories = Math.max(...weekData.map(d => Math.max(d.calories, d.goal)), 100);
 
   const getProgressColor = (calories: number, goal: number) => {
     if (calories === 0) return colors.gray300;
     const ratio = calories / goal;
-    if (ratio < 0.8) return colors.accentLight;
+    if (ratio < 0.8) return colors.blue500;
     if (ratio <= 1.1) return colors.success;
     return colors.warning;
   };
 
   const renderDayBar = (day: DayData) => {
-    const barHeight = Math.max((day.calories / maxCalories) * 120, 2);
-    const goalHeight = (day.goal / maxCalories) * 120;
+    const barHeight = Math.max((day.calories / maxCalories) * 100, 0);
+    const goalHeight = (day.goal / maxCalories) * 100;
     const progressColor = getProgressColor(day.calories, day.goal);
     const percentage = day.goal > 0 ? Math.round((day.calories / day.goal) * 100) : 0;
 
     return (
       <View key={day.dateKey} style={styles.dayColumn}>
-        {/* Bar Chart */}
+        {/* Bar container with fixed height */}
         <View style={styles.barContainer}>
-          {/* Goal line */}
-          <View
-            style={[
-              styles.goalLine,
-              { bottom: goalHeight }
-            ]}
-          />
+          {/* Goal indicator line */}
+          {day.goal > 0 && (
+            <View style={[styles.goalLine, { bottom: `${goalHeight}%` }]} />
+          )}
 
           {/* Calorie bar */}
-          <View
-            style={[
-              styles.bar,
-              {
-                height: barHeight,
-                backgroundColor: progressColor,
-              }
-            ]}
-          >
-            {day.calories > 0 && (
-              <Text style={styles.barCalories} numberOfLines={1}>
-                {day.calories}
-              </Text>
-            )}
-          </View>
+          {day.calories > 0 && (
+            <View
+              style={[
+                styles.bar,
+                {
+                  height: `${barHeight}%`,
+                  backgroundColor: progressColor,
+                },
+              ]}
+            />
+          )}
         </View>
 
-        {/* Day info */}
+        {/* Day label */}
         <View style={styles.dayInfo}>
-          <Text style={[
-            styles.dayLabel,
-            day.isToday && styles.todayLabel
-          ]}>
+          <Text style={[styles.dayLabel, day.isToday && styles.todayLabel]}>
             {day.dayShort}
           </Text>
-          <Text style={styles.dateLabel}>
-            {day.date.getDate()}
-          </Text>
+
           {day.calories > 0 && (
-            <View style={[
-              styles.percentageBadge,
-              { backgroundColor: progressColor }
-            ]}>
-              <Text style={styles.percentageText}>
+            <>
+              <Text style={styles.calorieValue} numberOfLines={1}>
+                {day.calories > 999 ? `${(day.calories / 1000).toFixed(1)}k` : day.calories}
+              </Text>
+              <Text style={[styles.percentageText, { color: progressColor }]}>
                 {percentage}%
               </Text>
-            </View>
+            </>
+          )}
+          {day.calories === 0 && (
+            <Text style={styles.noData}>—</Text>
           )}
         </View>
       </View>
@@ -149,22 +136,21 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
   };
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <Card style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
+    <Card style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
           <View style={styles.titleRow}>
-            <MaterialIcons name="insert-chart" size={24} color={colors.primary} />
-            <View style={styles.titleContent}>
-              <Text style={styles.title}>Weekly Overview</Text>
-              <Text style={styles.subtitle}>Last 7 days</Text>
-            </View>
+            <MaterialIcons name="insert-chart" size={20} color={colors.primary} />
+            <Text style={styles.title}>Weekly Overview</Text>
           </View>
-          <View style={styles.avgBadge}>
-            <Text style={styles.avgValue}>{stats.avgCalories}</Text>
-            <Text style={styles.avgLabel}>avg/day</Text>
-          </View>
+          <Text style={styles.subtitle}>Last 7 days performance</Text>
         </View>
+        <View style={styles.avgBadge}>
+          <Text style={styles.avgValue}>{stats.avgCalories}</Text>
+          <Text style={styles.avgLabel}>avg</Text>
+        </View>
+      </View>
 
         {/* Chart */}
         <View style={styles.chartSection}>
@@ -175,12 +161,12 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
           {/* Legend */}
           <View style={styles.legend}>
             <View style={styles.legendItem}>
-              <View style={styles.legendLine} />
-              <Text style={styles.legendText}>Goal line</Text>
+              <View style={styles.legendDash} />
+              <Text style={styles.legendText}>Goal</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
-              <Text style={styles.legendText}>On target</Text>
+              <Text style={styles.legendText}>Target</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
@@ -189,49 +175,57 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
           </View>
         </View>
 
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <MaterialIcons name="local-fire-department" size={20} color={colors.error} />
-            <Text style={styles.statValue}>{stats.totalCalories.toLocaleString()}</Text>
-            <Text style={styles.statLabel}>Total Calories</Text>
-          </View>
+        {/* Stats Summary - 2x2 Grid */}
+        <View style={styles.statsSection}>
+          <Text style={styles.sectionTitle}>Weekly Totals</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <View style={[styles.iconCircle, { backgroundColor: colors.red50 }]}>
+                <MaterialIcons name="local-fire-department" size={18} color={colors.error} />
+              </View>
+              <Text style={styles.statValue}>{(stats.totalCalories / 1000).toFixed(1)}k</Text>
+              <Text style={styles.statLabel}>Calories</Text>
+            </View>
 
-          <View style={styles.statCard}>
-            <MaterialIcons name="fitness-center" size={20} color={colors.blue600} />
-            <Text style={styles.statValue}>{stats.totalProtein}g</Text>
-            <Text style={styles.statLabel}>Total Protein</Text>
-          </View>
+            <View style={styles.statCard}>
+              <View style={[styles.iconCircle, { backgroundColor: colors.blue50 }]}>
+                <MaterialIcons name="fitness-center" size={18} color={colors.blue600} />
+              </View>
+              <Text style={styles.statValue}>{stats.totalProtein}g</Text>
+              <Text style={styles.statLabel}>Protein</Text>
+            </View>
 
-          <View style={styles.statCard}>
-            <MaterialIcons name="breakfast-dining" size={20} color={colors.yellow600} />
-            <Text style={styles.statValue}>{stats.totalCarbs}g</Text>
-            <Text style={styles.statLabel}>Total Carbs</Text>
-          </View>
+            <View style={styles.statCard}>
+              <View style={[styles.iconCircle, { backgroundColor: colors.yellow50 }]}>
+                <MaterialIcons name="bakery-dining" size={18} color={colors.yellow600} />
+              </View>
+              <Text style={styles.statValue}>{stats.totalCarbs}g</Text>
+              <Text style={styles.statLabel}>Carbs</Text>
+            </View>
 
-          <View style={styles.statCard}>
-            <MaterialIcons name="water-drop" size={20} color={colors.green600} />
-            <Text style={styles.statValue}>{stats.totalFat}g</Text>
-            <Text style={styles.statLabel}>Total Fat</Text>
+            <View style={styles.statCard}>
+              <View style={[styles.iconCircle, { backgroundColor: colors.green50 }]}>
+                <MaterialIcons name="water-drop" size={18} color={colors.green600} />
+              </View>
+              <Text style={styles.statValue}>{stats.totalFat}g</Text>
+              <Text style={styles.statLabel}>Fat</Text>
+            </View>
           </View>
         </View>
 
-        {/* Summary */}
-        <View style={styles.summary}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Days Logged</Text>
-            <Text style={styles.summaryValue}>{stats.daysLogged} / 7</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Avg vs Goal</Text>
-            <Text style={styles.summaryValue}>
-              {stats.avgCalories} / {stats.avgGoal}
-            </Text>
-          </View>
+      {/* Bottom Summary Bar */}
+      <View style={styles.summaryBar}>
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryValue}>{stats.daysLogged}/7</Text>
+          <Text style={styles.summaryLabel}>Days tracked</Text>
         </View>
-      </Card>
-    </ScrollView>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryValue}>{stats.avgCalories}</Text>
+          <Text style={styles.summaryLabel}>Daily average</Text>
+        </View>
+      </View>
+    </Card>
   );
 };
 
@@ -244,41 +238,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  headerLeft: {
+    flex: 1,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1,
-  },
-  titleContent: {
-    flex: 1,
-  },
-  title: {
-    fontSize: fonts.xl,
-    fontWeight: fonts.bold,
-    color: colors.textPrimary,
+    gap: spacing.xs,
     marginBottom: spacing.xs,
   },
+  title: {
+    fontSize: fonts.lg,
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+  },
   subtitle: {
-    fontSize: fonts.sm,
+    fontSize: fonts.xs,
     color: colors.textSecondary,
   },
   avgBadge: {
-    alignItems: 'flex-end',
+    alignItems: 'center',
+    backgroundColor: colors.primary + '10',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
   },
   avgValue: {
-    fontSize: fonts['3xl'],
+    fontSize: fonts.xl,
     fontWeight: fonts.bold,
     color: colors.primary,
-    lineHeight: fonts['3xl'] * 1.1,
+    lineHeight: fonts.xl * 1.1,
   },
   avgLabel: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
+    fontSize: 9,
+    color: colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    fontWeight: fonts.semibold,
   },
   chartSection: {
     backgroundColor: colors.backgroundSecondary,
@@ -289,116 +287,121 @@ const styles = StyleSheet.create({
   chartContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'space-around',
-    height: 160,
-    marginBottom: spacing.lg,
+    height: 140,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
   },
   dayColumn: {
     flex: 1,
+    height: '100%',
     alignItems: 'center',
   },
   barContainer: {
     width: '100%',
-    height: 120,
+    flex: 1,
     position: 'relative',
     justifyContent: 'flex-end',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
   bar: {
-    width: '80%',
-    borderTopLeftRadius: borderRadius.md,
-    borderTopRightRadius: borderRadius.md,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingTop: spacing.xs,
-    ...shadows.sm,
-  },
-  barCalories: {
-    fontSize: fonts.xs,
-    fontWeight: fonts.bold,
-    color: colors.white,
+    width: '85%',
+    borderTopLeftRadius: borderRadius.sm,
+    borderTopRightRadius: borderRadius.sm,
+    minHeight: 2,
   },
   goalLine: {
     position: 'absolute',
-    width: '85%',
-    height: 2,
+    width: '100%',
+    height: 1,
     backgroundColor: colors.textPrimary,
-    opacity: 0.3,
-    borderRadius: 1,
+    opacity: 0.4,
+    left: 0,
   },
   dayInfo: {
     alignItems: 'center',
+    gap: 2,
   },
   dayLabel: {
-    fontSize: fonts.xs,
+    fontSize: 10,
     fontWeight: fonts.semibold,
     color: colors.textSecondary,
-    marginBottom: 2,
   },
   todayLabel: {
     color: colors.primary,
     fontWeight: fonts.bold,
   },
-  dateLabel: {
-    fontSize: fonts.xs,
-    color: colors.textTertiary,
-    marginBottom: spacing.xs,
-  },
-  percentageBadge: {
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
-    minWidth: 32,
-    alignItems: 'center',
+  calorieValue: {
+    fontSize: 11,
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
   },
   percentageText: {
     fontSize: 9,
-    fontWeight: fonts.bold,
-    color: colors.white,
+    fontWeight: fonts.semibold,
+  },
+  noData: {
+    fontSize: 11,
+    color: colors.textTertiary,
   },
   legend: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: spacing.md,
-    paddingTop: spacing.md,
+    paddingTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.gray200,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 4,
   },
-  legendLine: {
-    width: 12,
-    height: 2,
+  legendDash: {
+    width: 10,
+    height: 1,
     backgroundColor: colors.textPrimary,
-    opacity: 0.3,
+    opacity: 0.4,
   },
   legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   legendText: {
-    fontSize: fonts.xs,
+    fontSize: 10,
     color: colors.textSecondary,
+  },
+  statsSection: {
+    marginBottom: spacing.md,
+  },
+  sectionTitle: {
+    fontSize: fonts.sm,
+    fontWeight: fonts.semibold,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    marginBottom: spacing.lg,
   },
   statCard: {
-    flex: 1,
-    minWidth: '47%',
+    width: '48.5%',
     backgroundColor: colors.backgroundSecondary,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
     gap: spacing.xs,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statValue: {
     fontSize: fonts.lg,
@@ -406,15 +409,16 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   statLabel: {
-    fontSize: fonts.xs,
+    fontSize: 10,
     color: colors.textSecondary,
-    textAlign: 'center',
   },
-  summary: {
+  summaryBar: {
     flexDirection: 'row',
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: colors.primary + '08',
     borderRadius: borderRadius.md,
     padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.primary + '20',
   },
   summaryItem: {
     flex: 1,
@@ -423,16 +427,16 @@ const styles = StyleSheet.create({
   summaryDivider: {
     width: 1,
     backgroundColor: colors.gray200,
-    marginHorizontal: spacing.md,
-  },
-  summaryLabel: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    marginHorizontal: spacing.sm,
   },
   summaryValue: {
     fontSize: fonts.base,
-    fontWeight: fonts.semibold,
+    fontWeight: fonts.bold,
     color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  summaryLabel: {
+    fontSize: 10,
+    color: colors.textSecondary,
   },
 });

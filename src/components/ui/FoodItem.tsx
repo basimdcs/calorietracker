@@ -10,31 +10,14 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { FoodItemProps } from '../../types/display';
-
-/**
- * Get food emoji based on food name
- */
-const getFoodEmoji = (foodName: string): string => {
-  const name = foodName.toLowerCase();
-  if (name.includes('chicken') || name.includes('salad')) return '🥗';
-  if (name.includes('apple') || name.includes('fruit')) return '🍎';
-  if (name.includes('pasta') || name.includes('spaghetti')) return '🍝';
-  if (name.includes('rice')) return '🍚';
-  if (name.includes('bread')) return '🍞';
-  if (name.includes('egg')) return '🥚';
-  if (name.includes('fish')) return '🐟';
-  if (name.includes('meat') || name.includes('beef')) return '🥩';
-  if (name.includes('vegetable')) return '🥕';
-  if (name.includes('milk') || name.includes('dairy')) return '🥛';
-  return '🍽️';
-};
+import { getFoodIcon } from '../../utils/foodIcons';
 
 /**
  * Consistent FoodItem component for all screens
- * 
+ *
  * Usage:
  * ```tsx
- * <FoodItem 
+ * <FoodItem
  *   food={displayFood}
  *   onDelete={(id) => handleDelete(id)}
  *   showMacros={true}
@@ -50,11 +33,14 @@ export const FoodItem: React.FC<FoodItemProps> = ({
   showMacros = true,
   showTime = true,
 }) => {
+  // Use the icon from the food item (set by AI or fallback from foodIcons utility)
+  const foodEmoji = food.icon || getFoodIcon(food.name);
+
   return (
     <View style={styles.container}>
       {/* Food Icon */}
       <View style={styles.iconContainer}>
-        <Text style={styles.emoji}>{getFoodEmoji(food.name)}</Text>
+        <Text style={styles.emoji}>{foodEmoji}</Text>
       </View>
       
       {/* Food Information */}

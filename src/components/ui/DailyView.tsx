@@ -19,6 +19,7 @@ import { FoodItem } from './FoodItem';
 import { DailyLog } from '../../types';
 import { useFoodData } from '../../hooks/useFoodData';
 import { toDisplayFood } from '../../types/display';
+import { useUserCalorieGoal } from '../../utils/calorieGoal';
 
 interface DailyViewProps {
   dailyLog?: DailyLog;
@@ -50,15 +51,17 @@ export const DailyView: React.FC<DailyViewProps> = ({
   onEditFood,
 }) => {
   const { removeFood } = useFoodData();
-  
-  // Calculate values
+  const userCalorieGoal = useUserCalorieGoal();
+
+  // Calculate values - use user's actual calorie goal from profile
   const consumed = dailyLog?.totalNutrition.calories || 0;
-  const goal = dailyLog?.calorieGoal || 2000;
-  const progress = Math.min(consumed / goal, 1);
-  const remaining = Math.max(0, goal - consumed);
+  const goal = userCalorieGoal; // Single source of truth
+  const progress = Math.min(consumed / goal, 1); // Cap at 100% for display
+  const remaining = goal - consumed; // Can be negative if over goal
+  const isOverGoal = remaining < 0;
   const foods = dailyLog?.foods || [];
   const displayFoods = foods.map(toDisplayFood);
-  
+
   // Progress circle calculations
   const strokeDasharray = 402;
   const strokeDashoffset = strokeDasharray - (progress * strokeDasharray);
@@ -152,7 +155,13 @@ export const DailyView: React.FC<DailyViewProps> = ({
         {/* Footer Section */}
         <View style={styles.footerSection}>
           <Text style={styles.remainingCalories}>
-            Remaining: <Text style={styles.remainingNumber}>{Math.round(remaining)} kcal</Text>
+            {isOverGoal ? 'Over goal: ' : 'Remaining: '}
+            <Text style={[styles.remainingNumber, isOverGoal && styles.overGoalNumber]}>
+              {isOverGoal ? '+' : ''}{Math.round(Math.abs(remaining))} kcal
+            </Text>
+          </Text>
+          <Text style={styles.goalText}>
+            Goal: {Math.round(goal)} kcal
           </Text>
         </View>
       </LinearGradient>
@@ -305,6 +314,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.white,
     opacity: 1,
+  },
+  overGoalNumber: {
+    color: colors.yellow300,
+  },
+  goalText: {
+    fontSize: fonts.xs,
+    color: colors.white,
+    opacity: 0.7,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
   macroSection: {
     paddingHorizontal: spacing.lg,
