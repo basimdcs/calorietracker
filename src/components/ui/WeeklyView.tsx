@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius, shadows } from '../../constants/theme';
@@ -10,207 +10,235 @@ interface WeeklyViewProps {
   dailyLogs: DailyLog[];
 }
 
-interface WeeklyDayData {
+interface DayData {
   date: Date;
-  day: string;
+  dateKey: string;
+  dayName: string;
+  dayShort: string;
   calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
   goal: number;
-  status: 'under' | 'target' | 'over';
+  itemCount: number;
+  isToday: boolean;
 }
 
 export const WeeklyView: React.FC<WeeklyViewProps> = ({ dailyLogs }) => {
-  // Generate weekly data for the last 7 days
-  const getWeeklyData = (): WeeklyDayData[] => {
-    const weekData: WeeklyDayData[] = [];
+  // Generate last 7 days data
+  const weekData = useMemo((): DayData[] => {
     const today = new Date();
-
-    // Group logs by date for quick lookup
     const logsByDate = dailyLogs.reduce((acc, log) => {
       acc[log.date] = log;
       return acc;
     }, {} as Record<string, DailyLog>);
 
-    for (let i = 6; i >= 0; i--) {
+    return Array.from({ length: 7 }, (_, i) => {
       const date = new Date(today);
-      date.setDate(date.getDate() - i);
+      date.setDate(date.getDate() - (6 - i));
       const dateKey = date.toISOString().split('T')[0];
-      const dayLog = logsByDate[dateKey];
-      const calories = dayLog?.totalNutrition.calories || 0;
-      const goal = dayLog?.calorieGoal || 2000;
-      const percentage = goal > 0 ? calories / goal : 0;
-      
-      let status: 'under' | 'target' | 'over' = 'under';
-      if (percentage >= 0.95 && percentage <= 1.05) status = 'target';
-      else if (percentage > 1.05) status = 'over';
+      const log = logsByDate[dateKey];
 
-      weekData.push({
+      return {
         date,
-        day: date.toLocaleDateString("en-US", { weekday: "short" }),
-        calories: Math.round(calories),
-        goal,
-        status,
-      });
-    }
+        dateKey,
+        dayName: date.toLocaleDateString('en-US', { weekday: 'long' }),
+        dayShort: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        calories: Math.round(log?.totalNutrition.calories || 0),
+        protein: Math.round(log?.totalNutrition.protein || 0),
+        carbs: Math.round(log?.totalNutrition.carbs || 0),
+        fat: Math.round(log?.totalNutrition.fat || 0),
+        goal: log?.calorieGoal || 2000,
+        itemCount: log?.foods.length || 0,
+        isToday: dateKey === today.toISOString().split('T')[0],
+      };
+    });
+  }, [dailyLogs]);
 
-    return weekData;
+  // Calculate weekly stats
+  const stats = useMemo(() => {
+    const totalCalories = weekData.reduce((sum, day) => sum + day.calories, 0);
+    const totalProtein = weekData.reduce((sum, day) => sum + day.protein, 0);
+    const totalCarbs = weekData.reduce((sum, day) => sum + day.carbs, 0);
+    const totalFat = weekData.reduce((sum, day) => sum + day.fat, 0);
+    const daysLogged = weekData.filter(day => day.calories > 0).length;
+    const avgCalories = daysLogged > 0 ? Math.round(totalCalories / daysLogged) : 0;
+    const avgGoal = weekData[0]?.goal || 2000;
+
+    return {
+      totalCalories,
+      avgCalories,
+      avgGoal,
+      totalProtein,
+      totalCarbs,
+      totalFat,
+      daysLogged,
+    };
+  }, [weekData]);
+
+  const maxCalories = Math.max(...weekData.map(d => d.calories), stats.avgGoal);
+
+  const getProgressColor = (calories: number, goal: number) => {
+    if (calories === 0) return colors.gray300;
+    const ratio = calories / goal;
+    if (ratio < 0.8) return colors.accentLight;
+    if (ratio <= 1.1) return colors.success;
+    return colors.warning;
   };
 
-  const weeklyData = getWeeklyData();
-  const weeklyTotal = weeklyData.reduce((sum, day) => sum + day.calories, 0);
-  const weeklyAverage = Math.round(weeklyTotal / 7);
-  
-  // Get the user's actual calorie goal
-  const userGoal = weeklyData.find(day => day.goal > 0)?.goal || 2000;
-  
-  // Calculate scaling - use a sensible maximum that includes user goal
-  const maxCalories = Math.max(...weeklyData.map(day => day.calories), userGoal);
-  const maxScale = Math.max(maxCalories, userGoal * 1.2); // 20% above goal for scaling
-  
-  // Animation values for bars
-  const barAnimations = React.useRef(weeklyData.map(() => new Animated.Value(0))).current;
-
-  // Animate bars on mount
-  React.useEffect(() => {
-    const animations = barAnimations.map((anim: Animated.Value, index: number) =>
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: 600,
-        delay: index * 80,
-        useNativeDriver: false,
-      })
-    );
-
-    Animated.stagger(80, animations).start();
-  }, [weeklyData]);
-
-  const getBarGradient = (status: 'under' | 'target' | 'over'): [string, string] => {
-    switch (status) {
-      case 'under':
-        return [colors.accentLight, colors.success];
-      case 'target':
-        return [colors.primaryLight, colors.primary];
-      case 'over':
-        return [colors.yellow200, colors.warning];
-      default:
-        return [colors.gray300, colors.gray400];
-    }
-  };
-
-  const renderDay = (day: WeeklyDayData, index: number) => {
-    const barHeight = Math.max((day.calories / maxScale) * 60, 2); // Max 60px height
-    const goalPosition = (userGoal / maxScale) * 60; // Goal line position
-    const [startCol, endCol] = getBarGradient(day.status);
-    const isToday = day.date.toDateString() === new Date().toDateString();
+  const renderDayBar = (day: DayData) => {
+    const barHeight = Math.max((day.calories / maxCalories) * 120, 2);
+    const goalHeight = (day.goal / maxCalories) * 120;
+    const progressColor = getProgressColor(day.calories, day.goal);
+    const percentage = day.goal > 0 ? Math.round((day.calories / day.goal) * 100) : 0;
 
     return (
-      <View key={index} style={styles.dayColumn}>
-        {/* Chart area */}
-        <View style={styles.chartArea}>
+      <View key={day.dateKey} style={styles.dayColumn}>
+        {/* Bar Chart */}
+        <View style={styles.barContainer}>
           {/* Goal line */}
-          <View style={[styles.goalLine, { bottom: goalPosition }]} />
-          
-          {/* Bar */}
-          <Animated.View
+          <View
+            style={[
+              styles.goalLine,
+              { bottom: goalHeight }
+            ]}
+          />
+
+          {/* Calorie bar */}
+          <View
             style={[
               styles.bar,
               {
-                height: barAnimations[index].interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, barHeight],
-                }),
-              },
+                height: barHeight,
+                backgroundColor: progressColor,
+              }
             ]}
           >
-            <LinearGradient
-              colors={[startCol, endCol]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </Animated.View>
+            {day.calories > 0 && (
+              <Text style={styles.barCalories} numberOfLines={1}>
+                {day.calories}
+              </Text>
+            )}
+          </View>
         </View>
-        
+
         {/* Day info */}
         <View style={styles.dayInfo}>
-          <Text style={[styles.dayText, isToday && styles.todayText]}>
-            {day.day}
+          <Text style={[
+            styles.dayLabel,
+            day.isToday && styles.todayLabel
+          ]}>
+            {day.dayShort}
           </Text>
-          <Text style={[styles.caloriesText, isToday && styles.todayCalories]} numberOfLines={1}>
-            {day.calories.toLocaleString()}
+          <Text style={styles.dateLabel}>
+            {day.date.getDate()}
           </Text>
+          {day.calories > 0 && (
+            <View style={[
+              styles.percentageBadge,
+              { backgroundColor: progressColor }
+            ]}>
+              <Text style={styles.percentageText}>
+                {percentage}%
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     );
   };
 
   return (
-    <Card style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
+    <ScrollView showsVerticalScrollIndicator={false}>
+      <Card style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
           <View style={styles.titleRow}>
-            <MaterialIcons name="bar-chart" size={20} color={colors.primary} />
-            <Text style={styles.title}>Weekly Overview</Text>
+            <MaterialIcons name="insert-chart" size={24} color={colors.primary} />
+            <View style={styles.titleContent}>
+              <Text style={styles.title}>Weekly Overview</Text>
+              <Text style={styles.subtitle}>Last 7 days</Text>
+            </View>
           </View>
-          <Text style={styles.subtitle}>Daily calories vs goal</Text>
+          <View style={styles.avgBadge}>
+            <Text style={styles.avgValue}>{stats.avgCalories}</Text>
+            <Text style={styles.avgLabel}>avg/day</Text>
+          </View>
         </View>
-        <View style={styles.badge}>
-          <Text style={styles.badgeValue}>{weeklyAverage}</Text>
-          <Text style={styles.badgeLabel}>avg/day</Text>
-        </View>
-      </View>
 
-      {/* Chart Panel */}
-      <View style={styles.chartPanel}>
-        <View style={styles.chartContainer}>
-          {weeklyData.map((day, index) => renderDay(day, index))}
-        </View>
-      </View>
+        {/* Chart */}
+        <View style={styles.chartSection}>
+          <View style={styles.chartContainer}>
+            {weekData.map(day => renderDayBar(day))}
+          </View>
 
-      {/* Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue} numberOfLines={1}>{weeklyTotal.toLocaleString()}</Text>
-          <Text style={styles.statLabel} numberOfLines={1}>Total</Text>
+          {/* Legend */}
+          <View style={styles.legend}>
+            <View style={styles.legendItem}>
+              <View style={styles.legendLine} />
+              <Text style={styles.legendText}>Goal line</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
+              <Text style={styles.legendText}>On target</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
+              <Text style={styles.legendText}>Over</Text>
+            </View>
+          </View>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue} numberOfLines={1}>{weeklyAverage.toLocaleString()}</Text>
-          <Text style={styles.statLabel} numberOfLines={1}>Average</Text>
-        </View>
-      </View>
 
-      {/* Legend */}
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <View style={styles.legendLine} />
-          <Text style={styles.legendText} numberOfLines={1}>Goal ({userGoal})</Text>
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <MaterialIcons name="local-fire-department" size={20} color={colors.error} />
+            <Text style={styles.statValue}>{stats.totalCalories.toLocaleString()}</Text>
+            <Text style={styles.statLabel}>Total Calories</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <MaterialIcons name="fitness-center" size={20} color={colors.blue600} />
+            <Text style={styles.statValue}>{stats.totalProtein}g</Text>
+            <Text style={styles.statLabel}>Total Protein</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <MaterialIcons name="breakfast-dining" size={20} color={colors.yellow600} />
+            <Text style={styles.statValue}>{stats.totalCarbs}g</Text>
+            <Text style={styles.statLabel}>Total Carbs</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <MaterialIcons name="water-drop" size={20} color={colors.green600} />
+            <Text style={styles.statValue}>{stats.totalFat}g</Text>
+            <Text style={styles.statLabel}>Total Fat</Text>
+          </View>
         </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
-          <Text style={styles.legendText} numberOfLines={1}>Under</Text>
+
+        {/* Summary */}
+        <View style={styles.summary}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Days Logged</Text>
+            <Text style={styles.summaryValue}>{stats.daysLogged} / 7</Text>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Avg vs Goal</Text>
+            <Text style={styles.summaryValue}>
+              {stats.avgCalories} / {stats.avgGoal}
+            </Text>
+          </View>
         </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-          <Text style={styles.legendText} numberOfLines={1}>Target</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
-          <Text style={styles.legendText} numberOfLines={1}>Over</Text>
-        </View>
-      </View>
-    </Card>
+      </Card>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    margin: spacing.sm,
     ...shadows.md,
-    shadowColor: colors.primary,
   },
   header: {
     flexDirection: 'row',
@@ -218,119 +246,193 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: spacing.xl,
   },
-  headerLeft: { flex: 1 },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    gap: spacing.sm,
+    flex: 1,
+  },
+  titleContent: {
+    flex: 1,
   },
   title: {
-    fontSize: fonts.lg,
-    fontWeight: fonts.semibold,
+    fontSize: fonts.xl,
+    fontWeight: fonts.bold,
     color: colors.textPrimary,
-    marginLeft: spacing.sm,
+    marginBottom: spacing.xs,
   },
   subtitle: {
     fontSize: fonts.sm,
     color: colors.textSecondary,
-    fontWeight: fonts.medium,
   },
-  badge: {
+  avgBadge: {
     alignItems: 'flex-end',
   },
-  badgeValue: {
-    fontSize: fonts['2xl'],
+  avgValue: {
+    fontSize: fonts['3xl'],
     fontWeight: fonts.bold,
     color: colors.primary,
-    lineHeight: fonts['2xl'] * 1.1,
+    lineHeight: fonts['3xl'] * 1.1,
   },
-  badgeLabel: {
+  avgLabel: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
-    fontWeight: fonts.medium,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  chartPanel: {
+  chartSection: {
     backgroundColor: colors.backgroundSecondary,
     borderRadius: borderRadius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    marginBottom: spacing.xl,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
   },
   chartContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.sm,
+    justifyContent: 'space-around',
+    height: 160,
+    marginBottom: spacing.lg,
   },
   dayColumn: {
     flex: 1,
     alignItems: 'center',
-    marginHorizontal: 2,
   },
-  chartArea: {
+  barContainer: {
     width: '100%',
-    height: 80,
+    height: 120,
     position: 'relative',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   bar: {
-    width: '70%',
-    borderRadius: borderRadius.md,
-    minHeight: 2,
+    width: '80%',
+    borderTopLeftRadius: borderRadius.md,
+    borderTopRightRadius: borderRadius.md,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: spacing.xs,
     ...shadows.sm,
+  },
+  barCalories: {
+    fontSize: fonts.xs,
+    fontWeight: fonts.bold,
+    color: colors.white,
   },
   goalLine: {
     position: 'absolute',
-    width: '90%',
-    height: 1,
-    backgroundColor: colors.textSecondary,
-    opacity: 0.5,
+    width: '85%',
+    height: 2,
+    backgroundColor: colors.textPrimary,
+    opacity: 0.3,
+    borderRadius: 1,
   },
   dayInfo: {
     alignItems: 'center',
-    minHeight: 40,
   },
-  dayText: {
+  dayLabel: {
     fontSize: fonts.xs,
     fontWeight: fonts.semibold,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    textAlign: 'center',
+    marginBottom: 2,
   },
-  todayText: {
+  todayLabel: {
     color: colors.primary,
     fontWeight: fonts.bold,
   },
-  caloriesText: {
+  dateLabel: {
+    fontSize: fonts.xs,
+    color: colors.textTertiary,
+    marginBottom: spacing.xs,
+  },
+  percentageBadge: {
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    minWidth: 32,
+    alignItems: 'center',
+  },
+  percentageText: {
+    fontSize: 9,
+    fontWeight: fonts.bold,
+    color: colors.white,
+  },
+  legend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  legendLine: {
+    width: 12,
+    height: 2,
+    backgroundColor: colors.textPrimary,
+    opacity: 0.3,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
-    fontWeight: fonts.medium,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: '47%',
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  statValue: {
+    fontSize: fonts.lg,
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+  },
+  statLabel: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
-  todayCalories: {
-    color: colors.textPrimary,
-    fontWeight: fonts.semibold,
-  },
-  statsContainer: {
+  summary: {
     flexDirection: 'row',
     backgroundColor: colors.backgroundSecondary,
     borderRadius: borderRadius.md,
     padding: spacing.md,
-    marginBottom: spacing.lg,
   },
-  statItem: { flex: 1, alignItems: 'center' },
-  statDivider: { width: 1, backgroundColor: colors.gray200, marginHorizontal: spacing.md },
-  statValue: { fontSize: fonts.lg, fontWeight: fonts.bold, color: colors.textPrimary, marginBottom: spacing.xs },
-  statLabel: { fontSize: fonts.xs, color: colors.textSecondary, fontWeight: fonts.medium },
-  legend: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.gray200 },
-  legendItem: { flexDirection: 'row', alignItems: 'center' },
-  legendLine: { width: 12, height: 1, backgroundColor: colors.textSecondary, opacity: 0.6, marginRight: spacing.xs },
-  legendDot: { width: 6, height: 6, borderRadius: 3, marginRight: spacing.xs },
-  legendText: { fontSize: fonts.xs, color: colors.textSecondary, fontWeight: fonts.medium },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryDivider: {
+    width: 1,
+    backgroundColor: colors.gray200,
+    marginHorizontal: spacing.md,
+  },
+  summaryLabel: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  summaryValue: {
+    fontSize: fonts.base,
+    fontWeight: fonts.semibold,
+    color: colors.textPrimary,
+  },
 });

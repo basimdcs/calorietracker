@@ -15,102 +15,120 @@ interface FoodCategory {
 
 // Food categories with keywords and corresponding icons
 const FOOD_CATEGORIES: FoodCategory[] = [
-  // Poultry & Chicken
+  // Water (most common, check first)
   {
-    keywords: ['chicken', 'فرخة', 'دجاج', 'فراخ', 'poultry', 'kfc', 'تشيكن'],
-    icon: 'restaurant',
+    keywords: ['water', 'مياه', 'ماء', 'مية'],
+    icon: 'water-drop',
   },
-  
-  // Meat & Beef
+
+  // Coffee & Hot Beverages
   {
-    keywords: ['beef', 'meat', 'لحمة', 'لحم', 'steak', 'burger', 'برجر', 'همبرجر'],
-    icon: 'restaurant-menu',
+    keywords: ['coffee', 'قهوة', 'cappuccino', 'كابتشينو', 'latte', 'لاتيه', 'espresso', 'اسبريسو', 'starbucks', 'ستاربوكس', 'dancing goat', 'دانسينج'],
+    icon: 'local-cafe',
   },
-  
-  // Fish & Seafood
+
+  // Cold Beverages & Sodas
   {
-    keywords: ['fish', 'سمك', 'salmon', 'tuna', 'seafood', 'shrimp', 'جمبري'],
-    icon: 'set-meal',
+    keywords: ['cola', 'كولا', 'كوكاكولا', 'pepsi', 'بيبسي', 'sprite', 'سبرايت', 'fanta', 'فانتا', 'soda', 'صودا'],
+    icon: 'local-drink',
   },
-  
+
+  // Juices & Smoothies
+  {
+    keywords: ['juice', 'عصير', 'smoothie', 'سموذي', 'orange juice', 'برتقال'],
+    icon: 'emoji-food-beverage',
+  },
+
   // Fruits
   {
-    keywords: ['apple', 'تفاح', 'banana', 'موز', 'orange', 'برتقال', 'mango', 'مانجا', 'grape', 'عنب', 'peach', 'خوخ', 'strawberry', 'فراولة', 'fruit'],
+    keywords: ['apple', 'تفاح', 'banana', 'موز', 'orange', 'برتقال', 'mango', 'منجا', 'منجاويز', 'عويس', 'grape', 'عنب', 'peach', 'خوخ', 'strawberry', 'فراولة', 'fruit', 'فاكهة'],
+    icon: 'apple',
+  },
+
+  // Vegetables & Salads
+  {
+    keywords: ['vegetables', 'خضار', 'salad', 'سلطة', 'سلو', 'coleslaw', 'كول سلو', 'tomato', 'طماطم', 'cucumber', 'خيار', 'lettuce', 'خس'],
     icon: 'eco',
   },
-  
-  // Vegetables
+
+  // Burgers & Sandwiches
   {
-    keywords: ['vegetables', 'خضار', 'salad', 'سلطة', 'tomato', 'طماطم', 'cucumber', 'خيار', 'lettuce', 'خس'],
-    icon: 'grass',
+    keywords: ['burger', 'برجر', 'همبرجر', 'sandwich', 'ساندوتش', 'بيج تيستي', 'big tasty', 'whopper'],
+    icon: 'lunch-dining',
   },
-  
+
+  // Poultry & Chicken
+  {
+    keywords: ['chicken', 'فرخة', 'دجاج', 'فراخ', 'poultry', 'kfc', 'تشيكن', 'nuggets', 'ناجتس'],
+    icon: 'set-meal',
+  },
+
+  // Meat & Beef
+  {
+    keywords: ['beef', 'meat', 'لحمة', 'لحم', 'steak', 'ستيك'],
+    icon: 'restaurant-menu',
+  },
+
+  // Fish & Seafood
+  {
+    keywords: ['fish', 'سمك', 'salmon', 'سالمون', 'tuna', 'تونة', 'seafood', 'shrimp', 'جمبري'],
+    icon: 'phishing',
+  },
+
   // Rice & Grains
   {
     keywords: ['rice', 'رز', 'ارز', 'grain', 'quinoa', 'كينوا', 'koshari', 'كشري'],
-    icon: 'grain',
+    icon: 'rice-bowl',
   },
-  
+
   // Bread & Baked Goods
   {
     keywords: ['bread', 'عيش', 'خبز', 'toast', 'توست', 'croissant', 'كرواسون', 'بسكويت', 'biscuit', 'مخبوزات'],
     icon: 'bakery-dining',
   },
-  
+
   // Dairy Products
   {
-    keywords: ['milk', 'لبن', 'yogurt', 'زبادي', 'cheese', 'جبن', 'جبنة', 'مراعي', 'cream', 'قشطة'],
-    icon: 'water-drop',
+    keywords: ['milk', 'لبن', 'حليب', 'yogurt', 'زبادي', 'cheese', 'جبن', 'جبنة', 'مراعي', 'cream', 'قشطة'],
+    icon: 'coffee',
   },
-  
-  // Coffee & Hot Beverages
-  {
-    keywords: ['coffee', 'قهوة', 'cappuccino', 'كابتشينو', 'latte', 'لاتيه', 'espresso', 'starbucks', 'ستاربوكس', 'tea', 'شاي'],
-    icon: 'local-cafe',
-  },
-  
-  // Cold Beverages & Juices
-  {
-    keywords: ['juice', 'عصير', 'smoothie', 'سموذي', 'soda', 'cola', 'كولا', 'pepsi', 'بيبسي', 'water', 'مياه'],
-    icon: 'local-drink',
-  },
-  
+
   // Pizza
   {
     keywords: ['pizza', 'بيتزا'],
     icon: 'local-pizza',
   },
-  
+
   // Fast Food
   {
-    keywords: ['mcdonald', 'ماكدونالدز', 'kfc', 'كنتاكي', 'burger king', 'sandwich', 'ساندوتش', 'fries', 'بطاطس', 'nuggets'],
+    keywords: ['mcdonald', 'ماكدونالدز', 'kfc', 'كنتاكي', 'burger king', 'fries', 'بطاطس'],
     icon: 'fastfood',
   },
-  
+
   // Sweets & Desserts
   {
     keywords: ['chocolate', 'شوكولاتة', 'cake', 'كيك', 'ice cream', 'آيس كريم', 'cookie', 'كوكيز', 'candy', 'حلوى', 'basbousa', 'بسبوسة', 'kunafa', 'كنافة'],
     icon: 'cake',
   },
-  
+
   // Nuts & Snacks
   {
     keywords: ['nuts', 'مكسرات', 'almonds', 'لوز', 'chips', 'شيبسي', 'snack', 'سناك'],
-    icon: 'scatter-plot',
+    icon: 'grain',
   },
-  
+
   // Eggs
   {
     keywords: ['egg', 'بيض', 'بيضة', 'omelet', 'اومليت'],
-    icon: 'egg',
+    icon: 'egg-alt',
   },
-  
+
   // Pasta
   {
-    keywords: ['pasta', 'مكرونة', 'spaghetti', 'اسباجيتي', 'noodles'],
+    keywords: ['pasta', 'مكرونة', 'باستا', 'spaghetti', 'اسباجيتي', 'نودلز', 'noodles', 'bolognese', 'بولونيز'],
     icon: 'ramen-dining',
   },
-  
+
   // Soup
   {
     keywords: ['soup', 'شوربة', 'broth', 'مرق'],

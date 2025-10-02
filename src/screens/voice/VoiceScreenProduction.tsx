@@ -351,13 +351,22 @@ Products: com.basimdcs.calorietracker.Monthly, com.basimdcs.calorietracker.Annua
               carbs: (food.carbs / actualQuantity) * 100,
               fat: (food.fat / actualQuantity) * 100,
             };
-            // The quantity multiplier should be actual grams / 100g
             quantityMultiplier = actualQuantity / 100;
             servingSize = 100;
             servingSizeUnit = 'g';
+          } else if (actualUnit === 'ml') {
+            // For ml-based foods, calculate per-100ml nutrition
+            nutritionPer100g = {
+              calories: (food.calories / actualQuantity) * 100,
+              protein: (food.protein / actualQuantity) * 100,
+              carbs: (food.carbs / actualQuantity) * 100,
+              fat: (food.fat / actualQuantity) * 100,
+            };
+            quantityMultiplier = actualQuantity / 100;
+            servingSize = 100;
+            servingSizeUnit = 'ml';
           } else {
             // For piece-based foods (cups, pieces, etc), use the provided nutrition as-is
-            // and treat quantity as serving multiplier
             nutritionPer100g = {
               calories: food.calories,
               protein: food.protein,

@@ -1,6 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius, shadows } from '../../constants/theme';
 import { DailyLog } from '../../types';
@@ -10,296 +9,390 @@ interface MonthlyViewProps {
   dailyLogs: DailyLog[];
 }
 
-interface MonthlyDayData {
+interface DayCell {
   date: Date;
+  dateKey: string;
+  day: number;
   calories: number;
   goal: number;
-  items: number;
-  intensity: number;
-  hasData: boolean;
+  itemCount: number;
+  isToday: boolean;
+  isCurrentMonth: boolean;
 }
 
-export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
-  // Generate monthly data for the last 30 days
-  const getMonthlyData = (): MonthlyDayData[] => {
-    const monthData: MonthlyDayData[] = [];
-    const today = new Date();
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-    // Group logs by date for quick lookup
-    const logsByDate = dailyLogs.reduce((acc, log) => {
+export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  // Index logs by date
+  const logsByDate = useMemo(() => {
+    return dailyLogs.reduce((acc, log) => {
       acc[log.date] = log;
       return acc;
     }, {} as Record<string, DailyLog>);
+  }, [dailyLogs]);
 
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
+  // Generate calendar cells
+  const calendarCells = useMemo((): DayCell[][] => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDay = firstDay.getDay();
+    const today = new Date().toISOString().split('T')[0];
+
+    const cells: (DayCell | null)[] = [];
+
+    // Add empty cells for days before month starts
+    for (let i = 0; i < startDay; i++) {
+      cells.push(null);
+    }
+
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
       const dateKey = date.toISOString().split('T')[0];
-      const dayLog = logsByDate[dateKey];
-      const calories = dayLog?.totalNutrition.calories || 0;
-      const goal = dayLog?.calorieGoal || 2000;
-      const itemCount = dayLog?.foods.length || 0;
-      const hasData = calories > 0;
+      const log = logsByDate[dateKey];
 
-      monthData.push({
+      cells.push({
         date,
-        calories: Math.round(calories),
-        goal,
-        items: itemCount,
-        intensity: 0, // Will be calculated after
-        hasData,
+        dateKey,
+        day,
+        calories: Math.round(log?.totalNutrition.calories || 0),
+        goal: log?.calorieGoal || 2000,
+        itemCount: log?.foods.length || 0,
+        isToday: dateKey === today,
+        isCurrentMonth: true,
       });
     }
 
-    // Calculate intensities based on goal achievement
-    monthData.forEach(day => {
-      if (!day.hasData) {
-        day.intensity = 0;
-      } else {
-        const percentage = day.calories / day.goal;
-        // Scale intensity: 0.2-1.0 based on goal achievement
-        day.intensity = Math.min(Math.max(percentage * 0.8 + 0.2, 0.2), 1.0);
-      }
-    });
-
-    return monthData;
-  };
-
-  const monthlyData = getMonthlyData();
-  const totalCalories = monthlyData.reduce((sum, day) => sum + day.calories, 0);
-  const monthlyAverage = Math.round(totalCalories / 30);
-  const activeDays = monthlyData.filter(day => day.hasData).length;
-  const totalItems = monthlyData.reduce((sum, day) => sum + day.items, 0);
-  
-  // Calculate streak (consecutive days with data)
-  let currentStreak = 0;
-  let longestStreak = 0;
-  let tempStreak = 0;
-  
-  monthlyData.reverse().forEach((day, index) => {
-    if (day.hasData) {
-      tempStreak++;
-      if (index === 0) currentStreak = tempStreak; // Current streak from today
-    } else {
-      longestStreak = Math.max(longestStreak, tempStreak);
-      tempStreak = 0;
+    // Group into weeks
+    const weeks: (DayCell | null)[][] = [];
+    for (let i = 0; i < cells.length; i += 7) {
+      weeks.push(cells.slice(i, i + 7));
     }
-  });
-  longestStreak = Math.max(longestStreak, tempStreak);
-  monthlyData.reverse(); // Restore original order
 
-  // Calculate consistency percentage
-  const consistencyPercentage = Math.round((activeDays / 30) * 100);
-  
-  // Goal achievement percentage
-  const goalsAchieved = monthlyData.filter(day => 
-    day.hasData && day.calories >= day.goal * 0.95 && day.calories <= day.goal * 1.05
-  ).length;
-  const goalAchievementPercentage = activeDays > 0 ? Math.round((goalsAchieved / activeDays) * 100) : 0;
-
-  const getIntensityColor = (intensity: number): string => {
-    if (intensity === 0) return colors.gray200;
-    
-    // Use theme accent color with varying opacity for consistency
-    const baseColor = colors.accent; // Theme accent color (emerald)
-    const alpha = Math.max(intensity * 0.8 + 0.2, 0.2); // Ensure minimum visibility
-    return `${baseColor}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`;
-  };
-
-  const getTextColor = (intensity: number): string => {
-    return intensity > 0.6 ? colors.white : colors.textPrimary;
-  };
-
-  // Group data into weeks for calendar display
-  const getWeekRows = () => {
-    const weeks: MonthlyDayData[][] = [];
-    const startDate = new Date(monthlyData[0].date);
-    const startDayOfWeek = startDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    
-    // Add empty cells for days before the start of our data
-    const firstWeek: (MonthlyDayData | null)[] = new Array(startDayOfWeek).fill(null);
-    let dataIndex = 0;
-    
-    // Fill the first week
-    while (firstWeek.length < 7 && dataIndex < monthlyData.length) {
-      firstWeek.push(monthlyData[dataIndex++]);
-    }
-    weeks.push(firstWeek.filter(Boolean) as MonthlyDayData[]);
-    
-    // Fill remaining weeks
-    while (dataIndex < monthlyData.length) {
-      const week = monthlyData.slice(dataIndex, dataIndex + 7);
-      weeks.push(week);
-      dataIndex += 7;
-    }
-    
     return weeks;
+  }, [currentMonth, logsByDate]);
+
+  // Calculate monthly stats
+  const monthStats = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+    const monthLogs = dailyLogs.filter(log => log.date.startsWith(monthKey));
+    const activeDays = monthLogs.filter(log => log.totalNutrition.calories > 0);
+
+    const totalCalories = activeDays.reduce((sum, log) => sum + log.totalNutrition.calories, 0);
+    const totalProtein = activeDays.reduce((sum, log) => sum + log.totalNutrition.protein, 0);
+    const totalCarbs = activeDays.reduce((sum, log) => sum + log.totalNutrition.carbs, 0);
+    const totalFat = activeDays.reduce((sum, log) => sum + log.totalNutrition.fat, 0);
+    const avgCalories = activeDays.length > 0 ? Math.round(totalCalories / activeDays.length) : 0;
+    const daysLogged = activeDays.length;
+
+    const onTargetDays = activeDays.filter(log => {
+      const ratio = log.totalNutrition.calories / log.calorieGoal;
+      return ratio >= 0.9 && ratio <= 1.1;
+    }).length;
+
+    const bestDay = activeDays.reduce<DailyLog | null>((best, log) => {
+      if (!best || log.totalNutrition.calories > best.totalNutrition.calories) return log;
+      return best;
+    }, null);
+
+    return {
+      totalCalories: Math.round(totalCalories),
+      avgCalories,
+      totalProtein: Math.round(totalProtein),
+      totalCarbs: Math.round(totalCarbs),
+      totalFat: Math.round(totalFat),
+      daysLogged,
+      onTargetDays,
+      bestDay,
+    };
+  }, [currentMonth, dailyLogs]);
+
+  const selectedLog = selectedDate ? logsByDate[selectedDate] : null;
+
+  const getCellColor = (calories: number, goal: number) => {
+    if (calories === 0) return colors.gray100;
+    const ratio = calories / goal;
+    if (ratio < 0.5) return colors.blue100;
+    if (ratio < 0.8) return colors.green100;
+    if (ratio <= 1.1) return colors.success;
+    if (ratio <= 1.3) return colors.yellow300;
+    return colors.red300;
   };
 
-  const weekRows = getWeekRows();
-  const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const handlePrevMonth = () => {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    setSelectedDate(null);
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    setSelectedDate(null);
+  };
+
+  const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
-    <Card style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>📈 This Month</Text>
-          <Text style={styles.subtitle}>Consistency & progress tracking</Text>
-        </View>
-        <View style={styles.averageContainer}>
-          <Text style={styles.averageNumber}>{monthlyAverage}</Text>
-          <Text style={styles.averageLabel}>avg/day</Text>
-        </View>
-      </View>
-
-      {/* Calendar Heatmap */}
-      <View style={styles.calendarContainer}>
-        <Text style={styles.sectionTitle}>Daily Activity</Text>
-        
-        {/* Week day headers */}
-        <View style={styles.weekDaysHeader}>
-          {weekDays.map((day, index) => (
-            <Text key={index} style={styles.weekDayText}>{day}</Text>
-          ))}
-        </View>
-        
-        {/* Calendar grid */}
-        <View style={styles.calendarGrid}>
-          {weekRows.map((week, weekIndex) => (
-            <View key={weekIndex} style={styles.weekRow}>
-              {/* Fill empty cells for incomplete weeks */}
-              {week.length < 7 && weekIndex === 0 && 
-                Array.from({ length: 7 - week.length }, (_, i) => (
-                  <View key={`empty-${i}`} style={styles.emptyCell} />
-                ))
-              }
-              {week.map((day, dayIndex) => (
-                <TouchableOpacity
-                  key={dayIndex}
-                  style={[
-                    styles.dayCell,
-                    { backgroundColor: getIntensityColor(day.intensity) }
-                  ]}
-                  activeOpacity={0.7}
-                >
-                  <Text 
-                    style={[
-                      styles.dayCellText,
-                      { color: getTextColor(day.intensity) }
-                    ]}
-                  >
-                    {day.date.getDate()}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {/* Fill empty cells at the end */}
-              {week.length < 7 && weekIndex === weekRows.length - 1 &&
-                Array.from({ length: 7 - week.length }, (_, i) => (
-                  <View key={`empty-end-${i}`} style={styles.emptyCell} />
-                ))
-              }
+    <ScrollView showsVerticalScrollIndicator={false}>
+      <Card style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.titleSection}>
+            <MaterialIcons name="calendar-month" size={24} color={colors.primary} />
+            <View style={styles.titleContent}>
+              <Text style={styles.title}>Monthly Calendar</Text>
+              <Text style={styles.subtitle}>{monthName}</Text>
             </View>
-          ))}
+          </View>
+          <View style={styles.monthNav}>
+            <TouchableOpacity
+              onPress={handlePrevMonth}
+              style={styles.navButton}
+              accessibilityLabel="Previous month"
+            >
+              <MaterialIcons name="chevron-left" size={24} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleNextMonth}
+              style={styles.navButton}
+              accessibilityLabel="Next month"
+            >
+              <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
-        
-        {/* Legend */}
-        <View style={styles.legend}>
-          <Text style={styles.legendText} numberOfLines={1}>Less</Text>
-          <View style={styles.legendDots}>
-            {[0, 0.3, 0.5, 0.7, 1.0].map((intensity, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.legendDot,
-                  { backgroundColor: getIntensityColor(intensity) }
-                ]}
-              />
+
+        {/* Calendar Grid */}
+        <View style={styles.calendarSection}>
+          {/* Weekday headers */}
+          <View style={styles.weekdayRow}>
+            {WEEKDAYS.map(day => (
+              <View key={day} style={styles.weekdayCell}>
+                <Text style={styles.weekdayText}>{day}</Text>
+              </View>
             ))}
           </View>
-          <Text style={styles.legendText} numberOfLines={1}>More</Text>
-        </View>
-      </View>
 
-      {/* Key Metrics */}
-      <View style={styles.metricsContainer}>
-        <Text style={styles.sectionTitle}>Key Metrics</Text>
-        <View style={styles.metricsGrid}>
-          <LinearGradient
-            colors={[colors.accent, colors.accentDark]}
-            style={styles.metricCard}
-          >
-            <MaterialIcons name="local-fire-department" size={18} color={colors.textOnPrimary} />
-            <Text style={[styles.metricValue, { color: colors.textOnPrimary }]}>{currentStreak}</Text>
-            <Text style={[styles.metricLabel, { color: colors.textOnPrimary }]} numberOfLines={2}>Streak</Text>
-          </LinearGradient>
-          
-          <View style={styles.metricCard}>
-            <MaterialIcons name="event-available" size={18} color={colors.primary} />
-            <Text style={styles.metricValue}>{activeDays}</Text>
-            <Text style={styles.metricLabel} numberOfLines={2}>Days</Text>
+          {/* Calendar grid */}
+          <View style={styles.calendarGrid}>
+            {calendarCells.map((week, weekIndex) => (
+              <View key={weekIndex} style={styles.weekRow}>
+                {week.map((cell, cellIndex) => {
+                  if (!cell) {
+                    return <View key={`empty-${weekIndex}-${cellIndex}`} style={styles.dayCell} />;
+                  }
+
+                  const isSelected = selectedDate === cell.dateKey;
+                  const cellColor = getCellColor(cell.calories, cell.goal);
+
+                  return (
+                    <Pressable
+                      key={cell.dateKey}
+                      style={[
+                        styles.dayCell,
+                        { backgroundColor: cellColor },
+                        isSelected && styles.dayCellSelected,
+                        cell.isToday && styles.dayCellToday,
+                      ]}
+                      onPress={() => setSelectedDate(isSelected ? null : cell.dateKey)}
+                      accessibilityLabel={`${cell.date.toDateString()}, ${cell.calories} calories`}
+                    >
+                      <Text style={[
+                        styles.dayNumber,
+                        cell.isToday && styles.dayNumberToday,
+                      ]}>
+                        {cell.day}
+                      </Text>
+                      {cell.calories > 0 && (
+                        <Text style={styles.calorieText} numberOfLines={1}>
+                          {cell.calories > 999 ? `${Math.round(cell.calories / 1000)}k` : cell.calories}
+                        </Text>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
           </View>
-          
-          <View style={styles.metricCard}>
-            <MaterialIcons name="track-changes" size={18} color={colors.secondary} />
-            <Text style={styles.metricValue}>{consistencyPercentage}%</Text>
-            <Text style={styles.metricLabel} numberOfLines={2}>Consistency</Text>
+
+          {/* Legend */}
+          <View style={styles.legend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendBox, { backgroundColor: colors.success }]} />
+              <Text style={styles.legendText}>On target</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendBox, { backgroundColor: colors.yellow300 }]} />
+              <Text style={styles.legendText}>Over</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendBox, { backgroundColor: colors.blue100 }]} />
+              <Text style={styles.legendText}>Under</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* Progress Summary */}
-      <View style={styles.progressContainer}>
-        <LinearGradient
-          colors={[colors.primary + '15', colors.primary + '25']}
-          style={styles.progressCard}
-        >
-          <View style={styles.progressHeader}>
-            <MaterialIcons name="emoji-events" size={24} color={colors.primary} />
-            <Text style={styles.progressTitle}>Monthly Progress</Text>
+        {/* Selected day details */}
+        {selectedLog && (
+          <View style={styles.detailsCard}>
+            <View style={styles.detailsHeader}>
+              <MaterialIcons name="today" size={20} color={colors.primary} />
+              <Text style={styles.detailsTitle}>
+                {new Date(selectedDate!).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </Text>
+            </View>
+
+            <View style={styles.detailsStats}>
+              <View style={styles.detailStat}>
+                <Text style={styles.detailStatValue}>
+                  {Math.round(selectedLog.totalNutrition.calories)}
+                </Text>
+                <Text style={styles.detailStatLabel}>Calories</Text>
+              </View>
+              <View style={styles.detailStat}>
+                <Text style={styles.detailStatValue}>{selectedLog.foods.length}</Text>
+                <Text style={styles.detailStatLabel}>Items</Text>
+              </View>
+              <View style={styles.detailStat}>
+                <Text style={styles.detailStatValue}>
+                  {Math.round(selectedLog.totalNutrition.protein)}g
+                </Text>
+                <Text style={styles.detailStatLabel}>Protein</Text>
+              </View>
+            </View>
+
+            {selectedLog.foods.length > 0 && (
+              <View style={styles.foodList}>
+                <Text style={styles.foodListTitle}>Food items:</Text>
+                {selectedLog.foods.slice(0, 3).map(food => (
+                  <View key={food.id} style={styles.foodItem}>
+                    <Text style={styles.foodName} numberOfLines={1}>
+                      • {food.foodItem.name}
+                    </Text>
+                    <Text style={styles.foodCalories}>
+                      {Math.round(food.nutrition.calories)} cal
+                    </Text>
+                  </View>
+                ))}
+                {selectedLog.foods.length > 3 && (
+                  <Text style={styles.moreItems}>
+                    +{selectedLog.foods.length - 3} more items
+                  </Text>
+                )}
+              </View>
+            )}
           </View>
-          
-          <View style={styles.progressStats}>
-            <View style={styles.progressStat}>
-              <Text style={styles.progressStatValue}>{totalCalories.toLocaleString()}</Text>
-              <Text style={styles.progressStatLabel}>Total Calories</Text>
+        )}
+
+        {/* Monthly Stats */}
+        <View style={styles.statsSection}>
+          <Text style={styles.statsTitle}>Monthly Summary</Text>
+
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <MaterialIcons name="local-fire-department" size={24} color={colors.error} />
+              <Text style={styles.statValue}>{monthStats.totalCalories.toLocaleString()}</Text>
+              <Text style={styles.statLabel}>Total Calories</Text>
             </View>
-            <View style={styles.progressStat}>
-              <Text style={styles.progressStatValue}>{goalAchievementPercentage}%</Text>
-              <Text style={styles.progressStatLabel}>Goals Achieved</Text>
+
+            <View style={styles.statCard}>
+              <MaterialIcons name="trending-up" size={24} color={colors.primary} />
+              <Text style={styles.statValue}>{monthStats.avgCalories}</Text>
+              <Text style={styles.statLabel}>Daily Average</Text>
             </View>
-            <View style={styles.progressStat}>
-              <Text style={styles.progressStatValue}>{totalItems}</Text>
-              <Text style={styles.progressStatLabel}>Food Items</Text>
+
+            <View style={styles.statCard}>
+              <MaterialIcons name="check-circle" size={24} color={colors.success} />
+              <Text style={styles.statValue}>{monthStats.daysLogged}</Text>
+              <Text style={styles.statLabel}>Days Logged</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <MaterialIcons name="track-changes" size={24} color={colors.blue600} />
+              <Text style={styles.statValue}>{monthStats.onTargetDays}</Text>
+              <Text style={styles.statLabel}>On Target</Text>
             </View>
           </View>
-          
-          {consistencyPercentage >= 80 && (
-            <View style={styles.celebrationBadge}>
-              <MaterialIcons name="stars" size={16} color={colors.white} />
-              <Text style={styles.celebrationText}>Excellent consistency! 🎉</Text>
+
+          {/* Macros summary */}
+          <View style={styles.macrosCard}>
+            <Text style={styles.macrosTitle}>Total Macros</Text>
+            <View style={styles.macrosRow}>
+              <View style={styles.macroItem}>
+                <MaterialIcons name="fitness-center" size={18} color={colors.blue600} />
+                <Text style={styles.macroValue}>{monthStats.totalProtein}g</Text>
+                <Text style={styles.macroLabel}>Protein</Text>
+              </View>
+              <View style={styles.macroItem}>
+                <MaterialIcons name="breakfast-dining" size={18} color={colors.yellow600} />
+                <Text style={styles.macroValue}>{monthStats.totalCarbs}g</Text>
+                <Text style={styles.macroLabel}>Carbs</Text>
+              </View>
+              <View style={styles.macroItem}>
+                <MaterialIcons name="water-drop" size={18} color={colors.green600} />
+                <Text style={styles.macroValue}>{monthStats.totalFat}g</Text>
+                <Text style={styles.macroLabel}>Fat</Text>
+              </View>
+            </View>
+          </View>
+
+          {monthStats.bestDay && (
+            <View style={styles.highlightCard}>
+              <MaterialIcons name="emoji-events" size={20} color={colors.warning} />
+              <View style={styles.highlightContent}>
+                <Text style={styles.highlightLabel}>Best Day</Text>
+                <Text style={styles.highlightValue}>
+                  {new Date(monthStats.bestDay.date).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })} • {Math.round(monthStats.bestDay.totalNutrition.calories)} cal
+                </Text>
+              </View>
             </View>
           )}
-        </LinearGradient>
-      </View>
-    </Card>
+        </View>
+      </Card>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.surface,
-    ...shadows.lg,
-    shadowColor: colors.primary,
+    ...shadows.md,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.xl,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  titleSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  titleContent: {
+    flex: 1,
   },
   title: {
-    fontSize: fonts['2xl'],
+    fontSize: fonts.xl,
     fontWeight: fonts.bold,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
@@ -307,177 +400,253 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: fonts.sm,
     color: colors.textSecondary,
-    fontWeight: fonts.normal,
   },
-  averageContainer: {
-    alignItems: 'flex-end',
-  },
-  averageNumber: {
-    fontSize: fonts['2xl'],
-    fontWeight: fonts.bold,
-    color: colors.primary,
-  },
-  averageLabel: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-    fontWeight: fonts.medium,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  sectionTitle: {
-    fontSize: fonts.lg,
-    fontWeight: fonts.semibold,
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
-  },
-  calendarContainer: {
-    marginBottom: spacing.xl,
-  },
-  weekDaysHeader: {
+  monthNav: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.xs,
+    gap: spacing.xs,
   },
-  weekDayText: {
+  navButton: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calendarSection: {
+    marginBottom: spacing.lg,
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    marginBottom: spacing.xs,
+  },
+  weekdayCell: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  weekdayText: {
     fontSize: fonts.xs,
-    color: colors.textSecondary,
     fontWeight: fonts.semibold,
-    textAlign: 'center',
-    width: 32,
+    color: colors.textSecondary,
   },
   calendarGrid: {
     gap: spacing.xs,
-    marginBottom: spacing.md,
   },
   weekRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: spacing.xs,
   },
   dayCell: {
-    width: 32,
-    height: 32,
-    borderRadius: borderRadius.sm,
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: borderRadius.md,
+    padding: spacing.xs,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.gray200,
   },
-  emptyCell: {
-    width: 32,
-    height: 32,
+  dayCellSelected: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    ...shadows.sm,
   },
-  dayCellText: {
-    fontSize: fonts.xs,
+  dayCellToday: {
+    borderWidth: 2,
+    borderColor: colors.accent,
+  },
+  dayNumber: {
+    fontSize: fonts.sm,
     fontWeight: fonts.semibold,
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  dayNumberToday: {
+    color: colors.accent,
+    fontWeight: fonts.bold,
+  },
+  calorieText: {
+    fontSize: 9,
+    color: colors.textSecondary,
+    fontWeight: fonts.medium,
   },
   legend: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  legendBox: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
   },
   legendText: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
-    fontWeight: fonts.medium,
   },
-  legendDots: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 2,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-  },
-  metricsContainer: {
-    marginBottom: spacing.xl,
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  metricCard: {
-    flex: 1,
+  detailsCard: {
     backgroundColor: colors.backgroundSecondary,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.gray200,
-  },
-  metricValue: {
-    fontSize: fonts.xl,
-    fontWeight: fonts.bold,
-    color: colors.textPrimary,
-    marginVertical: spacing.xs,
-    textAlign: 'center',
-  },
-  metricLabel: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    fontWeight: fonts.medium,
-  },
-  progressContainer: {
-    marginTop: spacing.sm,
-  },
-  progressCard: {
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
     borderWidth: 1,
     borderColor: colors.primary + '30',
   },
-  progressHeader: {
+  detailsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  progressTitle: {
-    fontSize: fonts.lg,
-    fontWeight: fonts.semibold,
-    color: colors.textPrimary,
-    marginLeft: spacing.sm,
-  },
-  progressStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  progressStat: {
+  detailsTitle: {
+    fontSize: fonts.base,
+    fontWeight: fonts.semibold,
+    color: colors.textPrimary,
+  },
+  detailsStats: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  detailStat: {
+    flex: 1,
     alignItems: 'center',
   },
-  progressStatValue: {
+  detailStatValue: {
     fontSize: fonts.lg,
     fontWeight: fonts.bold,
-    color: colors.primary,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
-    textAlign: 'center',
   },
-  progressStatLabel: {
+  detailStatLabel: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+  },
+  foodList: {
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+    paddingTop: spacing.sm,
+  },
+  foodListTitle: {
+    fontSize: fonts.xs,
+    fontWeight: fonts.semibold,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  foodItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  foodName: {
+    flex: 1,
+    fontSize: fonts.sm,
+    color: colors.textPrimary,
+  },
+  foodCalories: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+    marginLeft: spacing.sm,
+  },
+  moreItems: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
+  },
+  statsSection: {
+    gap: spacing.md,
+  },
+  statsTitle: {
+    fontSize: fonts.lg,
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: '47%',
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  statValue: {
+    fontSize: fonts.lg,
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+  },
+  statLabel: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
     textAlign: 'center',
-    fontWeight: fonts.medium,
   },
-  celebrationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.success,
+  macrosCard: {
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.sm,
+    padding: spacing.md,
   },
-  celebrationText: {
+  macrosTitle: {
     fontSize: fonts.sm,
     fontWeight: fonts.semibold,
-    color: colors.textOnPrimary,
-    marginLeft: spacing.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  macrosRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  macroItem: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  macroValue: {
+    fontSize: fonts.base,
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+  },
+  macroLabel: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+  },
+  highlightCard: {
+    backgroundColor: colors.yellow50,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.yellow200,
+  },
+  highlightContent: {
+    flex: 1,
+  },
+  highlightLabel: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  highlightValue: {
+    fontSize: fonts.sm,
+    fontWeight: fonts.semibold,
+    color: colors.textPrimary,
   },
 });
