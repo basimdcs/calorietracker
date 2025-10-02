@@ -61,7 +61,11 @@ export const FoodDetailsModal: React.FC<FoodDetailsModalProps> = ({
 
     const updatedFood: ParsedFoodItemWithConfidence = {
       ...food,
+      // Update quantity fields - all should reflect the same value
       gramEquivalent: gramsNum,
+      quantity: gramsNum,
+      unit: 'grams',
+      // Update nutrition values
       calories: liveNutrition.calories,
       protein: liveNutrition.protein,
       carbs: liveNutrition.carbs,

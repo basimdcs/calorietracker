@@ -627,7 +627,7 @@ NUTRITION CALCULATION FRAMEWORK:
 2. REGIONAL FOOD INTELLIGENCE
 
    Apply your knowledge of Egyptian and Saudi cuisine, including:
-   - Traditional dishes (كشري, فول, طعمية, كبسة, مندي)
+   - Traditional dishes (كشري, فول, طعمية, كفتة, كباب, كبسة, مندي, شاورما)
    - Regional fruit varieties (Owais mango variety from Egypt)
    - Typical preparation methods and ingredient combinations
    - Use your training data to provide accurate nutrition for these foods
@@ -667,21 +667,10 @@ NUTRITION CALCULATION FRAMEWORK:
 6. FOOD EMOJI SUGGESTION
 
    Suggest an appropriate emoji for each food item:
-   - Choose the emoji that best represents the MAIN/PRIMARY ingredient
-   - For "grilled chicken salad", use 🍗 (chicken is the main protein, not the salad)
-   - For "beef burger", use 🍔 (burger)
-   - For "fish and chips", use 🐟 (fish is the main protein)
-   - For "chicken rice bowl", use 🍗 (chicken is the main protein)
-   - Return ONLY the emoji character (e.g., "🍗" not "chicken emoji")
-
-   Common food emojis:
-   🍗 chicken/poultry, 🥩 meat/steak/beef, 🐟 fish, 🍤 shrimp, 🥚 egg,
-   🥗 salad/vegetables, 🍕 pizza, 🍔 burger, 🍟 fries, 🌮 taco, 🥙 wrap/sandwich,
-   🍝 pasta, 🍜 noodles/ramen, 🍲 soup/stew, 🍛 curry, 🍱 rice bowl,
-   🍞 bread, 🥖 baguette, 🥐 croissant, 🧀 cheese, 🥛 milk/yogurt,
-   🥓 bacon, 🍎 apple, 🍌 banana, 🍊 orange, 🍇 grapes, 🍓 strawberry,
-   ☕ coffee, 🧃 juice, 🥤 soda, 💧 water,
-   🍰 cake, 🍪 cookie, 🍫 chocolate, 🍦 ice cream, 🥜 nuts, 🍿 popcorn
+   - Choose the emoji that best represents the MAIN/PRIMARY ingredient or dish type
+   - Prioritize protein/main ingredient over sides (e.g., chicken over salad in "chicken salad")
+   - Use culturally appropriate emojis for Middle Eastern/Egyptian dishes
+   - Return ONLY the emoji character (not the name)
 
 7. OUTPUT SCHEMA
 

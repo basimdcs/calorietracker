@@ -24,7 +24,7 @@ const FOOD_CATEGORIES: FoodCategory[] = [
 
   // Meat & Beef (HIGH PRIORITY)
   {
-    keywords: ['beef', 'meat', 'لحمة', 'لحم', 'steak', 'ستيك', 'bacon', 'بيكون'],
+    keywords: ['beef', 'meat', 'لحمة', 'لحم', 'steak', 'ستيك', 'bacon', 'بيكون', 'kofta', 'كفتة', 'kebab', 'كباب', 'lamb', 'لحم ضاني', 'meatball', 'كرات اللحم'],
     icon: '🥩',
   },
 

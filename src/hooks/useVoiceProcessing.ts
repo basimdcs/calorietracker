@@ -129,42 +129,59 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
       const nutritionLatency = Date.now() - nutritionStart;
 
       // Convert ParsedFoodItem[] to ParsedFoodItemWithConfidence[]
-      const enhancedFoods: ParsedFoodItemWithConfidence[] = parsedFoodsRaw.map(food => ({
-        ...food,
-        // Add confidence fields
-        overallConfidence: food.confidence || 0.85,
-        quantityConfidence: food.confidence || 0.85,
-        cookingConfidence: food.cookingMethod ? 0.9 : 0.3,
-        // Add required fields for confidence interface
-        aiModel: (useGPT5 ? 'gpt-5-nano' : 'gpt-4o') as 'gpt-4o' | 'gpt-5-nano',
-        gramEquivalent: food.quantity || 100,
-        needsQuantityModal: food.needsQuantity || false,
-        needsCookingModal: food.needsCookingMethod || false,
-        suggestedUnits: food.suggestedQuantity?.map(q => ({
-          unit: food.unit || 'grams',
-          label: food.unit || 'grams',
-          gramsPerUnit: parseFloat(q) || 1,
-          confidence: 0.8,
-          isRecommended: parseFloat(q) === 1,
-          culturalContext: 'metric'
-        })) || [],
-        alternativeMethods: food.suggestedCookingMethods?.map(method => ({
-          method,
-          arabic_name: method,
-          calorie_multiplier: method === 'Fried' ? 1.3 : 1.0,
-          icon: method === 'Grilled' ? '🔥' : method === 'Fried' ? '🍳' : '🥘',
-          confidence: 0.7
-        })) || [],
-        assumptions: food.nutritionNotes ? [food.nutritionNotes] : [],
-        userModified: false,
-        originalAIEstimate: {
-          quantity: food.quantity || 1,
-          unit: food.unit || 'grams',
-          grams: food.quantity || 100,
-          calories: food.calories || 0,
-          cookingMethod: food.cookingMethod
+      const enhancedFoods: ParsedFoodItemWithConfidence[] = parsedFoodsRaw.map(food => {
+        // Calculate gramEquivalent based on unit - this is the single source of truth for quantity
+        const quantity = food.quantity || 100;
+        const unit = (food.unit || 'grams').toLowerCase();
+        let gramEquivalent = 100; // default fallback
+
+        if (unit === 'g' || unit === 'grams' || unit === 'gram') {
+          gramEquivalent = quantity; // Direct grams
+        } else if (unit === 'ml' || unit === 'milliliters' || unit === 'milliliter') {
+          gramEquivalent = quantity; // 1ml ≈ 1g for most liquids
+        } else {
+          // For pieces/cups/servings, AI already calculated total nutrition for that quantity
+          // We treat it as if it's that many grams for the modal
+          gramEquivalent = quantity;
         }
-      }));
+
+        return {
+          ...food,
+          // Add confidence fields
+          overallConfidence: food.confidence || 0.85,
+          quantityConfidence: food.confidence || 0.85,
+          cookingConfidence: food.cookingMethod ? 0.9 : 0.3,
+          // Add required fields for confidence interface
+          aiModel: (useGPT5 ? 'gpt-5-nano' : 'gpt-4o') as 'gpt-4o' | 'gpt-5-nano',
+          gramEquivalent, // Single source of truth for quantity
+          needsQuantityModal: food.needsQuantity || false,
+          needsCookingModal: food.needsCookingMethod || false,
+          suggestedUnits: food.suggestedQuantity?.map(q => ({
+            unit: food.unit || 'grams',
+            label: food.unit || 'grams',
+            gramsPerUnit: parseFloat(q) || 1,
+            confidence: 0.8,
+            isRecommended: parseFloat(q) === 1,
+            culturalContext: 'metric'
+          })) || [],
+          alternativeMethods: food.suggestedCookingMethods?.map(method => ({
+            method,
+            arabic_name: method,
+            calorie_multiplier: method === 'Fried' ? 1.3 : 1.0,
+            icon: method === 'Grilled' ? '🔥' : method === 'Fried' ? '🍳' : '🥘',
+            confidence: 0.7
+          })) || [],
+          assumptions: food.nutritionNotes ? [food.nutritionNotes] : [],
+          userModified: false,
+          originalAIEstimate: {
+            quantity: food.quantity || 1,
+            unit: food.unit || 'grams',
+            grams: gramEquivalent, // Use calculated gramEquivalent
+            calories: food.calories || 0,
+            cookingMethod: food.cookingMethod
+          }
+        };
+      });
       
       stats.nutritionLatency = nutritionLatency;
       setModelStats({ ...stats });
@@ -295,42 +312,59 @@ export const useVoiceProcessing = (): UseVoiceProcessingResult => {
       const nutritionLatency = Date.now() - nutritionStart;
 
       // Convert ParsedFoodItem[] to ParsedFoodItemWithConfidence[]
-      const enhancedFoods: ParsedFoodItemWithConfidence[] = parsedFoodsRaw.map(food => ({
-        ...food,
-        // Add confidence fields
-        overallConfidence: food.confidence || 0.85,
-        quantityConfidence: food.confidence || 0.85,
-        cookingConfidence: food.cookingMethod ? 0.9 : 0.3,
-        // Add required fields for confidence interface
-        aiModel: (useGPT5 ? 'gpt-5-nano' : 'gpt-4o') as 'gpt-4o' | 'gpt-5-nano',
-        gramEquivalent: food.quantity || 100,
-        needsQuantityModal: food.needsQuantity || false,
-        needsCookingModal: food.needsCookingMethod || false,
-        suggestedUnits: food.suggestedQuantity?.map(q => ({
-          unit: food.unit || 'grams',
-          label: food.unit || 'grams',
-          gramsPerUnit: parseFloat(q) || 1,
-          confidence: 0.8,
-          isRecommended: parseFloat(q) === 1,
-          culturalContext: 'metric'
-        })) || [],
-        alternativeMethods: food.suggestedCookingMethods?.map(method => ({
-          method,
-          arabic_name: method,
-          calorie_multiplier: method === 'Fried' ? 1.3 : 1.0,
-          icon: method === 'Grilled' ? '🔥' : method === 'Fried' ? '🍳' : '🥘',
-          confidence: 0.7
-        })) || [],
-        assumptions: food.nutritionNotes ? [food.nutritionNotes] : [],
-        userModified: false,
-        originalAIEstimate: {
-          quantity: food.quantity || 1,
-          unit: food.unit || 'grams',
-          grams: food.quantity || 100,
-          calories: food.calories || 0,
-          cookingMethod: food.cookingMethod
+      const enhancedFoods: ParsedFoodItemWithConfidence[] = parsedFoodsRaw.map(food => {
+        // Calculate gramEquivalent based on unit - this is the single source of truth for quantity
+        const quantity = food.quantity || 100;
+        const unit = (food.unit || 'grams').toLowerCase();
+        let gramEquivalent = 100; // default fallback
+
+        if (unit === 'g' || unit === 'grams' || unit === 'gram') {
+          gramEquivalent = quantity; // Direct grams
+        } else if (unit === 'ml' || unit === 'milliliters' || unit === 'milliliter') {
+          gramEquivalent = quantity; // 1ml ≈ 1g for most liquids
+        } else {
+          // For pieces/cups/servings, AI already calculated total nutrition for that quantity
+          // We treat it as if it's that many grams for the modal
+          gramEquivalent = quantity;
         }
-      }));
+
+        return {
+          ...food,
+          // Add confidence fields
+          overallConfidence: food.confidence || 0.85,
+          quantityConfidence: food.confidence || 0.85,
+          cookingConfidence: food.cookingMethod ? 0.9 : 0.3,
+          // Add required fields for confidence interface
+          aiModel: (useGPT5 ? 'gpt-5-nano' : 'gpt-4o') as 'gpt-4o' | 'gpt-5-nano',
+          gramEquivalent, // Single source of truth for quantity
+          needsQuantityModal: food.needsQuantity || false,
+          needsCookingModal: food.needsCookingMethod || false,
+          suggestedUnits: food.suggestedQuantity?.map(q => ({
+            unit: food.unit || 'grams',
+            label: food.unit || 'grams',
+            gramsPerUnit: parseFloat(q) || 1,
+            confidence: 0.8,
+            isRecommended: parseFloat(q) === 1,
+            culturalContext: 'metric'
+          })) || [],
+          alternativeMethods: food.suggestedCookingMethods?.map(method => ({
+            method,
+            arabic_name: method,
+            calorie_multiplier: method === 'Fried' ? 1.3 : 1.0,
+            icon: method === 'Grilled' ? '🔥' : method === 'Fried' ? '🍳' : '🥘',
+            confidence: 0.7
+          })) || [],
+          assumptions: food.nutritionNotes ? [food.nutritionNotes] : [],
+          userModified: false,
+          originalAIEstimate: {
+            quantity: food.quantity || 1,
+            unit: food.unit || 'grams',
+            grams: gramEquivalent, // Use calculated gramEquivalent
+            calories: food.calories || 0,
+            cookingMethod: food.cookingMethod
+          }
+        };
+      });
       
       // Update model stats for retry
       setModelStats({
