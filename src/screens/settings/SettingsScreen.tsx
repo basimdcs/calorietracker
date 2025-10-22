@@ -7,6 +7,7 @@ import {
   Alert,
   SafeAreaView,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -105,8 +106,17 @@ const SettingsScreen: React.FC = () => {
     }
   };
 
-  const handleOpenLink = (title: string) => {
-    Alert.alert(`Open ${title}`, `This would open ${title} in your browser.`);
+  const handleOpenLink = async (url: string, title: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Error', `Unable to open ${title}`);
+      }
+    } catch (error) {
+      Alert.alert('Error', `Failed to open ${title}`);
+    }
   };
 
   const handleResetProfile = () => {
@@ -413,9 +423,9 @@ const SettingsScreen: React.FC = () => {
               <Text style={styles.sectionTitle}>Support & Legal</Text>
               
               {/* Privacy Policy */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.settingsCard}
-                onPress={() => handleOpenLink('Privacy Policy')}
+                onPress={() => handleOpenLink('https://www.kamcalorie.app/privacy', 'Privacy Policy')}
               >
                 <View style={styles.cardContent}>
                   <View style={styles.cardLeft}>
@@ -432,9 +442,9 @@ const SettingsScreen: React.FC = () => {
               </TouchableOpacity>
 
               {/* Terms of Service */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.settingsCard}
-                onPress={() => handleOpenLink('Terms of Service')}
+                onPress={() => handleOpenLink('https://www.kamcalorie.app/terms', 'Terms of Service')}
               >
                 <View style={styles.cardContent}>
                   <View style={styles.cardLeft}>
@@ -451,9 +461,9 @@ const SettingsScreen: React.FC = () => {
               </TouchableOpacity>
 
               {/* Contact Support */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.settingsCard}
-                onPress={() => handleOpenLink('Contact Support')}
+                onPress={() => handleOpenLink('https://www.kamcalorie.app/support', 'Contact Support')}
               >
                 <View style={styles.cardContent}>
                   <View style={styles.cardLeft}>

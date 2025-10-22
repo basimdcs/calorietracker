@@ -112,9 +112,11 @@ export const useFoodStore = create<FoodState>()(
 
       // Daily log actions
       logFood: (foodId: string, quantity: number, mealType: MealType) => {
-        const { foodItems, dailyLogs, currentDate } = get();
+        // Always use real-time today's date, not the stored currentDate
+        const actualToday = getTodayString();
+        const { foodItems, dailyLogs } = get();
         const food = foodItems.find(item => item.id === foodId);
-        
+
         if (!food) {
           console.error('❌ Food item not found for logging:', foodId);
           return;
@@ -125,7 +127,8 @@ export const useFoodStore = create<FoodState>()(
           foodName: food.name,
           quantity,
           mealType,
-          currentDate
+          actualToday,
+          storeCurrentDate: get().currentDate
         });
 
         const loggedFood: LoggedFood = {
@@ -137,39 +140,39 @@ export const useFoodStore = create<FoodState>()(
           mealType,
         };
 
-        const existingLogIndex = dailyLogs.findIndex(log => log.date === currentDate);
-        
+        const existingLogIndex = dailyLogs.findIndex(log => log.date === actualToday);
+
         if (existingLogIndex >= 0) {
-          console.log('📅 Updating existing daily log for date:', currentDate);
+          console.log('📅 Updating existing daily log for date:', actualToday);
           // Update existing daily log
           const updatedLogs = [...dailyLogs];
           const existingLog = updatedLogs[existingLogIndex];
           const updatedFoods = [...existingLog.foods, loggedFood];
-          
+
           updatedLogs[existingLogIndex] = {
             ...existingLog,
             foods: updatedFoods,
             totalNutrition: sumNutrition(updatedFoods.map(f => f.nutrition)),
           };
-          
+
           console.log('✅ Updated daily log:', updatedLogs[existingLogIndex]);
-          set({ dailyLogs: updatedLogs });
+          set({ dailyLogs: updatedLogs, currentDate: actualToday });
         } else {
-          console.log('📅 Creating new daily log for date:', currentDate);
+          console.log('📅 Creating new daily log for date:', actualToday);
 
           // Get user's calorie goal from single source of truth
           const userCalorieGoal = getUserCalorieGoal();
 
           // Create new daily log
           const newLog: DailyLog = {
-            date: currentDate,
+            date: actualToday,
             foods: [loggedFood],
             totalNutrition: loggedFood.nutrition,
             calorieGoal: userCalorieGoal,
           };
 
           console.log('✅ Created new daily log with calorie goal:', userCalorieGoal, newLog);
-          set({ dailyLogs: [...dailyLogs, newLog] });
+          set({ dailyLogs: [...dailyLogs, newLog], currentDate: actualToday });
         }
       },
 

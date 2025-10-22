@@ -14,24 +14,36 @@ import { LoggedFood } from './index';
 export interface DisplayFood {
   // Core identification
   id: string;
-  
+
   // Display properties (flattened for easy access)
   name: string;
+  icon?: string; // Food emoji icon
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
-  
+
   // Quantity information
   quantity: number;
   servingSize: number;
   servingSizeUnit: string;
   displayQuantity: string; // e.g., "2 × 100g"
-  
+
   // Time information
   loggedAt: Date | string;
   displayTime: string; // e.g., "10:30 AM"
-  
+
+  // Meal type
+  mealType?: string;
+
+  // Nutrition details
+  nutrition: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+
   // Original data (for actions like delete/edit)
   originalFood: LoggedFood;
 }
@@ -42,10 +54,11 @@ export interface DisplayFood {
  */
 export const toDisplayFood = (food: LoggedFood): DisplayFood => {
   const loggedAtDate = new Date(food.loggedAt);
-  
+
   return {
     id: food.id,
     name: food.foodItem.name,
+    icon: food.foodItem.icon,
     calories: food.nutrition.calories,
     protein: food.nutrition.protein,
     carbs: food.nutrition.carbs,
@@ -59,6 +72,8 @@ export const toDisplayFood = (food: LoggedFood): DisplayFood => {
       hour: 'numeric',
       minute: '2-digit',
     }),
+    mealType: food.mealType,
+    nutrition: food.nutrition,
     originalFood: food,
   };
 };

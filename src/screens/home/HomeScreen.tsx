@@ -15,15 +15,36 @@ import { useFoodData } from '../../hooks/useFoodData';
 
 const HomeScreen: React.FC = () => {
   const { profile } = useUser();
-  const { todayLog, debug } = useFoodData();
+  const { todayLog, debug, allDailyLogs } = useFoodData();
 
-  // Log debug info on mount
+  // Log debug info on mount and whenever data changes
   React.useEffect(() => {
-    console.log('🏠 HomeScreen mounted with:', debug);
-  }, [debug]);
-  
+    console.log('🏠 HomeScreen mounted/updated with:', {
+      debug,
+      todayLogExists: !!todayLog,
+      todayFoodsCount: todayLog?.foods?.length || 0,
+      allLogsCount: allDailyLogs.length,
+      allLogs: allDailyLogs.map(log => ({
+        date: log.date,
+        foodCount: log.foods.length,
+        foods: log.foods.map(f => f.foodItem.name)
+      }))
+    });
+  }, [debug, todayLog, allDailyLogs]);
+
   // Debug info
-  console.log('🏠 HomeScreen Debug:', debug);
+  console.log('🏠 HomeScreen Render:', {
+    debug,
+    todayLog: todayLog ? {
+      date: todayLog.date,
+      foodsCount: todayLog.foods.length,
+      foods: todayLog.foods.map(f => ({
+        id: f.id,
+        name: f.foodItem.name,
+        calories: f.nutrition.calories
+      }))
+    } : 'No log'
+  });
 
 
   return (

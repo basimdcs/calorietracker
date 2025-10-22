@@ -51,33 +51,46 @@ export interface FoodDataHook {
  * ```
  */
 export const useFoodData = (): FoodDataHook => {
-  const { 
-    dailyLogs, 
-    removeLoggedFood, 
-    updateLoggedFood 
+  const {
+    dailyLogs,
+    removeLoggedFood,
+    updateLoggedFood,
+    currentDate
   } = useFoodStore();
-  
-  const todayDate = useMemo(() => 
-    new Date().toISOString().split('T')[0], 
+
+  const todayDate = useMemo(() =>
+    new Date().toISOString().split('T')[0],
     []
   );
-  
-  const todayLog = useMemo(() => 
-    dailyLogs.find(log => log.date === todayDate),
-    [dailyLogs, todayDate]
-  );
-  
-  const todayItems = useMemo(() => 
+
+  console.log('🔍 useFoodData hook:', {
+    todayDate,
+    storeCurrentDate: currentDate,
+    dailyLogsCount: dailyLogs.length,
+    allLogDates: dailyLogs.map(log => log.date),
+  });
+
+  const todayLog = useMemo(() => {
+    const log = dailyLogs.find(log => log.date === todayDate);
+    console.log('🔍 Finding today log:', {
+      searchingFor: todayDate,
+      found: !!log,
+      foodsCount: log?.foods?.length || 0
+    });
+    return log;
+  }, [dailyLogs, todayDate]);
+
+  const todayItems = useMemo(() =>
     todayLog?.foods || [],
     [todayLog]
   );
-  
-  const getLogForDate = useMemo(() => 
+
+  const getLogForDate = useMemo(() =>
     (date: string) => dailyLogs.find(log => log.date === date),
     [dailyLogs]
   );
-  
-  const getItemsForDate = useMemo(() => 
+
+  const getItemsForDate = useMemo(() =>
     (date: string) => getLogForDate(date)?.foods || [],
     [getLogForDate]
   );

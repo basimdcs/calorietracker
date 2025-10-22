@@ -62,6 +62,24 @@ export const DailyView: React.FC<DailyViewProps> = ({
   const foods = dailyLog?.foods || [];
   const displayFoods = foods.map(toDisplayFood);
 
+  // Debug logging
+  console.log('📊 DailyView Render:', {
+    date,
+    dailyLogExists: !!dailyLog,
+    foodsCount: foods.length,
+    displayFoodsCount: displayFoods.length,
+    foods: foods.map(f => ({
+      id: f.id,
+      name: f.foodItem.name,
+      calories: f.nutrition.calories
+    })),
+    displayFoods: displayFoods.map(f => ({
+      id: f.id,
+      name: f.name,
+      calories: f.nutrition.calories
+    }))
+  });
+
   // Progress circle calculations
   const strokeDasharray = 402;
   const strokeDashoffset = strokeDasharray - (progress * strokeDasharray);
