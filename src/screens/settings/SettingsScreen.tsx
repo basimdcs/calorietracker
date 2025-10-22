@@ -394,12 +394,11 @@ const SettingsScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {/* App Settings */}
-            <View style={styles.section}>
+            {/* App Settings - Hidden for production (not yet developed) */}
+            {/* <View style={styles.section}>
               <Text style={styles.sectionTitle}>App Settings</Text>
-              
-              {/* Notifications Card */}
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.settingsCard}
                 onPress={() => navigation.navigate('Notifications' as never)}
               >
@@ -416,7 +415,7 @@ const SettingsScreen: React.FC = () => {
                   <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
                 </View>
               </TouchableOpacity>
-            </View>
+            </View> */}
 
             {/* Support & Legal Section */}
             <View style={styles.section}>
