@@ -24,15 +24,13 @@ const getEnvironmentVariable = (keyName: string, defaultValue: string = 'not-con
     try {
       const key = source();
       if (key && key !== 'your-api-key-here' && key !== 'not-configured' && key.length > 5) {
-        console.log(`✅ Found ${keyName} from source:`, source.name || 'unknown');
         return key;
       }
     } catch (error) {
-      console.log(`❌ Error accessing ${keyName} from source:`, error);
+      // Silent fail
     }
   }
 
-  console.log(`❌ No valid ${keyName} found in any source`);
   return defaultValue;
 };
 
@@ -65,71 +63,6 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
   const geminiApiKey = getGeminiKey();
   const revenueCatIOSKey = getRevenueCatIOSKey();
   const revenueCatAndroidKey = getRevenueCatAndroidKey();
-  
-  // Enhanced debugging information
-  const debugInfo = {
-    hasOpenAIKey: !!openaiApiKey,
-    hasGeminiKey: !!geminiApiKey,
-    hasRevenueCatIOSKey: !!revenueCatIOSKey,
-    hasRevenueCatAndroidKey: !!revenueCatAndroidKey,
-    openaiKeyLength: openaiApiKey?.length || 0,
-    geminiKeyLength: geminiApiKey?.length || 0,
-    revenueCatIOSKeyLength: revenueCatIOSKey?.length || 0,
-    revenueCatAndroidKeyLength: revenueCatAndroidKey?.length || 0,
-    buildEnvironment: process.env.EAS_BUILD ? 'production' : 'development',
-    processEnvKeys: Object.keys(process.env).filter(key => key.includes('OPENAI') || key.includes('GEMINI') || key.includes('REVENUE_CAT')),
-    nodeEnv: process.env.NODE_ENV,
-    platform: process.env.EAS_PLATFORM || 'unknown',
-    constantsAvailable: !!Constants,
-    expoConfigAvailable: !!Constants.expoConfig,
-    manifestAvailable: !!Constants.manifest,
-    manifest2Available: !!Constants.manifest2,
-    expoConfigExtra: !!Constants.expoConfig?.extra,
-    manifestExtra: !!(Constants.manifest as any)?.extra,
-    manifest2Extra: !!(Constants.manifest2 as any)?.extra
-  };
-  
-  console.log('🔍 Environment Config Debug:', debugInfo);
-  
-  // Log all environment variables that might contain our keys (for debugging)
-  Object.keys(process.env).forEach(key => {
-    if (key.includes('OPENAI') || key.includes('GEMINI') || key.includes('REVENUE_CAT') || key.includes('API')) {
-      console.log(`🔑 Found env var: ${key} = ${process.env[key]?.substring(0, 10)}...`);
-    }
-  });
-
-  // Log Constants information
-  console.log('📱 Constants Debug:', {
-    expoConfig: Constants.expoConfig ? 'Available' : 'Not available',
-    manifest: Constants.manifest ? 'Available' : 'Not available',
-    manifest2: Constants.manifest2 ? 'Available' : 'Not available',
-    expoConfigExtra: Constants.expoConfig?.extra ? 'Available' : 'Not available',
-    manifestExtra: (Constants.manifest as any)?.extra ? 'Available' : 'Not available',
-    manifest2Extra: (Constants.manifest2 as any)?.extra ? 'Available' : 'Not available'
-  });
-
-  // Log the actual RevenueCat keys (first 10 chars for security)
-  console.log('🔑 RevenueCat Keys Debug:', {
-    iosKey: revenueCatIOSKey ? `${revenueCatIOSKey.substring(0, 10)}...` : 'NOT FOUND',
-    androidKey: revenueCatAndroidKey ? `${revenueCatAndroidKey.substring(0, 10)}...` : 'NOT FOUND',
-    iosKeyLength: revenueCatIOSKey?.length || 0,
-    androidKeyLength: revenueCatAndroidKey?.length || 0,
-    iosKeyStartsWithAppl: revenueCatIOSKey?.startsWith('appl_') || false,
-    androidKeyStartsWithGoog: revenueCatAndroidKey?.startsWith('goog_') || false,
-    isTestFlight: !__DEV__ && process.env.NODE_ENV === 'production',
-    buildType: __DEV__ ? 'development' : 'production'
-  });
-
-  // Enhanced warnings for TestFlight
-  if (!__DEV__ && process.env.NODE_ENV === 'production') {
-    console.log('🧪 Production/TestFlight build detected');
-    if (!revenueCatIOSKey || revenueCatIOSKey === 'your-api-key-here') {
-      console.warn('⚠️ RevenueCat iOS API key missing in production build - subscriptions will not work');
-    }
-    if (revenueCatIOSKey && revenueCatIOSKey.length !== 32) {
-      console.warn(`⚠️ RevenueCat iOS API key length unexpected (${revenueCatIOSKey.length} chars) - expected 32 characters`);
-    }
-  }
 
   return {
     OPENAI_API_KEY: openaiApiKey,

@@ -107,7 +107,6 @@ const VoiceScreenProduction: React.FC = () => {
       const success = await voiceProcessing.actions.processRecording(audioUri);
       
       if (success) {
-        console.log('🎉 Processing successful, parsed foods:', voiceProcessing.data.parsedFoods);
         // Processing completed successfully - state will be handled by useEffect
       } else {
         setVoiceState('ready');
@@ -127,7 +126,6 @@ const VoiceScreenProduction: React.FC = () => {
   // Handle voice processing completion
   useEffect(() => {
     if (voiceProcessing.data.state === 'completed' && voiceProcessing.data.parsedFoods.length > 0) {
-      console.log('📋 Setting parsed foods for review:', voiceProcessing.data.parsedFoods);
       setParsedFoods(voiceProcessing.data.parsedFoods);
       setVoiceState('reviewing');
     }
@@ -163,8 +161,6 @@ const VoiceScreenProduction: React.FC = () => {
 
   const handleConfirmFoods = useCallback(async () => {
     try {
-      console.log('🍽️ Starting to log foods:', parsedFoods);
-      
       // Update current date to ensure we're logging to the right day
       updateCurrentDate();
       
@@ -199,28 +195,16 @@ const VoiceScreenProduction: React.FC = () => {
           // Calculate quantity multiplier based on grams entered
           const quantityMultiplier = gramsEntered / 100;
 
-          console.log('📝 Adding food item:', {
-            ...foodItem,
-            gramsEntered,
-            quantityMultiplier,
-            totalCalories: food.calories,
-            totalProtein: food.protein,
-          });
-
           // Add food item to the store
           addFoodItem(foodItem);
 
           // Log the food consumption
-          console.log('📊 Logging food with quantity multiplier:', quantityMultiplier);
           logFood(foodItem.id, quantityMultiplier, 'snacks');
         }
       }
 
-      console.log('✅ All foods logged successfully');
-
       // Update RevenueCat usage count (single source of truth)
       revenueCatActions.updateUsageCount(1);
-      console.log('📊 Recording usage incremented after successful food logging');
 
       // Reset state
       setVoiceState('ready');
@@ -240,7 +224,6 @@ const VoiceScreenProduction: React.FC = () => {
       );
 
     } catch (error) {
-      console.error('❌ Failed to log foods:', error);
       Alert.alert('Error', 'Failed to save food items. Please try again.');
     }
   }, [parsedFoods, addFoodItem, logFood, voiceProcessing.actions, updateCurrentDate, revenueCatActions, navigation]);
@@ -339,11 +322,7 @@ const VoiceScreenProduction: React.FC = () => {
                     style={[styles.retryButton, styles.retryButtonPrimary]}
                     onPress={async () => {
                       // Retry processing with existing transcript
-                      const success = await voiceProcessing.actions.retryProcessing();
-                      if (success) {
-                        // The useEffect will handle state transition to reviewing
-                        console.log('🔄 Retry successful, waiting for state update');
-                      }
+                      await voiceProcessing.actions.retryProcessing();
                     }}
                   >
                     <Text style={[styles.retryButtonText, styles.retryButtonTextPrimary]}>Retry</Text>

@@ -53,44 +53,22 @@ const SettingsScreen: React.FC = () => {
       }
       
       Alert.alert(title, message, [
-        { text: 'OK' },
-        ...(revenueCatState.error?.includes('TestFlight') ? [{ 
-          text: 'Debug Info', 
-          onPress: () => showRevenueCatDebugInfo() 
-        }] : [])
+        { text: 'OK' }
       ]);
     }
   };
 
-  const showRevenueCatDebugInfo = async () => {
+  const handleManageSubscription = async () => {
     try {
-      const debugInfo = await revenueCatActions.debugSubscriptionStatus();
-      
-      Alert.alert(
-        'Enhanced RevenueCat Debug Info',
-        debugInfo,
-        [
-          { text: 'Force Refresh', onPress: async () => {
-            try {
-              await revenueCatActions.forceRefreshSubscriptionStatus();
-              Alert.alert('Success', 'Subscription status refreshed! Check if Pro status is now recognized.');
-            } catch (error) {
-              Alert.alert('Error', `Failed to refresh: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            }
-          }},
-          { text: 'Copy to Clipboard', onPress: () => {
-            console.log('Enhanced Debug info:', debugInfo);
-          }},
-          { text: 'Close' }
-        ]
-      );
+      const supported = await Linking.canOpenURL('https://apps.apple.com/account/subscriptions');
+      if (supported) {
+        await Linking.openURL('https://apps.apple.com/account/subscriptions');
+      } else {
+        Alert.alert('Error', 'Unable to open App Store subscription management.');
+      }
     } catch (error) {
-      Alert.alert('Debug Error', `Failed to get debug info: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      Alert.alert('Error', 'Failed to open subscription management.');
     }
-  };
-
-  const handleManageSubscription = () => {
-    Alert.alert('Subscription Management', 'This would open subscription management in the App Store.');
   };
   
   const handleRestorePurchases = async () => {
