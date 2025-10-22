@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { colors, spacing } from '../../constants/theme';
 import { ScreenHeader } from '../../components/layout';
 import { FoodReviewNew } from '../../components/ui/FoodReview/FoodReviewNew';
@@ -30,9 +31,10 @@ import { usePaywall } from '../../hooks/usePaywall';
 type VoiceState = 'ready' | 'recording' | 'processing' | 'reviewing';
 
 const VoiceScreenProduction: React.FC = () => {
+  const navigation = useNavigation();
   const [voiceState, setVoiceState] = useState<VoiceState>('ready');
   const [parsedFoods, setParsedFoods] = useState<ParsedFoodItemWithConfidence[]>([]);
-  
+
   const { addFoodItem, logFood, updateCurrentDate } = useFoodStore();
   const { profile } = useUserStore();
   const { state: revenueCatState, actions: revenueCatActions } = useRevenueCatContext();
@@ -224,14 +226,24 @@ const VoiceScreenProduction: React.FC = () => {
       setVoiceState('ready');
       voiceProcessing.actions.reset();
       setParsedFoods([]);
-      
-      Alert.alert('Success', `${parsedFoods.length} food item${parsedFoods.length !== 1 ? 's' : ''} logged successfully!`);
-      
+
+      // Navigate to home screen after successful logging
+      Alert.alert(
+        'Success',
+        `${parsedFoods.length} food item${parsedFoods.length !== 1 ? 's' : ''} logged successfully!`,
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Home' as never)
+          }
+        ]
+      );
+
     } catch (error) {
       console.error('❌ Failed to log foods:', error);
       Alert.alert('Error', 'Failed to save food items. Please try again.');
     }
-  }, [parsedFoods, addFoodItem, logFood, voiceProcessing.actions, updateCurrentDate, revenueCatActions]);
+  }, [parsedFoods, addFoodItem, logFood, voiceProcessing.actions, updateCurrentDate, revenueCatActions, navigation]);
 
   const handleCancel = useCallback(() => {
     // Cancel recording if in progress
