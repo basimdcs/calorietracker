@@ -479,8 +479,8 @@ const SettingsScreen: React.FC = () => {
                 </View>
               </TouchableOpacity>
 
-              {/* Rate the App */}
-              <TouchableOpacity 
+              {/* Rate the App - Hidden for production */}
+              {/* <TouchableOpacity
                 style={styles.settingsCard}
                 onPress={() => handleOpenLink('Rate the App')}
               >
@@ -496,16 +496,15 @@ const SettingsScreen: React.FC = () => {
                   </View>
                   <MaterialIcons name="open-in-new" size={20} color={colors.textSecondary} />
                 </View>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
 
 
-            {/* Account Management Section */}
-            <View style={styles.section}>
+            {/* Account Management Section - Hidden for production */}
+            {/* <View style={styles.section}>
               <Text style={styles.sectionTitle}>Account Management</Text>
-              
-              {/* Reset Profile */}
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[styles.settingsCard, styles.dangerCard]}
                 onPress={handleResetProfile}
               >
@@ -524,7 +523,7 @@ const SettingsScreen: React.FC = () => {
                   <MaterialIcons name="chevron-right" size={24} color={colors.error} />
                 </View>
               </TouchableOpacity>
-            </View>
+            </View> */}
 
           </View>
         </ScrollView>
