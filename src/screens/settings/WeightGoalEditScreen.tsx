@@ -202,7 +202,10 @@ const WeightGoalEditScreen: React.FC = () => {
               <Card style={styles.card}>
                 <View style={styles.calorieSection}>
                   <Text style={styles.inputLabel}>Target calories per day</Text>
-                  
+                  <Text style={styles.medicalCitation}>
+                    Based on Mifflin-St Jeor Equation (AJCN, 1990)
+                  </Text>
+
                   <View style={styles.calorieToggleContainer}>
                     <TouchableOpacity
                       style={[
@@ -460,6 +463,13 @@ const styles = StyleSheet.create({
   },
   card: {
     padding: spacing.lg,
+  },
+  medicalCitation: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 4,
+    marginBottom: 8,
   },
   inputHelper: {
     fontSize: fonts.xs,

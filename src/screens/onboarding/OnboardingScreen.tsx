@@ -379,6 +379,9 @@ const OnboardingScreen: React.FC = () => {
               {customCalories && (
                 <Text style={styles.compactCustomLabel}>✨ Custom</Text>
               )}
+              <Text style={styles.medicalCitation}>
+                Calculated using Mifflin-St Jeor Equation{'\n'}(American Journal of Clinical Nutrition, 1990)
+              </Text>
             </View>
 
             {/* Compact Summary Stats */}
@@ -1036,6 +1039,13 @@ const styles = StyleSheet.create({
     color: colors.brandOuterSkin,
     fontWeight: fonts.semibold,
     marginTop: spacing.xs,
+  },
+  medicalCitation: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 8,
   },
   compactStatsContainer: {
     flexDirection: 'row',

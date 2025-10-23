@@ -181,6 +181,9 @@ export const DailyView: React.FC<DailyViewProps> = ({
           <Text style={styles.goalText}>
             Goal: {Math.round(goal)} kcal
           </Text>
+          <Text style={styles.medicalCitation}>
+            Based on Mifflin-St Jeor Equation (AJCN, 1990)
+          </Text>
         </View>
       </LinearGradient>
 
@@ -342,6 +345,14 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     textAlign: 'center',
     marginTop: spacing.xs,
+  },
+  medicalCitation: {
+    fontSize: 10,
+    color: colors.white,
+    opacity: 0.6,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 4,
   },
   macroSection: {
     paddingHorizontal: spacing.lg,

@@ -86,7 +86,12 @@ const CalorieCalculator: React.FC<CalorieCalculatorProps> = ({
           <View style={[styles.row, styles.targetRow]}>
             <View style={styles.rowLeft}>
               <MaterialIcons name="flag" size={20} color={colors.brandOuterSkin} />
-              <Text style={[styles.rowLabel, styles.targetLabel]}>Daily Target</Text>
+              <View>
+                <Text style={[styles.rowLabel, styles.targetLabel]}>Daily Target</Text>
+                <Text style={styles.medicalCitation}>
+                  Based on Mifflin-St Jeor Equation (1990)
+                </Text>
+              </View>
             </View>
             <Text style={[styles.rowValue, styles.targetValue]}>
               {targetCalories.toLocaleString()} cal
@@ -198,6 +203,12 @@ const styles = StyleSheet.create({
     fontSize: fonts.base,
     fontWeight: fonts.bold,
     color: colors.brandOuterSkin,
+  },
+  medicalCitation: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 2,
   },
   goalSummary: {
     flexDirection: 'row',
