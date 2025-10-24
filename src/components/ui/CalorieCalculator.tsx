@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, TouchableOpacity, Linking, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius, shadows } from '../../constants/theme';
@@ -88,9 +88,24 @@ const CalorieCalculator: React.FC<CalorieCalculatorProps> = ({
               <MaterialIcons name="flag" size={20} color={colors.brandOuterSkin} />
               <View>
                 <Text style={[styles.rowLabel, styles.targetLabel]}>Daily Target</Text>
-                <Text style={styles.medicalCitation}>
-                  Based on Mifflin-St Jeor Equation (1990)
-                </Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    const url = 'https://pubmed.ncbi.nlm.nih.gov/2305711/';
+                    const supported = await Linking.canOpenURL(url);
+                    if (supported) {
+                      await Linking.openURL(url);
+                    } else {
+                      Alert.alert('Error', 'Unable to open link');
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.medicalCitation}>
+                    Based on Mifflin-St Jeor Equation (1990)
+                    {' '}
+                    <Text style={styles.citationLink}>→ Source</Text>
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
             <Text style={[styles.rowValue, styles.targetValue]}>
@@ -209,6 +224,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontStyle: 'italic',
     marginTop: 2,
+  },
+  citationLink: {
+    fontSize: 9,
+    color: colors.brandOuterSkin,
+    textDecorationLine: 'underline',
+    fontStyle: 'normal',
   },
   goalSummary: {
     flexDirection: 'row',

@@ -13,6 +13,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { Button, Card, Input, BrandProgressIndicator } from '../../components/ui';
 import { useUserStore } from '../../stores/userStore';
@@ -379,9 +380,24 @@ const OnboardingScreen: React.FC = () => {
               {customCalories && (
                 <Text style={styles.compactCustomLabel}>✨ Custom</Text>
               )}
-              <Text style={styles.medicalCitation}>
-                Calculated using Mifflin-St Jeor Equation{'\n'}(American Journal of Clinical Nutrition, 1990)
-              </Text>
+              <TouchableOpacity
+                onPress={async () => {
+                  const url = 'https://pubmed.ncbi.nlm.nih.gov/2305711/';
+                  const supported = await Linking.canOpenURL(url);
+                  if (supported) {
+                    await Linking.openURL(url);
+                  } else {
+                    Alert.alert('Error', 'Unable to open link');
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.medicalCitation}>
+                  Calculated using Mifflin-St Jeor Equation{'\n'}(American Journal of Clinical Nutrition, 1990)
+                  {'\n'}
+                  <Text style={styles.citationLink}>Tap for medical source →</Text>
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Compact Summary Stats */}
@@ -1046,6 +1062,12 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: 8,
+  },
+  citationLink: {
+    fontSize: 9,
+    color: colors.brandOuterSkin,
+    textDecorationLine: 'underline',
+    fontStyle: 'normal',
   },
   compactStatsContainer: {
     flexDirection: 'row',

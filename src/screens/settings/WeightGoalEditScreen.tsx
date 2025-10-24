@@ -7,6 +7,7 @@ import {
   Alert,
   SafeAreaView,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -202,9 +203,24 @@ const WeightGoalEditScreen: React.FC = () => {
               <Card style={styles.card}>
                 <View style={styles.calorieSection}>
                   <Text style={styles.inputLabel}>Target calories per day</Text>
-                  <Text style={styles.medicalCitation}>
-                    Based on Mifflin-St Jeor Equation (AJCN, 1990)
-                  </Text>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      const url = 'https://pubmed.ncbi.nlm.nih.gov/2305711/';
+                      const supported = await Linking.canOpenURL(url);
+                      if (supported) {
+                        await Linking.openURL(url);
+                      } else {
+                        Alert.alert('Error', 'Unable to open link');
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.medicalCitation}>
+                      Based on Mifflin-St Jeor Equation (AJCN, 1990)
+                      {' '}
+                      <Text style={styles.citationLink}>→ Source</Text>
+                    </Text>
+                  </TouchableOpacity>
 
                   <View style={styles.calorieToggleContainer}>
                     <TouchableOpacity
@@ -470,6 +486,12 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 4,
     marginBottom: 8,
+  },
+  citationLink: {
+    fontSize: 9,
+    color: colors.brandOuterSkin,
+    textDecorationLine: 'underline',
+    fontStyle: 'normal',
   },
   inputHelper: {
     fontSize: fonts.xs,

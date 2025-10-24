@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
@@ -181,9 +181,24 @@ export const DailyView: React.FC<DailyViewProps> = ({
           <Text style={styles.goalText}>
             Goal: {Math.round(goal)} kcal
           </Text>
-          <Text style={styles.medicalCitation}>
-            Based on Mifflin-St Jeor Equation (AJCN, 1990)
-          </Text>
+          <TouchableOpacity
+            onPress={async () => {
+              const url = 'https://pubmed.ncbi.nlm.nih.gov/2305711/';
+              const supported = await Linking.canOpenURL(url);
+              if (supported) {
+                await Linking.openURL(url);
+              } else {
+                Alert.alert('Error', 'Unable to open link');
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.medicalCitation}>
+              Based on Mifflin-St Jeor Equation (AJCN, 1990)
+              {'\n'}
+              <Text style={styles.citationLink}>Tap for medical source →</Text>
+            </Text>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -353,6 +368,13 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: 4,
+  },
+  citationLink: {
+    fontSize: 9,
+    color: colors.white,
+    opacity: 0.8,
+    textDecorationLine: 'underline',
+    fontStyle: 'normal',
   },
   macroSection: {
     paddingHorizontal: spacing.lg,
