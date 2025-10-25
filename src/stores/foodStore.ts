@@ -30,10 +30,13 @@ interface FoodState {
   debugStoreState: () => void;
   clearAllData: () => void;
   updateCurrentDate: () => void;
-  
+
+  // Data deletion for Apple compliance
+  deleteAllFoodData: () => void;
+
   // Display helpers
   getDisplayQuantity: (food: LoggedFood) => { amount: number; unit: string };
-  
+
   // Profile integration
   updateCalorieGoalForAllLogs: (newCalorieGoal: number) => void;
 }
@@ -284,7 +287,17 @@ export const useFoodStore = create<FoodState>()(
         });
         console.log('✅ All data cleared');
       },
-      
+
+      deleteAllFoodData: () => {
+        console.log('foodStore: Deleting all food data for Apple compliance');
+        set({
+          foodItems: [],
+          dailyLogs: [],
+          currentDate: getTodayString(),
+        });
+        console.log('foodStore: All food data deleted');
+      },
+
       // Fix current date if it's wrong
       updateCurrentDate: () => {
         const todayString = getTodayString();

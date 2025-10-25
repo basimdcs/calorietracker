@@ -24,8 +24,9 @@ const SettingsScreen: React.FC = () => {
   const {
     profile,
     resetProfile,
+    deleteAllUserData,
   } = useUserStore();
-  const { clearAllData: clearFoodData } = useFoodStore();
+  const { clearAllData: clearFoodData, deleteAllFoodData } = useFoodStore();
   const { userStats } = useUser();
   const { state: revenueCatState, actions: revenueCatActions } = useRevenueCatContext();
   const { presentPaywallIfNeededWithAlert } = usePaywall();
@@ -117,6 +118,51 @@ const SettingsScreen: React.FC = () => {
     );
   };
 
+  const handleDeleteAllData = () => {
+    // First confirmation
+    Alert.alert(
+      'Delete All Your Data?',
+      'This will permanently delete:\n\n• All food logs and meal history\n• Personal information (name, age, weight, height)\n• Goal settings and preferences\n• Voice recording usage count\n\nYour subscription status will be preserved.\n\nThis action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            // Second confirmation
+            Alert.alert(
+              'Are You Absolutely Sure?',
+              'All your data will be permanently deleted and you will return to the first-time setup screen.\n\nYour subscription will remain active and can be managed through App Store settings.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, Delete Everything',
+                  style: 'destructive',
+                  onPress: () => {
+                    // Execute deletion
+                    deleteAllUserData();
+                    deleteAllFoodData();
+                    Alert.alert(
+                      'Data Deleted',
+                      'All your data has been deleted. The app will now restart to the setup screen.',
+                      [
+                        {
+                          text: 'OK',
+                          onPress: () => {
+                            // Navigation will automatically handle this since isOnboardingComplete is now false
+                          }
+                        }
+                      ]
+                    );
+                  }
+                }
+              ]
+            );
+          }
+        }
+      ]
+    );
+  };
 
   // Get usage stats from RevenueCat (single source of truth)
   const usageStats = {
@@ -395,10 +441,36 @@ const SettingsScreen: React.FC = () => {
               </TouchableOpacity>
             </View> */}
 
+            {/* Data & Privacy Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>🔒 Data & Privacy</Text>
+
+              {/* Delete All Data */}
+              <TouchableOpacity
+                style={[styles.settingsCard, styles.dangerCard]}
+                onPress={handleDeleteAllData}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.cardLeft}>
+                    <View style={[styles.iconContainer, styles.dangerIconContainer]}>
+                      <MaterialIcons name="delete-forever" size={24} color={colors.error} />
+                    </View>
+                    <View style={styles.cardText}>
+                      <Text style={[styles.cardTitle, styles.dangerText]}>Delete All My Data</Text>
+                      <Text style={styles.cardSubtitle}>
+                        Permanently delete all your personal information and food logs
+                      </Text>
+                    </View>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={24} color={colors.error} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
             {/* Support & Legal Section */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Support & Legal</Text>
-              
+
               {/* Privacy Policy */}
               <TouchableOpacity
                 style={styles.settingsCard}
@@ -870,6 +942,17 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     fontSize: fonts.sm,
     color: colors.textSecondary,
+  },
+  // Danger styles for delete data button
+  dangerCard: {
+    borderColor: colors.error + '30',
+    borderWidth: 1,
+  },
+  dangerIconContainer: {
+    backgroundColor: colors.error + '20',
+  },
+  dangerText: {
+    color: colors.error,
   },
   // Profile overview card styles
   profileOverviewCard: {

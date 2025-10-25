@@ -16,6 +16,8 @@ interface UserState {
   updateCalorieGoal: (newGoal: number, isCustom?: boolean) => void;
   updateWeightGoal: (newGoal: 'lose' | 'maintain' | 'gain', weeklyTarget?: number) => void;
   recalculateGoals: () => void;
+  // Data deletion for Apple compliance
+  deleteAllUserData: () => void;
 }
 
 // BMR calculation using Mifflin-St Jeor Equation
@@ -174,7 +176,7 @@ export const useUserStore = create<UserState>()(
 
         const bmr = calculateBMR(currentProfile);
         const tdee = bmr * activityMultipliers[currentProfile.activityLevel];
-        
+
         const updatedProfile: UserProfile = {
           ...currentProfile,
           bmr,
@@ -185,6 +187,20 @@ export const useUserStore = create<UserState>()(
 
         set({ profile: updatedProfile });
         console.log('userStore: Goals recalculated based on current profile');
+      },
+
+      deleteAllUserData: () => {
+        // Clear all user data including profile and onboarding status
+        // Note: Subscription data is managed by RevenueCat independently
+        // When user completes onboarding again, RevenueCat will automatically
+        // re-sync their subscription status from Apple's servers
+        set({
+          profile: null,
+          isOnboardingComplete: false
+        });
+
+        console.log('userStore: All user data deleted');
+        console.log('userStore: Subscription will be automatically restored by RevenueCat on next app launch');
       },
     }),
     {
