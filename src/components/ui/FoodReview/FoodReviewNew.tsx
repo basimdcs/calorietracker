@@ -15,7 +15,7 @@ import { useRTLStyles } from '../../../utils/rtl';
 
 interface FoodReviewNewProps {
   foods: ParsedFoodItem[];
-  onEditFood: (index: number) => void;
+  onUpdateFood: (index: number) => void;
   onRemoveFood: (index: number) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -27,7 +27,7 @@ const formatNutritionValue = (value: number): string => {
 
 export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
   foods,
-  onEditFood,
+  onUpdateFood,
   onRemoveFood,
   onConfirm,
   onCancel,
@@ -122,7 +122,12 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.foodList}>
           {validatedFoods.map((food, index) => (
-            <View key={index} style={styles.foodCard}>
+            <TouchableOpacity
+              key={index}
+              style={styles.foodCard}
+              onPress={() => onUpdateFood(index)}
+              activeOpacity={0.7}
+            >
               {/* Food Header */}
               <View style={[styles.foodHeader, rtlRow]}>
                 <View style={styles.foodInfo}>
@@ -142,14 +147,20 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
                 {/* Action Icons */}
                 <View style={[styles.foodActions, rtlRow]}>
                   <TouchableOpacity
-                    onPress={() => onEditFood(index)}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      onUpdateFood(index);
+                    }}
                     style={styles.iconButton}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <MaterialIcons name="edit" size={20} color={colors.gray400} />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => onRemoveFood(index)}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      onRemoveFood(index);
+                    }}
                     style={styles.iconButton}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
@@ -177,7 +188,7 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
                   <Text style={styles.nutritionValue}>{formatNutritionValue(food.fat)}G</Text>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
