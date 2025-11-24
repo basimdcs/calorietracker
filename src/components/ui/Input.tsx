@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TextInput } from 'react-native';
 import { InputProps } from '../../types';
 import { colors, fonts, components, spacing } from '../../constants/theme';
+import { useRTLStyles } from '../../utils/rtl';
 
 export const Input: React.FC<InputProps> = ({
   label,
@@ -14,6 +15,8 @@ export const Input: React.FC<InputProps> = ({
   disabled = false,
   style,
 }) => {
+  const { rtlText } = useRTLStyles();
+
   const getInputStyle = () => {
     return {
       height: components.input.height,
@@ -46,9 +49,9 @@ export const Input: React.FC<InputProps> = ({
 
   return (
     <View style={style}>
-      {label && <Text style={getLabelStyle()}>{label}</Text>}
+      {label && <Text style={[getLabelStyle(), rtlText]}>{label}</Text>}
       <TextInput
-        style={getInputStyle()}
+        style={[getInputStyle(), rtlText]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -59,7 +62,7 @@ export const Input: React.FC<InputProps> = ({
         autoCapitalize="none"
         autoCorrect={false}
       />
-      {error && <Text style={getErrorStyle()}>{error}</Text>}
+      {error && <Text style={[getErrorStyle(), rtlText]}>{error}</Text>}
     </View>
   );
 }; 
