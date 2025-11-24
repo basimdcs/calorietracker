@@ -23,6 +23,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import WelcomeScreen from './WelcomeScreen';
 import CalorieEditor from '../../components/ui/CalorieEditor';
+import { useTranslation } from '../../hooks/useTranslation';
+import { useRTLStyles } from '../../utils/rtl';
 
 // No external slider - we'll use a custom implementation
 
@@ -37,6 +39,9 @@ interface OnboardingData {
 }
 
 const OnboardingScreen: React.FC = () => {
+  const { t } = useTranslation();
+  const { rtlText } = useRTLStyles();
+
   const [step, setStep] = useState(0); // Start with welcome screen
   const [data, setData] = useState<OnboardingData>({
     name: '',
@@ -55,6 +60,48 @@ const OnboardingScreen: React.FC = () => {
 
   const updateData = (field: keyof OnboardingData, value: any) => {
     setData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Helper functions to get translated activity level labels and descriptions
+  const getActivityLevelLabel = (value: ActivityLevel): string => {
+    const labelMap: Record<ActivityLevel, string> = {
+      'sedentary': t('onboarding.step3.sedentary'),
+      'lightly-active': t('onboarding.step3.lightlyActive'),
+      'moderately-active': t('onboarding.step3.moderatelyActive'),
+      'very-active': t('onboarding.step3.veryActive'),
+      'extra-active': t('onboarding.step3.extraActive'),
+    };
+    return labelMap[value] || value;
+  };
+
+  const getActivityLevelDesc = (value: ActivityLevel): string => {
+    const descMap: Record<ActivityLevel, string> = {
+      'sedentary': t('onboarding.step3.sedentaryDesc'),
+      'lightly-active': t('onboarding.step3.lightlyActiveDesc'),
+      'moderately-active': t('onboarding.step3.moderatelyActiveDesc'),
+      'very-active': t('onboarding.step3.veryActiveDesc'),
+      'extra-active': t('onboarding.step3.extraActiveDesc'),
+    };
+    return descMap[value] || value;
+  };
+
+  // Helper functions to get translated goal labels and descriptions
+  const getGoalLabel = (value: Goal): string => {
+    const labelMap: Record<Goal, string> = {
+      'lose': t('onboarding.step4.lose'),
+      'maintain': t('onboarding.step4.maintain'),
+      'gain': t('onboarding.step4.gain'),
+    };
+    return labelMap[value] || value;
+  };
+
+  const getGoalDesc = (value: Goal): string => {
+    const descMap: Record<Goal, string> = {
+      'lose': t('onboarding.step4.loseDesc'),
+      'maintain': t('onboarding.step4.maintainDesc'),
+      'gain': t('onboarding.step4.gainDesc'),
+    };
+    return descMap[value] || value;
   };
 
   const validateStep = (currentStep: number): boolean => {
@@ -93,49 +140,49 @@ const OnboardingScreen: React.FC = () => {
     } else {
       // Give detailed, user-friendly error messages
       let errorMessages: string[] = [];
-      
+
       if (step === 1) {
         // Name validation
         if (data.name.trim() === '') {
-          errorMessages.push('• Please enter your name');
+          errorMessages.push(t('onboarding.validation.enterName'));
         }
-        
+
         // Age validation with specific feedback
         if (data.age === '') {
-          errorMessages.push('• Please enter your age');
+          errorMessages.push(t('onboarding.validation.enterAge'));
         } else if (isNaN(parseInt(data.age))) {
-          errorMessages.push('• Age must be a number (e.g., 25)');
+          errorMessages.push(t('onboarding.validation.ageNumber'));
         } else if (parseInt(data.age) <= 0) {
-          errorMessages.push('• Age must be greater than 0');
+          errorMessages.push(t('onboarding.validation.ageGreaterThanZero'));
         } else if (parseInt(data.age) > 120) {
-          errorMessages.push('• Please enter a valid age (1-120)');
+          errorMessages.push(t('onboarding.validation.ageValid'));
         }
-        
+
       } else if (step === 2) {
         // Height validation
         if (data.height === '') {
-          errorMessages.push('• Please enter your height');
+          errorMessages.push(t('onboarding.validation.enterHeight'));
         } else if (isNaN(parseFloat(data.height))) {
-          errorMessages.push('• Height must be a number (e.g., 175)');
+          errorMessages.push(t('onboarding.validation.heightNumber'));
         } else if (parseFloat(data.height) < 50) {
-          errorMessages.push('• Height seems too low (minimum 50cm)');
+          errorMessages.push(t('onboarding.validation.heightTooLow'));
         } else if (parseFloat(data.height) > 250) {
-          errorMessages.push('• Height seems too high (maximum 250cm)');
+          errorMessages.push(t('onboarding.validation.heightTooHigh'));
         }
-        
+
         // Weight validation
         if (data.weight === '') {
-          errorMessages.push('• Please enter your weight');
+          errorMessages.push(t('onboarding.validation.enterWeight'));
         } else if (isNaN(parseFloat(data.weight))) {
-          errorMessages.push('• Weight must be a number (e.g., 70)');
+          errorMessages.push(t('onboarding.validation.weightNumber'));
         } else if (parseFloat(data.weight) < 20) {
-          errorMessages.push('• Weight seems too low (minimum 20kg)');
+          errorMessages.push(t('onboarding.validation.weightTooLow'));
         } else if (parseFloat(data.weight) > 300) {
-          errorMessages.push('• Weight seems too high (maximum 300kg)');
+          errorMessages.push(t('onboarding.validation.weightTooHigh'));
         }
       }
-      
-      const title = errorMessages.length === 1 ? 'Please Fix This:' : 'Please Fix These:';
+
+      const title = errorMessages.length === 1 ? t('onboarding.validation.pleaseFixThis') : t('onboarding.validation.pleaseFixThese');
       Alert.alert(title, errorMessages.join('\n'));
     }
   };
@@ -171,46 +218,46 @@ const OnboardingScreen: React.FC = () => {
 
   const renderStep1 = () => (
     <Card style={styles.stepCard}>
-      <Text style={styles.stepTitle}>👋 Tell us about yourself</Text>
-      <Text style={styles.stepSubtitle}>Basic information to get started</Text>
-      
+      <Text style={[styles.stepTitle, rtlText]}>{t('onboarding.step1.title')}</Text>
+      <Text style={[styles.stepSubtitle, rtlText]}>{t('onboarding.step1.subtitle')}</Text>
+
       <Input
-        label="Name"
+        label={t('onboarding.step1.nameLabel')}
         value={data.name}
         onChangeText={(text) => updateData('name', text)}
-        placeholder="e.g., John Doe"
+        placeholder={t('onboarding.step1.namePlaceholder')}
         style={styles.input}
         returnKeyType="next"
         onSubmitEditing={() => Keyboard.dismiss()}
       />
-      
+
       <Input
-        label="Age (years)"
+        label={t('onboarding.step1.ageLabel')}
         value={data.age}
         onChangeText={(text) => updateData('age', text)}
-        placeholder="e.g., 25"
+        placeholder={t('onboarding.step1.agePlaceholder')}
         keyboardType="numeric"
         style={styles.input}
         returnKeyType="done"
         onSubmitEditing={() => Keyboard.dismiss()}
       />
 
-      <Text style={styles.label}>Gender</Text>
+      <Text style={[styles.label, rtlText]}>{t('onboarding.step1.genderLabel')}</Text>
       <View style={styles.buttonRow}>
         <TouchableOpacity
           style={[styles.optionButton, data.gender === 'male' && styles.selectedButton]}
           onPress={() => updateData('gender', 'male')}
         >
-          <Text style={[styles.optionText, data.gender === 'male' && styles.selectedButtonText]}>
-            Male
+          <Text style={[styles.optionText, data.gender === 'male' && styles.selectedButtonText, rtlText]}>
+            {t('profileEdit.male')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.optionButton, data.gender === 'female' && styles.selectedButton]}
           onPress={() => updateData('gender', 'female')}
         >
-          <Text style={[styles.optionText, data.gender === 'female' && styles.selectedButtonText]}>
-            Female
+          <Text style={[styles.optionText, data.gender === 'female' && styles.selectedButtonText, rtlText]}>
+            {t('profileEdit.female')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -219,25 +266,25 @@ const OnboardingScreen: React.FC = () => {
 
   const renderStep2 = () => (
     <Card style={styles.stepCard}>
-      <Text style={styles.stepTitle}>📏 Physical Details</Text>
-      <Text style={styles.stepSubtitle}>Help us calculate your daily needs</Text>
-      
+      <Text style={[styles.stepTitle, rtlText]}>{t('onboarding.step2.title')}</Text>
+      <Text style={[styles.stepSubtitle, rtlText]}>{t('onboarding.step2.subtitle')}</Text>
+
       <Input
-        label="Height (centimeters)"
+        label={t('onboarding.step2.heightLabel')}
         value={data.height}
         onChangeText={(text) => updateData('height', text)}
-        placeholder="e.g., 175"
+        placeholder={t('onboarding.step2.heightPlaceholder')}
         keyboardType="numeric"
         style={styles.input}
         returnKeyType="next"
         onSubmitEditing={() => Keyboard.dismiss()}
       />
-      
+
       <Input
-        label="Weight (kilograms)"
+        label={t('onboarding.step2.weightLabel')}
         value={data.weight}
         onChangeText={(text) => updateData('weight', text)}
-        placeholder="e.g., 70"
+        placeholder={t('onboarding.step2.weightPlaceholder')}
         keyboardType="numeric"
         style={styles.input}
         returnKeyType="done"
@@ -248,19 +295,21 @@ const OnboardingScreen: React.FC = () => {
 
   const renderStep3 = () => (
     <Card style={styles.stepCard}>
-      <Text style={styles.stepTitle}>🏃‍♂️ Activity Level</Text>
-      <Text style={styles.stepSubtitle}>How active are you during the week?</Text>
-      
+      <Text style={[styles.stepTitle, rtlText]}>{t('onboarding.step3.title')}</Text>
+      <Text style={[styles.stepSubtitle, rtlText]}>{t('onboarding.step3.subtitle')}</Text>
+
       {ACTIVITY_LEVELS.map((level) => (
         <TouchableOpacity
           key={level.value}
           style={[styles.optionCard, data.activityLevel === level.value && styles.selectedCard]}
           onPress={() => updateData('activityLevel', level.value)}
         >
-          <Text style={[styles.optionCardTitle, data.activityLevel === level.value && styles.selectedText]}>
-            {level.label}
+          <Text style={[styles.optionCardTitle, data.activityLevel === level.value && styles.selectedText, rtlText]}>
+            {getActivityLevelLabel(level.value)}
           </Text>
-          <Text style={[styles.optionCardDesc, data.activityLevel === level.value && styles.selectedDescText]}>{level.description}</Text>
+          <Text style={[styles.optionCardDesc, data.activityLevel === level.value && styles.selectedDescText, rtlText]}>
+            {getActivityLevelDesc(level.value)}
+          </Text>
         </TouchableOpacity>
       ))}
     </Card>
@@ -268,19 +317,21 @@ const OnboardingScreen: React.FC = () => {
 
   const renderStep4 = () => (
     <Card style={styles.stepCard}>
-      <Text style={styles.stepTitle}>🎯 Weight Goal</Text>
-      <Text style={styles.stepSubtitle}>What's your main fitness goal?</Text>
-      
+      <Text style={[styles.stepTitle, rtlText]}>{t('onboarding.step4.title')}</Text>
+      <Text style={[styles.stepSubtitle, rtlText]}>{t('onboarding.step4.subtitle')}</Text>
+
       {GOALS.map((goal) => (
         <TouchableOpacity
           key={goal.value}
           style={[styles.optionCard, data.goal === goal.value && styles.selectedCard]}
           onPress={() => updateData('goal', goal.value)}
         >
-          <Text style={[styles.optionCardTitle, data.goal === goal.value && styles.selectedText]}>
-            {goal.label}
+          <Text style={[styles.optionCardTitle, data.goal === goal.value && styles.selectedText, rtlText]}>
+            {getGoalLabel(goal.value)}
           </Text>
-          <Text style={[styles.optionCardDesc, data.goal === goal.value && styles.selectedDescText]}>{goal.description}</Text>
+          <Text style={[styles.optionCardDesc, data.goal === goal.value && styles.selectedDescText, rtlText]}>
+            {getGoalDesc(goal.value)}
+          </Text>
         </TouchableOpacity>
       ))}
     </Card>
