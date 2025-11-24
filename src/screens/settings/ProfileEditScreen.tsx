@@ -25,7 +25,7 @@ const ProfileEditScreen: React.FC = () => {
   const navigation = useNavigation();
   const { profile, updateProfile } = useUserStore();
   const { t } = useTranslation();
-  const { rtlText } = useRTLStyles();
+  const { rtlText, rtlRow, rtlIcon } = useRTLStyles();
 
   const [formData, setFormData] = useState<Partial<UserProfile>>({
     name: profile?.name || '',
@@ -96,7 +96,7 @@ const ProfileEditScreen: React.FC = () => {
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
+          <View style={[styles.modalHeader, rtlRow]}>
             <Text style={[styles.modalTitle, rtlText]}>{t('profileEdit.gender')}</Text>
             <TouchableOpacity onPress={() => setShowGenderPicker(false)}>
               <MaterialIcons name="close" size={24} color={colors.textSecondary} />
@@ -108,6 +108,7 @@ const ProfileEditScreen: React.FC = () => {
               key={gender}
               style={[
                 styles.pickerItem,
+                rtlRow,
                 formData.gender === gender && styles.selectedPickerItem,
               ]}
               onPress={() => {
@@ -147,9 +148,9 @@ const ProfileEditScreen: React.FC = () => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, rtlRow]}>
           <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
-            <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
+            <MaterialIcons name={rtlIcon("arrow-back", "arrow-forward")} size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, rtlText]}>{t('profileEdit.title')}</Text>
           <TouchableOpacity onPress={handleSave} style={styles.headerButton}>
@@ -227,7 +228,7 @@ const ProfileEditScreen: React.FC = () => {
         </ScrollView>
 
         {/* Action Buttons */}
-        <View style={styles.actions}>
+        <View style={[styles.actions, rtlRow]}>
           <Button
             title={t('common.cancel')}
             onPress={handleCancel}

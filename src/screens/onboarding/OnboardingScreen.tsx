@@ -40,7 +40,7 @@ interface OnboardingData {
 
 const OnboardingScreen: React.FC = () => {
   const { t } = useTranslation();
-  const { rtlText } = useRTLStyles();
+  const { rtlText, rtlRow } = useRTLStyles();
 
   const [step, setStep] = useState(0); // Start with welcome screen
   const [data, setData] = useState<OnboardingData>({
@@ -243,7 +243,7 @@ const OnboardingScreen: React.FC = () => {
       />
 
       <Text style={[styles.label, rtlText]}>{t('onboarding.step1.genderLabel')}</Text>
-      <View style={styles.buttonRow}>
+      <View style={[styles.buttonRow, rtlRow]}>
         <TouchableOpacity
           style={[styles.optionButton, data.gender === 'male' && styles.selectedButton]}
           onPress={() => updateData('gender', 'male')}
@@ -470,7 +470,7 @@ const OnboardingScreen: React.FC = () => {
 
             {/* Compact Customize Button */}
             <TouchableOpacity
-              style={styles.compactCustomizeButton}
+              style={[styles.compactCustomizeButton, rtlRow]}
               onPress={() => setShowCustomEditor(true)}
             >
               <MaterialIcons name="tune" size={16} color={colors.brandOuterSkin} />
@@ -487,7 +487,7 @@ const OnboardingScreen: React.FC = () => {
               <Text style={[styles.compactCalorieLabel, rtlText]}>{t('onboarding.step5.enterTarget')}</Text>
 
               {/* Manual Input */}
-              <View style={styles.manualInputContainer}>
+              <View style={[styles.manualInputContainer, rtlRow]}>
                 <TextInput
                   style={styles.calorieInput}
                   value={Math.round(currentCalories).toString()}
@@ -519,7 +519,7 @@ const OnboardingScreen: React.FC = () => {
 
             {/* Compact Impact Display */}
             <View style={styles.compactImpactContainer}>
-              <View style={styles.compactImpactRow}>
+              <View style={[styles.compactImpactRow, rtlRow]}>
                 <View style={styles.compactImpactItem}>
                   <Text style={[styles.compactImpactLabel, rtlText]}>
                     {type === 'deficit' ? t('onboarding.step5.dailyDeficit') :
@@ -554,7 +554,7 @@ const OnboardingScreen: React.FC = () => {
             {/* Reset Button */}
             {customCalories && customCalories !== recommendedCalories && (
               <TouchableOpacity
-                style={styles.editorResetButton}
+                style={[styles.editorResetButton, rtlRow]}
                 onPress={() => setCustomCalories(null)}
               >
                 <MaterialIcons name="refresh" size={18} color={colors.brandOuterSkin} />
@@ -564,7 +564,7 @@ const OnboardingScreen: React.FC = () => {
 
             {/* Back to Summary */}
             <TouchableOpacity
-              style={styles.backToSummaryButton}
+              style={[styles.backToSummaryButton, rtlRow]}
               onPress={() => setShowCustomEditor(false)}
             >
               <MaterialIcons name="check" size={18} color={colors.white} />
@@ -594,7 +594,7 @@ const OnboardingScreen: React.FC = () => {
         >
           {/* Small Banner */}
           <View style={styles.smallBanner}>
-            <View style={styles.smallBannerContent}>
+            <View style={[styles.smallBannerContent, rtlRow]}>
               <Text style={[styles.smallBannerTitle, rtlText]}>{t('onboarding.profileSetup')}</Text>
               <Text style={[styles.smallBannerStep, rtlText]}>{t('onboarding.stepOf', { current: step, total: 5 })}</Text>
             </View>
@@ -612,7 +612,7 @@ const OnboardingScreen: React.FC = () => {
           {step === 5 && renderStep5()}
         </ScrollView>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, rtlRow]}>
           {step > 1 && (
             <Button
               title={t('common.back')}
