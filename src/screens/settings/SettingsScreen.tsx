@@ -245,8 +245,8 @@ const SettingsScreen: React.FC = () => {
                       <MaterialIcons name="auto-awesome" size={24} color="#FFD700" />
                     </View>
                     <View style={styles.proTitleSection}>
-                      <Text style={styles.proTitle}>{t('settings.upgradeTitle')}</Text>
-                      <Text style={styles.proSubtitle}>{t('settings.unlockPotential')}</Text>
+                      <Text style={[styles.proTitle, rtlText]}>{t('settings.upgradeTitle')}</Text>
+                      <Text style={[styles.proSubtitle, rtlText]}>{t('settings.unlockPotential')}</Text>
                     </View>
                   </View>
 
@@ -255,19 +255,19 @@ const SettingsScreen: React.FC = () => {
                       <View style={styles.checkIconContainer}>
                         <MaterialIcons name="check" size={14} color={colors.white} />
                       </View>
-                      <Text style={styles.proFeatureText}>{t('settings.proFeature1')}</Text>
+                      <Text style={[styles.proFeatureText, rtlText]}>{t('settings.proFeature1')}</Text>
                     </View>
                     <View style={styles.proFeatureRow}>
                       <View style={styles.checkIconContainer}>
                         <MaterialIcons name="check" size={14} color={colors.white} />
                       </View>
-                      <Text style={styles.proFeatureText}>{t('settings.proFeature3')}</Text>
+                      <Text style={[styles.proFeatureText, rtlText]}>{t('settings.proFeature3')}</Text>
                     </View>
                     <View style={styles.proFeatureRow}>
                       <View style={styles.checkIconContainer}>
                         <MaterialIcons name="check" size={14} color={colors.white} />
                       </View>
-                      <Text style={styles.proFeatureText}>{t('settings.proFeature4')}</Text>
+                      <Text style={[styles.proFeatureText, rtlText]}>{t('settings.proFeature4')}</Text>
                     </View>
                   </View>
 
@@ -282,7 +282,7 @@ const SettingsScreen: React.FC = () => {
                       end={{ x: 1, y: 0 }}
                       style={styles.upgradeButtonGradient}
                     >
-                      <Text style={styles.upgradeButtonText}>{t('settings.getProNow')}</Text>
+                      <Text style={[styles.upgradeButtonText, rtlText]}>{t('settings.getProNow')}</Text>
                       <MaterialIcons name={rtlIcon("arrow-forward", "arrow-back")} size={20} color="#2D1B69" />
                     </LinearGradient>
                   </TouchableOpacity>
