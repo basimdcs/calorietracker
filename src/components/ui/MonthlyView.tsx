@@ -135,7 +135,11 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
   };
 
   const locale = currentLanguage === 'ar' ? 'ar-SA' : 'en-US';
-  const monthName = currentMonth.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+  const monthName = currentMonth.toLocaleDateString(locale, {
+    month: 'long',
+    year: 'numeric',
+    calendar: 'gregory' // Force Gregorian calendar only
+  });
 
   // Calculate the progress percentage for calorie bars
   const getProgressPercentage = (calories: number, goal: number) => {
