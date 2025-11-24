@@ -7,6 +7,7 @@ import { useUserStore } from '../stores/userStore';
 import { RootStackParamList, TabParamList } from '../types';
 import { colors, fonts } from '../constants/theme';
 import { CustomBottomTab } from '../components/ui/CustomBottomTab';
+import { useTranslation } from '../hooks/useTranslation';
 
 // Import screens (we'll create these next)
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
@@ -24,6 +25,8 @@ const Tab = createBottomTabNavigator<TabParamList>();
 
 // Tab Navigator for main app screens
 function MainTabNavigator() {
+  const { t } = useTranslation();
+
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomBottomTab {...props} />}
@@ -43,39 +46,39 @@ function MainTabNavigator() {
         headerTitleAlign: 'center',
       }}
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomeScreen}
         options={{
-          title: 'Dashboard',
-          tabBarLabel: 'Home',
+          title: t('navigation.home'),
+          tabBarLabel: t('navigation.home'),
           headerShown: false,
         }}
       />
-      <Tab.Screen 
-        name="Voice" 
+      <Tab.Screen
+        name="Voice"
         component={VoiceScreen}
         options={{
-          title: 'Record Food',
-          tabBarLabel: 'Record',
+          title: t('navigation.voice'),
+          tabBarLabel: t('navigation.voice'),
           headerShown: false,
         }}
       />
-      <Tab.Screen 
-        name="History" 
+      <Tab.Screen
+        name="History"
         component={HistoryScreen}
         options={{
-          title: 'Food History',
-          tabBarLabel: 'History',
+          title: t('navigation.history'),
+          tabBarLabel: t('navigation.history'),
           headerShown: false,
         }}
       />
-      <Tab.Screen 
-        name="Settings" 
+      <Tab.Screen
+        name="Settings"
         component={SettingsScreen}
         options={{
-          title: 'Settings',
-          tabBarLabel: 'Settings',
+          title: t('navigation.settings'),
+          tabBarLabel: t('navigation.settings'),
           headerShown: false,
         }}
       />

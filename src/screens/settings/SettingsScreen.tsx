@@ -215,8 +215,8 @@ const SettingsScreen: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View style={styles.headerLeft}>
-              <Text style={styles.headerTitle}>{t('settings.settings')}</Text>
-              <Text style={styles.headerSubtitle}>
+              <Text style={[styles.headerTitle, rtlText]}>{t('settings.settings')}</Text>
+              <Text style={[styles.headerSubtitle, rtlText]}>
                 {t('settings.subtitle')}
               </Text>
             </View>
@@ -293,7 +293,7 @@ const SettingsScreen: React.FC = () => {
             {(!revenueCatState.subscriptionStatus.isActive || revenueCatState.subscriptionStatus.tier === 'FREE') && (
               <View style={styles.usageProgressContainer}>
                 <View style={styles.usageProgressHeader}>
-                  <Text style={styles.usageProgressLabel}>Monthly Usage</Text>
+                  <Text style={[styles.usageProgressLabel, rtlText]}>{t('settings.monthlyUsage')}</Text>
                   <Text style={styles.usageProgressText}>
                     {usageStats.recordingsUsed} / {usageStats.monthlyLimit || '∞'}
                   </Text>
@@ -340,7 +340,7 @@ const SettingsScreen: React.FC = () => {
                 onPress={handleRestorePurchases}
               >
                 <MaterialIcons name="restore" size={20} color={colors.primary} />
-                <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+                <Text style={[styles.restoreButtonText, rtlText]}>{t('settings.restorePurchases')}</Text>
               </TouchableOpacity>
             </View>
 
