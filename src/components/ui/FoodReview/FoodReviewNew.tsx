@@ -11,6 +11,7 @@ import { ParsedFoodItem } from '../../../types';
 import { colors, fonts, spacing, borderRadius } from '../../../constants/theme';
 import { Button } from '../Button';
 import { useTranslation } from '../../../hooks/useTranslation';
+import { useRTLStyles } from '../../../utils/rtl';
 
 interface FoodReviewNewProps {
   foods: ParsedFoodItem[];
@@ -31,12 +32,8 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const { t, isRTL } = useTranslation();
-
-  // RTL text style following Arabic.md pattern
-  const rtlTextStyle = isRTL
-    ? { writingDirection: 'rtl' as const, textAlign: 'left' as const }
-    : { writingDirection: 'ltr' as const, textAlign: 'left' as const };
+  const { t } = useTranslation();
+  const { rtlText, rtlRow } = useRTLStyles();
 
   // Validate foods and filter out invalid entries
   const validatedFoods = useMemo(() => {
@@ -63,12 +60,12 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.header, rtlRow]}>
         <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, rtlTextStyle]}>
+          <Text style={[styles.headerTitle, rtlText]}>
             {t('foodReview.title') || 'Review Your Meal'}
           </Text>
-          <Text style={[styles.headerSubtitle, rtlTextStyle]}>
+          <Text style={[styles.headerSubtitle, rtlText]}>
             {t('foodReview.subtitle') || 'Confirm or edit the items from your recording.'}
           </Text>
         </View>
@@ -79,12 +76,12 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
 
       {/* Meal Totals Card */}
       <View style={styles.totalsCard}>
-        <View style={styles.totalsHeader}>
+        <View style={[styles.totalsHeader, rtlRow]}>
           <View>
-            <Text style={[styles.totalsTitle, rtlTextStyle]}>
+            <Text style={[styles.totalsTitle, rtlText]}>
               {t('foodReview.mealTotals') || 'Meal Totals'}
             </Text>
-            <Text style={[styles.itemCount, rtlTextStyle]}>
+            <Text style={[styles.itemCount, rtlText]}>
               {validatedFoods.length} {validatedFoods.length === 1
                 ? (t('foodReview.item') || 'item')
                 : (t('foodReview.items') || 'items')}
@@ -99,24 +96,24 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
         </View>
 
         {/* Macros Row */}
-        <View style={styles.macrosRow}>
+        <View style={[styles.macrosRow, rtlRow]}>
           <View style={styles.macroItem}>
-            <Text style={[styles.macroValue, rtlTextStyle]}>
+            <Text style={[styles.macroValue, rtlText]}>
               {formatNutritionValue(totalNutrition.protein)}G
             </Text>
-            <Text style={[styles.macroLabel, rtlTextStyle]}>P</Text>
+            <Text style={[styles.macroLabel, rtlText]}>P</Text>
           </View>
           <View style={styles.macroItem}>
-            <Text style={[styles.macroValue, rtlTextStyle]}>
+            <Text style={[styles.macroValue, rtlText]}>
               {formatNutritionValue(totalNutrition.carbs)}G
             </Text>
-            <Text style={[styles.macroLabel, rtlTextStyle]}>C</Text>
+            <Text style={[styles.macroLabel, rtlText]}>C</Text>
           </View>
           <View style={styles.macroItem}>
-            <Text style={[styles.macroValue, rtlTextStyle]}>
+            <Text style={[styles.macroValue, rtlText]}>
               {formatNutritionValue(totalNutrition.fat)}G
             </Text>
-            <Text style={[styles.macroLabel, rtlTextStyle]}>F</Text>
+            <Text style={[styles.macroLabel, rtlText]}>F</Text>
           </View>
         </View>
       </View>
@@ -127,23 +124,23 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
           {validatedFoods.map((food, index) => (
             <View key={index} style={styles.foodCard}>
               {/* Food Header */}
-              <View style={[styles.foodHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.foodHeader, rtlRow]}>
                 <View style={styles.foodInfo}>
-                  <Text style={[styles.foodName, rtlTextStyle]}>{food.name}</Text>
+                  <Text style={[styles.foodName, rtlText]}>{food.name}</Text>
                   {food.quantity && food.unit && (
-                    <Text style={[styles.foodQuantity, rtlTextStyle]}>
+                    <Text style={[styles.foodQuantity, rtlText]}>
                       {food.quantity} {food.unit}
                     </Text>
                   )}
                   {food.cookingMethod && (
-                    <Text style={[styles.cookingMethod, rtlTextStyle]}>
+                    <Text style={[styles.cookingMethod, rtlText]}>
                       {food.cookingMethod}
                     </Text>
                   )}
                 </View>
 
                 {/* Action Icons */}
-                <View style={[styles.foodActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={[styles.foodActions, rtlRow]}>
                   <TouchableOpacity
                     onPress={() => onEditFood(index)}
                     style={styles.iconButton}
@@ -162,7 +159,7 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
               </View>
 
               {/* Nutrition Row */}
-              <View style={styles.nutritionGrid}>
+              <View style={[styles.nutritionGrid, rtlRow]}>
                 <View style={styles.nutritionItemFirst}>
                   <Text style={styles.nutritionLabel}>KCAL</Text>
                   <Text style={styles.nutritionValue}>{formatNutritionValue(food.calories)}</Text>
@@ -186,11 +183,11 @@ export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
       </ScrollView>
 
       {/* Footer */}
-      <View style={[styles.footer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.footer, rtlRow]}>
         <Button
           title={t('common.cancel') || 'Cancel'}
           onPress={onCancel}
-          variant="secondary"
+          variant="outline"
           style={styles.footerButton}
         />
         <Button
