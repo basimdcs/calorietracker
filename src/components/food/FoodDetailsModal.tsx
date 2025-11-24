@@ -14,6 +14,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ParsedFoodItemWithConfidence } from '../../types/aiTypes';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { Button } from '../ui/Button';
+import { useTranslation } from '../../hooks/useTranslation';
+import { getCurrentLanguage } from '../../localization';
 
 interface FoodDetailsModalProps {
   visible: boolean;
@@ -28,8 +30,16 @@ export const FoodDetailsModal: React.FC<FoodDetailsModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const { t, isRTL } = useTranslation();
+  const activeLanguage = getCurrentLanguage();
   const [grams, setGrams] = useState('100');
   const [selectedCookingMethod, setSelectedCookingMethod] = useState('');
+
+  // RTL text style following Arabic.md pattern - ALWAYS use textAlign: 'left'
+  const rtlTextStyle = isRTL
+    ? { writingDirection: 'rtl' as const, textAlign: 'left' as const }
+    : { writingDirection: 'ltr' as const, textAlign: 'left' as const };
+  const rtlRowStyle = isRTL ? { flexDirection: 'row-reverse' as const } : {};
 
   // Reset when modal opens
   useEffect(() => {
@@ -87,32 +97,41 @@ export const FoodDetailsModal: React.FC<FoodDetailsModalProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle="formSheet"
       onRequestClose={onCancel}
+      transparent={false}
     >
-      <View style={styles.container}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onCancel}>
-              <MaterialIcons name="close" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Adjust Food Details</Text>
-            <View style={styles.spacer} />
-          </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        {/* Drag Indicator */}
+        <View style={styles.dragIndicatorContainer}>
+          <View style={styles.dragIndicator} />
+        </View>
 
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={[styles.header, rtlRowStyle]}>
+          <TouchableOpacity onPress={onCancel} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <MaterialIcons name="close" size={22} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, rtlTextStyle]}>{t('foodModals.adjustDetails')}</Text>
+          <View style={styles.spacer} />
+        </View>
+
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
             {/* Food Name */}
             <View style={styles.foodHeader}>
-              <Text style={styles.foodName}>{food.name}</Text>
+              <Text style={[styles.foodName, rtlTextStyle]}>{food.name}</Text>
             </View>
 
             {/* Grams Input */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Amount (grams)</Text>
+              <Text style={[styles.sectionTitle, rtlTextStyle]}>{t('foodModals.amount')}</Text>
               <TextInput
                 style={styles.gramsInput}
                 value={grams}
@@ -126,15 +145,17 @@ export const FoodDetailsModal: React.FC<FoodDetailsModalProps> = ({
             {/* Cooking Method - Only if available */}
             {showCookingMethods && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Cooking Method</Text>
+                <Text style={[styles.sectionTitle, rtlTextStyle]}>{t('foodModals.cookingMethod')}</Text>
                 {food.alternativeMethods.map((method) => {
                   const isSelected = selectedCookingMethod === method.method;
+                  const displayName = activeLanguage === 'ar' ? (method.arabic_name || method.method) : method.method;
                   return (
                     <TouchableOpacity
                       key={method.method}
                       style={[
                         styles.cookingButton,
-                        isSelected && styles.cookingButtonActive
+                        isSelected && styles.cookingButtonActive,
+                        rtlRowStyle
                       ]}
                       onPress={() => setSelectedCookingMethod(method.method)}
                     >
@@ -142,15 +163,10 @@ export const FoodDetailsModal: React.FC<FoodDetailsModalProps> = ({
                       <View style={styles.cookingContent}>
                         <Text style={[
                           styles.cookingText,
-                          isSelected && styles.cookingTextActive
+                          isSelected && styles.cookingTextActive,
+                          rtlTextStyle
                         ]}>
-                          {method.method}
-                        </Text>
-                        <Text style={[
-                          styles.cookingArabic,
-                          isSelected && styles.cookingArabicActive
-                        ]}>
-                          {method.arabic_name}
+                          {displayName}
                         </Text>
                       </View>
                       {isSelected && (
@@ -165,46 +181,45 @@ export const FoodDetailsModal: React.FC<FoodDetailsModalProps> = ({
             {/* Live Nutrition Preview */}
             {liveNutrition && (
               <View style={styles.nutritionPreview}>
-                <Text style={styles.previewTitle}>Nutrition</Text>
+                <Text style={[styles.previewTitle, rtlTextStyle]}>{t('foodModals.nutrition')}</Text>
                 <View style={styles.nutritionGrid}>
                   <View style={styles.nutritionItem}>
-                    <Text style={styles.nutritionValue}>{liveNutrition.calories}</Text>
-                    <Text style={styles.nutritionLabel}>cal</Text>
+                    <Text style={[styles.nutritionValue, rtlTextStyle]}>{liveNutrition.calories}</Text>
+                    <Text style={[styles.nutritionLabel, rtlTextStyle]}>{t('foodModals.cal')}</Text>
                   </View>
                   <View style={styles.nutritionItem}>
-                    <Text style={styles.nutritionValue}>{liveNutrition.protein}g</Text>
-                    <Text style={styles.nutritionLabel}>protein</Text>
+                    <Text style={[styles.nutritionValue, rtlTextStyle]}>{liveNutrition.protein}g</Text>
+                    <Text style={[styles.nutritionLabel, rtlTextStyle]}>{t('foodModals.protein')}</Text>
                   </View>
                   <View style={styles.nutritionItem}>
-                    <Text style={styles.nutritionValue}>{liveNutrition.carbs}g</Text>
-                    <Text style={styles.nutritionLabel}>carbs</Text>
+                    <Text style={[styles.nutritionValue, rtlTextStyle]}>{liveNutrition.carbs}g</Text>
+                    <Text style={[styles.nutritionLabel, rtlTextStyle]}>{t('foodModals.carbs')}</Text>
                   </View>
                   <View style={styles.nutritionItem}>
-                    <Text style={styles.nutritionValue}>{liveNutrition.fat}g</Text>
-                    <Text style={styles.nutritionLabel}>fat</Text>
+                    <Text style={[styles.nutritionValue, rtlTextStyle]}>{liveNutrition.fat}g</Text>
+                    <Text style={[styles.nutritionLabel, rtlTextStyle]}>{t('foodModals.fat')}</Text>
                   </View>
                 </View>
               </View>
             )}
-          </ScrollView>
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Button
-              title="Cancel"
-              onPress={onCancel}
-              variant="secondary"
-              style={styles.button}
-            />
-            <Button
-              title="Save"
-              onPress={handleConfirm}
-              variant="primary"
-              style={[styles.button, styles.saveButton]}
-            />
-          </View>
-        </KeyboardAvoidingView>
-      </View>
+            {/* Footer Buttons */}
+            <View style={[styles.footer, rtlRowStyle]}>
+              <Button
+                title={t('common.cancel')}
+                onPress={onCancel}
+                variant="outline"
+                style={styles.button}
+              />
+              <Button
+                title={t('common.save')}
+                onPress={handleConfirm}
+                variant="primary"
+                style={[styles.button, styles.saveButton]}
+              />
+            </View>
+          </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -213,63 +228,80 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.white,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
-  keyboardView: {
-    flex: 1,
+  dragIndicatorContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.white,
+  },
+  dragIndicator: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.gray300,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
+    backgroundColor: colors.white,
   },
   headerTitle: {
-    fontSize: fonts.lg,
+    fontSize: fonts.base,
     fontWeight: 'bold',
     color: colors.textPrimary,
+    width: '100%',
   },
   spacer: {
-    width: 24,
+    width: 22,
   },
   content: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: spacing.md,
+  },
   foodHeader: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.sm,
     backgroundColor: colors.gray50,
   },
   foodName: {
-    fontSize: fonts['2xl'],
+    fontSize: fonts.lg,
     fontWeight: 'bold',
     color: colors.textPrimary,
     textAlign: 'center',
+    width: '100%',
   },
   section: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray100,
   },
   sectionTitle: {
-    fontSize: fonts.base,
+    fontSize: fonts.sm,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
+    width: '100%',
   },
   gramsInput: {
     height: 56,
     borderWidth: 2,
-    borderColor: colors.gray200,
+    borderColor: colors.primary,
     borderRadius: 12,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     fontSize: fonts['2xl'],
     textAlign: 'center',
     fontWeight: 'bold',
-    backgroundColor: colors.white,
+    backgroundColor: '#F0F9FF',
     color: colors.primary,
   },
   cookingButton: {
@@ -277,7 +309,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: colors.gray200,
@@ -290,6 +322,7 @@ const styles = StyleSheet.create({
   cookingIcon: {
     fontSize: 28,
     marginRight: spacing.md,
+    marginLeft: spacing.md,
   },
   cookingContent: {
     flex: 1,
@@ -298,29 +331,24 @@ const styles = StyleSheet.create({
     fontSize: fonts.base,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: 2,
+    width: '100%',
   },
   cookingTextActive: {
     color: colors.primary,
   },
-  cookingArabic: {
-    fontSize: fonts.sm,
-    color: colors.textSecondary,
-  },
-  cookingArabicActive: {
-    color: colors.primary,
-  },
   nutritionPreview: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    backgroundColor: colors.primary + '10',
+    paddingVertical: spacing.md,
+    backgroundColor: '#F0F9FF',
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
   },
   previewTitle: {
-    fontSize: fonts.base,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
-    textAlign: 'center',
+    fontSize: fonts.sm,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    width: '100%',
   },
   nutritionGrid: {
     flexDirection: 'row',
@@ -328,6 +356,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: spacing.md,
     gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   nutritionItem: {
     flex: 1,
@@ -337,22 +372,21 @@ const styles = StyleSheet.create({
     fontSize: fonts.lg,
     fontWeight: 'bold',
     color: colors.primary,
-    marginBottom: spacing.xs,
+    marginBottom: 4,
+    width: '100%',
   },
   nutritionLabel: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
     fontWeight: '500',
-    textTransform: 'uppercase',
+    width: '100%',
   },
   footer: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray200,
-    backgroundColor: colors.white,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
   },
   button: {
     flex: 1,

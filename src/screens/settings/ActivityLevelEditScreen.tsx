@@ -14,14 +14,39 @@ import { colors, fonts, spacing } from '../../constants/theme';
 import { Card } from '../../components/ui';
 import { useUserStore } from '../../stores/userStore';
 import { ActivityLevel, ACTIVITY_LEVELS } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
 
 const ActivityLevelEditScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { t } = useTranslation();
   const { profile, updateProfile } = useUserStore();
-  
+
   const [selectedLevel, setSelectedLevel] = useState<ActivityLevel>(
     profile?.activityLevel || 'sedentary'
   );
+
+  // Translation mapping for activity levels
+  const getActivityLevelLabel = (level: ActivityLevel): string => {
+    const labelMap: Record<ActivityLevel, string> = {
+      'sedentary': t('activityLevelEdit.sedentary'),
+      'lightly-active': t('activityLevelEdit.lightlyActive'),
+      'moderately-active': t('activityLevelEdit.moderatelyActive'),
+      'very-active': t('activityLevelEdit.veryActive'),
+      'extra-active': t('activityLevelEdit.extremelyActive'),
+    };
+    return labelMap[level] || level;
+  };
+
+  const getActivityLevelDescription = (level: ActivityLevel): string => {
+    const descMap: Record<ActivityLevel, string> = {
+      'sedentary': t('activityLevelEdit.sedentaryDesc'),
+      'lightly-active': t('activityLevelEdit.lightlyActiveDesc'),
+      'moderately-active': t('activityLevelEdit.moderatelyActiveDesc'),
+      'very-active': t('activityLevelEdit.veryActiveDesc'),
+      'extra-active': t('activityLevelEdit.extremelyActiveDesc'),
+    };
+    return descMap[level] || level;
+  };
 
   const handleSave = () => {
     if (!profile) return;
@@ -33,8 +58,8 @@ const ActivityLevelEditScreen: React.FC = () => {
     };
 
     updateProfile(updatedProfile);
-    Alert.alert('Success', 'Your activity level has been updated!', [
-      { text: 'OK', onPress: () => navigation.goBack() }
+    Alert.alert(t('common.success'), t('activityLevelEdit.activityLevelUpdated'), [
+      { text: t('common.ok'), onPress: () => navigation.goBack() }
     ]);
   };
 
@@ -46,7 +71,7 @@ const ActivityLevelEditScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={styles.loadingText}>{t('common.loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -60,29 +85,29 @@ const ActivityLevelEditScreen: React.FC = () => {
           <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
             <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Activity Level</Text>
+          <Text style={styles.headerTitle}>{t('activityLevelEdit.title')}</Text>
           <TouchableOpacity onPress={handleSave} style={styles.headerButton}>
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={styles.saveButtonText}>{t('common.save')}</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
-            
+
             {/* Description */}
             <Card style={styles.descriptionCard}>
               <View style={styles.descriptionHeader}>
                 <MaterialIcons name="info" size={24} color={colors.primary} />
-                <Text style={styles.descriptionTitle}>Choose Your Activity Level</Text>
+                <Text style={styles.descriptionTitle}>{t('activityLevelEdit.subtitle')}</Text>
               </View>
               <Text style={styles.descriptionText}>
-                This affects your daily calorie needs calculation. Be honest about your typical activity level for the most accurate results.
+                {t('activityLevelEdit.estimatedCalories')}
               </Text>
             </Card>
 
             {/* Activity Level Options */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Activity Levels</Text>
+              <Text style={styles.sectionTitle}>{t('activityLevelEdit.title')}</Text>
               
               {ACTIVITY_LEVELS.map((level) => (
                 <TouchableOpacity
@@ -108,13 +133,13 @@ const ActivityLevelEditScreen: React.FC = () => {
                           styles.optionTitle,
                           selectedLevel === level.value && styles.selectedOptionTitle,
                         ]}>
-                          {level.label}
+                          {getActivityLevelLabel(level.value)}
                         </Text>
                         <Text style={[
                           styles.optionDescription,
                           selectedLevel === level.value && styles.selectedOptionDescription,
                         ]}>
-                          {level.description}
+                          {getActivityLevelDescription(level.value)}
                         </Text>
                       </View>
                     </View>
@@ -133,10 +158,10 @@ const ActivityLevelEditScreen: React.FC = () => {
                 <Text style={styles.summaryTitle}>Current Selection</Text>
               </View>
               <Text style={styles.summaryLevel}>
-                {ACTIVITY_LEVELS.find(level => level.value === selectedLevel)?.label}
+                {getActivityLevelLabel(selectedLevel)}
               </Text>
               <Text style={styles.summaryDescription}>
-                {ACTIVITY_LEVELS.find(level => level.value === selectedLevel)?.description}
+                {getActivityLevelDescription(selectedLevel)}
               </Text>
             </Card>
 

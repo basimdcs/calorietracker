@@ -18,6 +18,8 @@ import { useFoodStore } from '../../stores/foodStore';
 import { useUser } from '../../hooks/useUser';
 import { useRevenueCatContext } from '../../contexts/RevenueCatContext';
 import { usePaywall } from '../../hooks/usePaywall';
+import { useRTLStyles } from '../../utils/rtl';
+import { useTranslation } from '../../hooks/useTranslation';
 
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -30,6 +32,27 @@ const SettingsScreen: React.FC = () => {
   const { userStats } = useUser();
   const { state: revenueCatState, actions: revenueCatActions } = useRevenueCatContext();
   const { presentPaywallIfNeededWithAlert } = usePaywall();
+  const { rtlText, rtlRow, rtlMarginRight, rtlMarginLeft, isRTL, rtlIcon } = useRTLStyles();
+  const { t, activeLanguage, changeLanguage } = useTranslation();
+
+  const handleLanguageChange = async (newLanguage: 'en' | 'ar') => {
+    if (newLanguage === activeLanguage) return;
+
+    Alert.alert(
+      t('settings.changeLanguage'),
+      t('settings.changeLanguageMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.continue'),
+          onPress: async () => {
+            // Change language and app will automatically reload
+            await changeLanguage(newLanguage);
+          }
+        }
+      ]
+    );
+  };
 
   const handleUpgradeWithPaywall = async () => {
     if (revenueCatState.isInitialized) {
@@ -192,9 +215,9 @@ const SettingsScreen: React.FC = () => {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View style={styles.headerLeft}>
-              <Text style={styles.headerTitle}>Settings</Text>
+              <Text style={styles.headerTitle}>{t('settings.settings')}</Text>
               <Text style={styles.headerSubtitle}>
-                Manage your account and preferences
+                {t('settings.subtitle')}
               </Text>
             </View>
           </View>
@@ -222,33 +245,33 @@ const SettingsScreen: React.FC = () => {
                       <MaterialIcons name="auto-awesome" size={24} color="#FFD700" />
                     </View>
                     <View style={styles.proTitleSection}>
-                      <Text style={styles.proTitle}>Upgrade to Pro</Text>
-                      <Text style={styles.proSubtitle}>Unlock your full potential</Text>
+                      <Text style={styles.proTitle}>{t('settings.upgradeTitle')}</Text>
+                      <Text style={styles.proSubtitle}>{t('settings.unlockPotential')}</Text>
                     </View>
                   </View>
-                  
+
                   <View style={styles.proFeatures}>
                     <View style={styles.proFeatureRow}>
                       <View style={styles.checkIconContainer}>
                         <MaterialIcons name="check" size={14} color={colors.white} />
                       </View>
-                      <Text style={styles.proFeatureText}>300 voice recordings monthly</Text>
+                      <Text style={styles.proFeatureText}>{t('settings.proFeature1')}</Text>
                     </View>
                     <View style={styles.proFeatureRow}>
                       <View style={styles.checkIconContainer}>
                         <MaterialIcons name="check" size={14} color={colors.white} />
                       </View>
-                      <Text style={styles.proFeatureText}>Advanced nutrition insights</Text>
+                      <Text style={styles.proFeatureText}>{t('settings.proFeature3')}</Text>
                     </View>
                     <View style={styles.proFeatureRow}>
                       <View style={styles.checkIconContainer}>
                         <MaterialIcons name="check" size={14} color={colors.white} />
                       </View>
-                      <Text style={styles.proFeatureText}>Priority customer support</Text>
+                      <Text style={styles.proFeatureText}>{t('settings.proFeature4')}</Text>
                     </View>
                   </View>
-                  
-                  <TouchableOpacity 
+
+                  <TouchableOpacity
                     style={styles.upgradeButton}
                     onPress={handleUpgradeWithPaywall}
                     activeOpacity={0.9}
@@ -259,8 +282,8 @@ const SettingsScreen: React.FC = () => {
                       end={{ x: 1, y: 0 }}
                       style={styles.upgradeButtonGradient}
                     >
-                      <Text style={styles.upgradeButtonText}>Get Pro Now</Text>
-                      <MaterialIcons name="arrow-forward" size={20} color="#2D1B69" />
+                      <Text style={styles.upgradeButtonText}>{t('settings.getProNow')}</Text>
+                      <MaterialIcons name={rtlIcon("arrow-forward", "arrow-back")} size={20} color="#2D1B69" />
                     </LinearGradient>
                   </TouchableOpacity>
                 </LinearGradient>
@@ -312,7 +335,7 @@ const SettingsScreen: React.FC = () => {
             
             {/* Restore Purchases - Always show for support */}
             <View style={styles.section}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.restoreButton}
                 onPress={handleRestorePurchases}
               >
@@ -321,99 +344,153 @@ const SettingsScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
+            {/* Language Selection */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>🌍 {t('settings.languageSection')}</Text>
+
+              <View style={styles.settingsCard}>
+                <View style={styles.languageContainer}>
+                  <View style={[styles.cardContent, rtlRow]}>
+                    <View style={[styles.iconContainer, rtlMarginRight(spacing.md)]}>
+                      <MaterialIcons name="language" size={24} color={colors.brandOuterSkin} />
+                    </View>
+                    <View style={styles.cardText}>
+                      <Text style={[styles.cardTitle, rtlText]}>{t('settings.language')}</Text>
+                      <Text style={[styles.cardSubtitle, rtlText]}>{t('settings.languageSubtitle')}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.languageOptions}>
+                    <TouchableOpacity
+                      style={[
+                        styles.languageButton,
+                        activeLanguage === 'en' && styles.languageButtonActive
+                      ]}
+                      onPress={() => handleLanguageChange('en')}
+                    >
+                      <Text style={[
+                        styles.languageButtonText,
+                        activeLanguage === 'en' && styles.languageButtonTextActive
+                      ]}>
+                        {t('settings.english')}
+                      </Text>
+                      {activeLanguage === 'en' && (
+                        <MaterialIcons name="check-circle" size={20} color={colors.primary} />
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.languageButton,
+                        activeLanguage === 'ar' && styles.languageButtonActive
+                      ]}
+                      onPress={() => handleLanguageChange('ar')}
+                    >
+                      <Text style={[
+                        styles.languageButtonText,
+                        activeLanguage === 'ar' && styles.languageButtonTextActive
+                      ]}>
+                        {t('settings.arabicNative')}
+                      </Text>
+                      {activeLanguage === 'ar' && (
+                        <MaterialIcons name="check-circle" size={20} color={colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </View>
+
             {/* Profile Overview */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>👤 Profile</Text>
+              <Text style={styles.sectionTitle}>{t('settings.profileSection')}</Text>
               
               {/* Basic Profile Information */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.settingsCard}
                 onPress={() => navigation.navigate('ProfileEdit' as never)}
               >
-                <View style={styles.cardContent}>
-                  <View style={styles.cardLeft}>
-                    <View style={styles.iconContainer}>
-                      <MaterialIcons name="person" size={24} color={colors.brandOuterSkin} />
-                    </View>
-                    <View style={styles.cardText}>
-                      <Text style={styles.cardTitle}>Personal Information</Text>
-                      <Text style={styles.cardSubtitle}>
-                        {profile.name || 'Not set'} • {profile.gender || 'Not set'}
-                      </Text>
-                      <Text style={styles.cardSubtitle}>
-                        {profile.age || '--'} years • {profile.height || '--'}cm • {profile.weight || '--'}kg
-                      </Text>
-                    </View>
+                <View style={[styles.cardContent, rtlRow]}>
+                  <View style={[styles.iconContainer, rtlMarginRight(spacing.md)]}>
+                    <MaterialIcons name="person" size={24} color={colors.brandOuterSkin} />
                   </View>
-                  <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                  <MaterialIcons name={rtlIcon("chevron-right", "chevron-left")} size={24}
+                    color={colors.textSecondary} style={rtlMarginRight(spacing.md)} />
+                  <View style={styles.cardText}>
+                    <Text style={[styles.cardTitle, rtlText]}>{t('settings.personalInfo')}</Text>
+                    <Text style={[styles.cardSubtitle, rtlText]}>
+                      {profile.name || t('settings.notSet')} • {profile.gender || t('settings.notSet')}
+                    </Text>
+                    <Text style={[styles.cardSubtitle, rtlText]}>
+                      {profile.age || '--'} years • {profile.height || '--'}cm • {profile.weight || '--'}kg
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
             </View>
 
             {/* Goal Management */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🎯 Goals & Nutrition</Text>
+              <Text style={styles.sectionTitle}>{t('settings.goalsSection')}</Text>
               
               {/* Activity Level Card */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.settingsCard}
                 onPress={() => navigation.navigate('ActivityLevelEdit' as never)}
               >
-                <View style={styles.cardContent}>
-                  <View style={styles.cardLeft}>
-                    <View style={styles.iconContainer}>
-                      <MaterialIcons name="directions-run" size={24} color={colors.brandOuterSkin} />
-                    </View>
-                    <View style={styles.cardText}>
-                      <Text style={styles.cardTitle}>Activity Level</Text>
-                      <Text style={styles.cardSubtitle}>
-                        {profile.activityLevel ? 
-                          profile.activityLevel.split('-').map(word => 
-                            word.charAt(0).toUpperCase() + word.slice(1)
-                          ).join(' ') : 'Not set'}
-                      </Text>
-                      <Text style={styles.cardSubtitle}>
-                        Affects your daily calorie calculation
-                      </Text>
-                    </View>
+                <View style={[styles.cardContent, rtlRow]}>
+                  <View style={[styles.iconContainer, rtlMarginRight(spacing.md)]}>
+                    <MaterialIcons name="directions-run" size={24} color={colors.brandOuterSkin} />
                   </View>
-                  <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                  <MaterialIcons name={rtlIcon("chevron-right", "chevron-left")} size={24}
+                    color={colors.textSecondary} style={rtlMarginRight(spacing.md)} />
+                  <View style={styles.cardText}>
+                    <Text style={[styles.cardTitle, rtlText]}>{t('settings.activityLevel')}</Text>
+                    <Text style={[styles.cardSubtitle, rtlText]}>
+                      {profile.activityLevel ?
+                        profile.activityLevel.split('-').map(word =>
+                          word.charAt(0).toUpperCase() + word.slice(1)
+                        ).join(' ') : t('settings.notSet')}
+                    </Text>
+                    <Text style={[styles.cardSubtitle, rtlText]}>
+                      {t('settings.affectsCalories')}
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
 
               {/* Weight Goal Card */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.settingsCard}
                 onPress={() => navigation.navigate('WeightGoalEdit' as never)}
               >
-                <View style={styles.cardContent}>
-                  <View style={styles.cardLeft}>
-                    <View style={styles.iconContainer}>
-                      <MaterialIcons 
-                        name={profile.goal === 'lose' ? 'trending-down' : 
-                              profile.goal === 'gain' ? 'trending-up' : 'trending-flat'} 
-                        size={24} 
-                        color={colors.brandOuterSkin} 
-                      />
-                    </View>
-                    <View style={styles.cardText}>
-                      <Text style={styles.cardTitle}>Weight Goals & Calorie Target</Text>
-                      <Text style={styles.cardSubtitle}>
-                        {profile.goal === 'lose' ? 'Lose Weight' :
-                         profile.goal === 'gain' ? 'Gain Weight' : 'Maintain Weight'}
-                        {profile.weeklyWeightGoal && profile.goal !== 'maintain' && 
-                          ` • ${Math.abs(profile.weeklyWeightGoal).toFixed(1)} lbs/week`
-                        }
-                      </Text>
-                      <Text style={styles.cardSubtitle}>
-                        {profile.customCalorieGoal 
-                          ? `Custom: ${profile.customCalorieGoal} cal/day`
-                          : `Auto: ${userStats?.dailyCalorieGoal || userStats?.tdee || '--'} cal/day`
-                        }
-                      </Text>
-                    </View>
+                <View style={[styles.cardContent, rtlRow]}>
+                  <View style={[styles.iconContainer, rtlMarginRight(spacing.md)]}>
+                    <MaterialIcons
+                      name={profile.goal === 'lose' ? 'trending-down' :
+                            profile.goal === 'gain' ? 'trending-up' : 'trending-flat'}
+                      size={24}
+                      color={colors.brandOuterSkin}
+                    />
                   </View>
-                  <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+                  <MaterialIcons name={rtlIcon("chevron-right", "chevron-left")} size={24}
+                    color={colors.textSecondary} style={rtlMarginRight(spacing.md)} />
+                  <View style={styles.cardText}>
+                    <Text style={[styles.cardTitle, rtlText]}>{t('settings.weightGoal')}</Text>
+                    <Text style={[styles.cardSubtitle, rtlText]}>
+                      {profile.goal === 'lose' ? t('settings.loseWeight') :
+                       profile.goal === 'gain' ? t('settings.gainWeight') : t('settings.maintainWeight')}
+                      {profile.weeklyWeightGoal && profile.goal !== 'maintain' &&
+                        ` • ${Math.abs(profile.weeklyWeightGoal).toFixed(1)} lbs/week`
+                      }
+                    </Text>
+                    <Text style={[styles.cardSubtitle, rtlText]}>
+                      {profile.customCalorieGoal
+                        ? `${t('settings.custom')}: ${profile.customCalorieGoal} cal/day`
+                        : `${t('settings.auto')}: ${userStats?.dailyCalorieGoal || userStats?.tdee || '--'} cal/day`
+                      }
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
             </View>
@@ -443,50 +520,48 @@ const SettingsScreen: React.FC = () => {
 
             {/* Data & Privacy Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🔒 Data & Privacy</Text>
+              <Text style={styles.sectionTitle}>{t('settings.dataSection')}</Text>
 
               {/* Delete All Data */}
               <TouchableOpacity
                 style={[styles.settingsCard, styles.dangerCard]}
                 onPress={handleDeleteAllData}
               >
-                <View style={styles.cardContent}>
-                  <View style={styles.cardLeft}>
-                    <View style={[styles.iconContainer, styles.dangerIconContainer]}>
-                      <MaterialIcons name="delete-forever" size={24} color={colors.error} />
-                    </View>
-                    <View style={styles.cardText}>
-                      <Text style={[styles.cardTitle, styles.dangerText]}>Delete All My Data</Text>
-                      <Text style={styles.cardSubtitle}>
-                        Permanently delete all your personal information and food logs
-                      </Text>
-                    </View>
+                <View style={[styles.cardContent, rtlRow]}>
+                  <View style={[styles.iconContainer, styles.dangerIconContainer, rtlMarginRight(spacing.md)]}>
+                    <MaterialIcons name="delete-forever" size={24} color={colors.error} />
                   </View>
-                  <MaterialIcons name="chevron-right" size={24} color={colors.error} />
+                  <MaterialIcons name={rtlIcon("chevron-right", "chevron-left")} size={24}
+                    color={colors.error} style={rtlMarginRight(spacing.md)} />
+                  <View style={styles.cardText}>
+                    <Text style={[styles.cardTitle, styles.dangerText, rtlText]}>{t('settings.deleteAllMyData')}</Text>
+                    <Text style={[styles.cardSubtitle, rtlText]}>
+                      {t('settings.deleteAllMyDataSubtitle')}
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
             </View>
 
             {/* Support & Legal Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Support & Legal</Text>
+              <Text style={styles.sectionTitle}>{t('settings.supportLegalSection')}</Text>
 
               {/* Privacy Policy */}
               <TouchableOpacity
                 style={styles.settingsCard}
                 onPress={() => handleOpenLink('https://www.kamcalorie.app/privacy', 'Privacy Policy')}
               >
-                <View style={styles.cardContent}>
-                  <View style={styles.cardLeft}>
-                    <View style={styles.iconContainer}>
-                      <MaterialIcons name="privacy-tip" size={24} color={colors.primary} />
-                    </View>
-                    <View style={styles.cardText}>
-                      <Text style={styles.cardTitle}>Privacy Policy</Text>
-                      <Text style={styles.cardSubtitle}>Read our privacy policy</Text>
-                    </View>
+                <View style={[styles.cardContent, rtlRow]}>
+                  <View style={[styles.iconContainer, rtlMarginRight(spacing.md)]}>
+                    <MaterialIcons name="privacy-tip" size={24} color={colors.primary} />
                   </View>
-                  <MaterialIcons name="open-in-new" size={20} color={colors.textSecondary} />
+                  <MaterialIcons name="open-in-new" size={20} color={colors.textSecondary}
+                    style={rtlMarginRight(spacing.md)} />
+                  <View style={styles.cardText}>
+                    <Text style={[styles.cardTitle, rtlText]}>{t('settings.privacyPolicy')}</Text>
+                    <Text style={[styles.cardSubtitle, rtlText]}>{t('settings.privacyPolicySubtitle')}</Text>
+                  </View>
                 </View>
               </TouchableOpacity>
 
@@ -495,17 +570,16 @@ const SettingsScreen: React.FC = () => {
                 style={styles.settingsCard}
                 onPress={() => handleOpenLink('https://www.kamcalorie.app/terms', 'Terms of Service')}
               >
-                <View style={styles.cardContent}>
-                  <View style={styles.cardLeft}>
-                    <View style={styles.iconContainer}>
-                      <MaterialIcons name="article" size={24} color={colors.primary} />
-                    </View>
-                    <View style={styles.cardText}>
-                      <Text style={styles.cardTitle}>Terms of Service</Text>
-                      <Text style={styles.cardSubtitle}>Read our terms of service</Text>
-                    </View>
+                <View style={[styles.cardContent, rtlRow]}>
+                  <View style={[styles.iconContainer, rtlMarginRight(spacing.md)]}>
+                    <MaterialIcons name="article" size={24} color={colors.primary} />
                   </View>
-                  <MaterialIcons name="open-in-new" size={20} color={colors.textSecondary} />
+                  <MaterialIcons name="open-in-new" size={20} color={colors.textSecondary}
+                    style={rtlMarginRight(spacing.md)} />
+                  <View style={styles.cardText}>
+                    <Text style={[styles.cardTitle, rtlText]}>{t('settings.termsOfService')}</Text>
+                    <Text style={[styles.cardSubtitle, rtlText]}>{t('settings.termsSubtitle')}</Text>
+                  </View>
                 </View>
               </TouchableOpacity>
 
@@ -514,17 +588,16 @@ const SettingsScreen: React.FC = () => {
                 style={styles.settingsCard}
                 onPress={() => handleOpenLink('https://www.kamcalorie.app/support', 'Contact Support')}
               >
-                <View style={styles.cardContent}>
-                  <View style={styles.cardLeft}>
-                    <View style={styles.iconContainer}>
-                      <MaterialIcons name="support" size={24} color={colors.primary} />
-                    </View>
-                    <View style={styles.cardText}>
-                      <Text style={styles.cardTitle}>Contact Support</Text>
-                      <Text style={styles.cardSubtitle}>Get help from our team</Text>
-                    </View>
+                <View style={[styles.cardContent, rtlRow]}>
+                  <View style={[styles.iconContainer, rtlMarginRight(spacing.md)]}>
+                    <MaterialIcons name="support" size={24} color={colors.primary} />
                   </View>
-                  <MaterialIcons name="email" size={20} color={colors.textSecondary} />
+                  <MaterialIcons name="email" size={20} color={colors.textSecondary}
+                    style={rtlMarginRight(spacing.md)} />
+                  <View style={styles.cardText}>
+                    <Text style={[styles.cardTitle, rtlText]}>{t('settings.contactSupport')}</Text>
+                    <Text style={[styles.cardSubtitle, rtlText]}>{t('settings.contactSupportSubtitle')}</Text>
+                  </View>
                 </View>
               </TouchableOpacity>
 
@@ -916,11 +989,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: spacing.lg,
   },
-  cardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
   iconContainer: {
     width: 40,
     height: 40,
@@ -928,7 +996,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.brandFlesh + '40',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    // marginRight handled by rtlMarginRight
   },
   cardText: {
     flex: 1,
@@ -1003,6 +1071,41 @@ const styles = StyleSheet.create({
   },
   dangerSubtitle: {
     color: colors.error + '80',
+  },
+  // Language selector styles
+  languageContainer: {
+    gap: spacing.md,
+  },
+  languageOptions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  languageButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.gray200,
+    backgroundColor: colors.white,
+    gap: spacing.xs,
+  },
+  languageButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.blue50,
+  },
+  languageButtonText: {
+    fontSize: fonts.base,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  languageButtonTextActive: {
+    color: colors.primary,
   },
 });
 

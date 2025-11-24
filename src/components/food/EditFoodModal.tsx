@@ -15,6 +15,7 @@ import { ParsedFoodItem } from '../../types';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { Button } from '../ui/Button';
 import { getSuggestedUnits, calculateNutrition, getEstimatedWeight, UnitConversion } from '../../utils/unitConversions';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface EditFoodModalProps {
   visible: boolean;
@@ -37,8 +38,8 @@ const QUICK_QUANTITIES = [
 const COOKING_METHODS = [
   { method: 'Grilled', icon: '🔥', description: 'Adds light smoky flavor', arabic: 'مشوي' },
   { method: 'Fried', icon: '🍳', description: 'Pan fried, moderate oil', arabic: 'مقلي' },
-  { method: 'Baked', icon: '🔄', description: 'Oven cooked, minimal oil', arabic: 'في الفرن' },
-  { method: 'Boiled', icon: '💧', description: 'Water cooked, no added fat', arabic: 'مسلوق' },
+  { method: 'Baked', icon: '🥘', description: 'Oven cooked, minimal oil', arabic: 'في الفرن' },
+  { method: 'Boiled', icon: '🫕', description: 'Water cooked, no added fat', arabic: 'مسلوق' },
 ];
 
 
@@ -100,10 +101,16 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const { t, activeLanguage, isRTL } = useTranslation();
   const [editMode, setEditMode] = useState<EditMode>('quantity');
   const [quantityInput, setQuantityInput] = useState('1');
   const [selectedUnit, setSelectedUnit] = useState('pieces');
   const [selectedCookingMethod, setSelectedCookingMethod] = useState('');
+
+  // RTL text style following Arabic.md pattern
+  const rtlTextStyle = isRTL
+    ? { writingDirection: 'rtl' as const, textAlign: 'left' as const }
+    : { writingDirection: 'ltr' as const, textAlign: 'left' as const };
 
   // Use food or default to prevent conditional hook calls
   const currentFood = food || DEFAULT_FOOD;
@@ -262,41 +269,41 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
         >
           <View style={styles.modal}>
             {/* Header with close button */}
-            <View style={styles.header}>
+            <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity style={styles.closeButton} onPress={onCancel}>
                 <MaterialIcons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>Edit Food Item</Text>
+              <Text style={[styles.headerTitle, rtlTextStyle]}>Edit Food Item</Text>
               <View style={styles.headerSpacer} />
             </View>
 
             {/* Tab Headers */}
-            <View style={styles.tabContainer}>
+            <View style={[styles.tabContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 style={[styles.tab, editMode === 'quantity' && styles.tabActive]}
                 onPress={() => setEditMode('quantity')}
               >
-                <MaterialIcons 
-                  name="bar-chart" 
-                  size={20} 
-                  color={editMode === 'quantity' ? colors.primary : colors.textSecondary} 
+                <MaterialIcons
+                  name="bar-chart"
+                  size={20}
+                  color={editMode === 'quantity' ? colors.primary : colors.textSecondary}
                 />
-                <Text style={[styles.tabText, editMode === 'quantity' && styles.tabTextActive]}>
+                <Text style={[styles.tabText, editMode === 'quantity' && styles.tabTextActive, rtlTextStyle]}>
                   Quantity
                 </Text>
               </TouchableOpacity>
-              
+
               {needsCookingMethod && (
                 <TouchableOpacity
                   style={[styles.tab, editMode === 'cooking' && styles.tabActive]}
                   onPress={() => setEditMode('cooking')}
                 >
-                  <MaterialIcons 
-                    name="restaurant" 
-                    size={20} 
-                    color={editMode === 'cooking' ? colors.primary : colors.textSecondary} 
+                  <MaterialIcons
+                    name="restaurant"
+                    size={20}
+                    color={editMode === 'cooking' ? colors.primary : colors.textSecondary}
                   />
-                  <Text style={[styles.tabText, editMode === 'cooking' && styles.tabTextActive]}>
+                  <Text style={[styles.tabText, editMode === 'cooking' && styles.tabTextActive, rtlTextStyle]}>
                     Cooking
                   </Text>
                 </TouchableOpacity>
@@ -307,10 +314,10 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
 
               {/* Food Name and Weight Focus */}
               <View style={styles.foodInfo}>
-                <Text style={styles.foodName}>{food.name}</Text>
-                <Text style={styles.estimatedWeight}>{estimatedWeight}</Text>
+                <Text style={[styles.foodName, rtlTextStyle]}>{food.name}</Text>
+                <Text style={[styles.estimatedWeight, rtlTextStyle]}>{estimatedWeight}</Text>
                 {updatedNutrition && (
-                  <Text style={styles.nutritionSummary}>
+                  <Text style={[styles.nutritionSummary, rtlTextStyle]}>
                     {updatedNutrition.calories} cal, {updatedNutrition.protein}g protein, {updatedNutrition.carbs}g carbs, {updatedNutrition.fat}g fat
                   </Text>
                 )}
@@ -322,7 +329,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
                 <>
                   {/* Quick Select */}
                   <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Quick Select</Text>
+                    <Text style={[styles.sectionTitle, rtlTextStyle]}>Quick Select</Text>
                     <View style={styles.quickQuantitiesGrid}>
                       {QUICK_QUANTITIES.slice(0, 4).map((preset) => {
                         const isSelected = quantityInput === String(preset.value);
@@ -371,9 +378,9 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
 
                   {/* Custom Amount */}
                   <View style={styles.section}>
-                    <Text style={styles.inputLabel}>Custom Amount</Text>
+                    <Text style={[styles.inputLabel, rtlTextStyle]}>Custom Amount</Text>
                     <TextInput
-                      style={styles.quantityInput}
+                      style={[styles.quantityInput, rtlTextStyle]}
                       value={quantityInput}
                       onChangeText={setQuantityInput}
                       placeholder="Enter amount"
@@ -384,7 +391,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
 
                   {/* Unit selection */}
                   <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Unit</Text>
+                    <Text style={[styles.sectionTitle, rtlTextStyle]}>Unit</Text>
                     <View style={styles.unitGrid}>
                       {suggestedUnits.map((unitOption) => {
                         const isSelected = selectedUnit === unitOption.unit;
@@ -399,16 +406,17 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
                             onPress={() => handleUnitSelect(unitOption.unit)}
                           >
                             {unitOption.isRecommended && (
-                              <MaterialIcons 
-                                name="star" 
-                                size={12} 
-                                color={colors.primary} 
-                                style={styles.unitStar} 
+                              <MaterialIcons
+                                name="star"
+                                size={12}
+                                color={colors.primary}
+                                style={styles.unitStar}
                               />
                             )}
                             <Text style={[
                               styles.unitButtonText,
-                              isSelected && styles.unitButtonTextActive
+                              isSelected && styles.unitButtonTextActive,
+                              rtlTextStyle
                             ]}>
                               {unitOption.label}
                             </Text>
@@ -422,55 +430,74 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
                 <>
                   {/* Cooking Methods Grid */}
                   <View style={styles.section}>
-                    <View style={styles.methodsGrid}>
-                      {filteredCookingMethods.slice(0, 3).map((item) => (
-                        <TouchableOpacity
-                          key={item.method}
-                          style={[
-                            styles.methodButton,
-                            selectedCookingMethod === item.method && styles.methodButtonActive
-                          ]}
-                          onPress={() => handleCookingMethodSelect(item.method)}
-                        >
-                          <Text style={styles.methodIcon}>{item.icon}</Text>
-                          <View style={styles.methodTextContainer}>
+                    <View style={[styles.methodsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      {filteredCookingMethods.slice(0, 3).map((item) => {
+                        const displayName = activeLanguage === 'ar' ? item.arabic : item.method;
+                        return (
+                          <TouchableOpacity
+                            key={item.method}
+                            style={[
+                              styles.methodButton,
+                              selectedCookingMethod === item.method && styles.methodButtonActive,
+                              { flexDirection: isRTL ? 'row-reverse' : 'row' }
+                            ]}
+                            onPress={() => handleCookingMethodSelect(item.method)}
+                          >
                             <Text style={[
-                              styles.methodText,
-                              selectedCookingMethod === item.method && styles.methodTextActive
-                            ]}>
-                              {item.method}
-                            </Text>
+                              styles.methodIcon,
+                              { marginRight: isRTL ? 0 : spacing.sm, marginLeft: isRTL ? spacing.sm : 0 }
+                            ]}>{item.icon}</Text>
+                            <View style={styles.methodTextContainer}>
+                              <Text style={[
+                                styles.methodText,
+                                selectedCookingMethod === item.method && styles.methodTextActive,
+                                rtlTextStyle
+                              ]}>
+                                {displayName}
+                              </Text>
                             <Text style={styles.methodArabic}>
                               {item.arabic}
                             </Text>
                           </View>
                         </TouchableOpacity>
-                      ))}
+                        );
+                      })}
                     </View>
-                    
+
                     {/* Fourth method centered */}
                     {filteredCookingMethods.length >= 4 && (
                       <View style={styles.centerMethod}>
-                        <TouchableOpacity
-                          style={[
-                            styles.methodButton,
-                            selectedCookingMethod === filteredCookingMethods[3].method && styles.methodButtonActive
-                          ]}
-                          onPress={() => handleCookingMethodSelect(filteredCookingMethods[3].method)}
-                        >
-                          <Text style={styles.methodIcon}>{filteredCookingMethods[3].icon}</Text>
-                          <View style={styles.methodTextContainer}>
-                            <Text style={[
-                              styles.methodText,
-                              selectedCookingMethod === filteredCookingMethods[3].method && styles.methodTextActive
-                            ]}>
-                              {filteredCookingMethods[3].method}
-                            </Text>
+                        {(() => {
+                          const item = filteredCookingMethods[3];
+                          const displayName = activeLanguage === 'ar' ? item.arabic : item.method;
+                          return (
+                            <TouchableOpacity
+                              style={[
+                                styles.methodButton,
+                                selectedCookingMethod === item.method && styles.methodButtonActive,
+                                { flexDirection: isRTL ? 'row-reverse' : 'row' }
+                              ]}
+                              onPress={() => handleCookingMethodSelect(item.method)}
+                            >
+                              <Text style={[
+                                styles.methodIcon,
+                                { marginRight: isRTL ? 0 : spacing.sm, marginLeft: isRTL ? spacing.sm : 0 }
+                              ]}>{item.icon}</Text>
+                              <View style={styles.methodTextContainer}>
+                                <Text style={[
+                                  styles.methodText,
+                                  selectedCookingMethod === item.method && styles.methodTextActive,
+                                  rtlTextStyle
+                                ]}>
+                                  {displayName}
+                                </Text>
                             <Text style={styles.methodArabic}>
-                              {filteredCookingMethods[3].arabic}
+                              {item.arabic}
                             </Text>
                           </View>
                         </TouchableOpacity>
+                          );
+                        })()}
                       </View>
                     )}
                   </View>
@@ -479,7 +506,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
                   {/* Nutrition impact preview */}
                   {selectedCookingMethod && (
                     <View style={styles.section}>
-                      <Text style={styles.sectionTitle}>Calorie Impact</Text>
+                      <Text style={[styles.sectionTitle, rtlTextStyle]}>Calorie Impact</Text>
                       <View style={styles.impactPreview}>
                         {(() => {
                           const multiplier = {
@@ -495,20 +522,20 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
                             'Deep Fried': 1.8,
                             'Braised': 1.15,
                           }[selectedCookingMethod] || 1.0;
-                          
+
                           const change = Math.round((multiplier - 1) * 100);
                           const baseCalories = Math.round(food.calories * (quantity / (food.quantity || 1)));
                           const newCalories = Math.round(baseCalories * multiplier);
-                          
+
                           return (
                             <View style={styles.impactContent}>
-                              <Text style={styles.impactText}>
-                                {change === 0 
-                                  ? 'No change to calories' 
+                              <Text style={[styles.impactText, rtlTextStyle]}>
+                                {change === 0
+                                  ? 'No change to calories'
                                   : `${change > 0 ? '+' : ''}${change}% calories`
                                 }
                               </Text>
-                              <Text style={styles.impactCalories}>
+                              <Text style={[styles.impactCalories, rtlTextStyle]}>
                                 {baseCalories} → {newCalories} cal
                               </Text>
                             </View>
@@ -523,31 +550,31 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
               {/* Updated Nutrition Preview */}
               {updatedNutrition && (
                 <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Updated Nutrition</Text>
+                  <Text style={[styles.sectionTitle, rtlTextStyle]}>Updated Nutrition</Text>
                   <View style={styles.nutritionPreview}>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>
+                      <Text style={[styles.nutritionValue, rtlTextStyle]}>
                         {updatedNutrition.calories}
                       </Text>
-                      <Text style={styles.nutritionLabel}>calories</Text>
+                      <Text style={[styles.nutritionLabel, rtlTextStyle]}>calories</Text>
                     </View>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>
+                      <Text style={[styles.nutritionValue, rtlTextStyle]}>
                         {updatedNutrition.protein}g
                       </Text>
-                      <Text style={styles.nutritionLabel}>protein</Text>
+                      <Text style={[styles.nutritionLabel, rtlTextStyle]}>protein</Text>
                     </View>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>
+                      <Text style={[styles.nutritionValue, rtlTextStyle]}>
                         {updatedNutrition.carbs}g
                       </Text>
-                      <Text style={styles.nutritionLabel}>carbs</Text>
+                      <Text style={[styles.nutritionLabel, rtlTextStyle]}>carbs</Text>
                     </View>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>
+                      <Text style={[styles.nutritionValue, rtlTextStyle]}>
                         {updatedNutrition.fat}g
                       </Text>
-                      <Text style={styles.nutritionLabel}>fat</Text>
+                      <Text style={[styles.nutritionLabel, rtlTextStyle]}>fat</Text>
                     </View>
                   </View>
                 </View>
@@ -555,7 +582,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
             </ScrollView>
 
             {/* Footer buttons */}
-            <View style={styles.footer}>
+            <View style={[styles.footer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Button
                 title="Cancel"
                 onPress={onCancel}
@@ -606,6 +633,7 @@ const styles = StyleSheet.create({
     fontSize: fonts.lg,
     fontWeight: 'bold',
     color: colors.textPrimary,
+    width: '100%',
   },
   headerSpacer: {
     width: 48, // Same width as close button
@@ -631,6 +659,7 @@ const styles = StyleSheet.create({
     fontSize: fonts.base,
     color: colors.textSecondary,
     fontWeight: '500',
+    width: '100%',
   },
   tabTextActive: {
     color: colors.primary,
@@ -650,17 +679,20 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.sm,
     textAlign: 'center',
+    width: '100%',
   },
   estimatedWeight: {
     fontSize: fonts['3xl'],
     fontWeight: 'bold',
     color: colors.primary,
     marginBottom: spacing.sm,
+    width: '100%',
   },
   nutritionSummary: {
     fontSize: fonts.sm,
     color: colors.textSecondary,
     textAlign: 'center',
+    width: '100%',
   },
   divider: {
     height: 1,
@@ -675,6 +707,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.textPrimary,
     marginBottom: spacing.md,
+    width: '100%',
   },
   quickQuantitiesGrid: {
     flexDirection: 'row',
@@ -708,6 +741,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
+    width: '100%',
   },
   quantityInput: {
     height: 48,
@@ -777,7 +811,7 @@ const styles = StyleSheet.create({
   },
   methodIcon: {
     fontSize: 20,
-    marginRight: spacing.sm,
+    // marginRight/Left set inline for RTL support
   },
   methodTextContainer: {
     flex: 1,
@@ -787,6 +821,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: 2,
+    width: '100%',
   },
   methodTextActive: {
     color: colors.primary,
@@ -843,11 +878,13 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: '600',
     marginBottom: spacing.sm,
+    width: '100%',
   },
   impactCalories: {
     fontSize: fonts.xl,
     color: colors.primary,
     fontWeight: 'bold',
+    width: '100%',
   },
   nutritionPreview: {
     flexDirection: 'row',
@@ -865,12 +902,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.textPrimary,
     marginBottom: spacing.xs,
+    width: '100%',
   },
   nutritionLabel: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
     fontWeight: '500',
     textAlign: 'center',
+    width: '100%',
   },
   footer: {
     flexDirection: 'row',

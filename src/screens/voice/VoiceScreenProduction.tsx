@@ -26,6 +26,7 @@ import { useVoiceRecording } from '../../hooks/useVoiceRecording';
 import { useVoiceProcessing } from '../../hooks/useVoiceProcessing';
 import { useRevenueCatContext } from '../../contexts/RevenueCatContext';
 import { usePaywall } from '../../hooks/usePaywall';
+import { useTranslation } from '../../hooks/useTranslation';
 
 // Voice processing states for UI
 type VoiceState = 'ready' | 'recording' | 'processing' | 'reviewing';
@@ -39,7 +40,8 @@ const VoiceScreenProduction: React.FC = () => {
   const { profile } = useUserStore();
   const { state: revenueCatState, actions: revenueCatActions } = useRevenueCatContext();
   const { presentPaywallIfNeededWithAlert } = usePaywall();
-  
+  const { t } = useTranslation();
+
   // Custom hooks for voice functionality
   const voiceRecording = useVoiceRecording();
   const voiceProcessing = useVoiceProcessing();
@@ -69,11 +71,11 @@ const VoiceScreenProduction: React.FC = () => {
       
       if (currentTier === 'FREE') {
         Alert.alert(
-          'Recording Limit Reached',
-          `You've reached your monthly limit of ${usageStats.monthlyLimit} recordings. Upgrade to PRO for 300 recordings per month!`,
+          t('voice.limitReached'),
+          t('voice.limitReachedFree', { limit: usageStats.monthlyLimit }),
           [
-            { text: 'Maybe Later', style: 'cancel' },
-            { text: 'Upgrade to Pro', onPress: async () => {
+            { text: t('voice.maybeLater'), style: 'cancel' },
+            { text: t('voice.upgradeToPro'), onPress: async () => {
               await presentPaywallIfNeededWithAlert({
                 requiredEntitlement: 'pro',
               });
@@ -82,9 +84,9 @@ const VoiceScreenProduction: React.FC = () => {
         );
       } else {
         Alert.alert(
-          'Recording Limit Reached',
-          `You've reached your monthly limit of ${usageStats.monthlyLimit} recordings. Your limit will reset next month.`,
-          [{ text: 'OK', style: 'default' }]
+          t('voice.limitReached'),
+          t('voice.limitReachedPro', { limit: usageStats.monthlyLimit }),
+          [{ text: t('common.ok'), style: 'default' }]
         );
       }
       return;
@@ -115,9 +117,9 @@ const VoiceScreenProduction: React.FC = () => {
       setVoiceState('ready');
       if (!voiceRecording.state.error) {
         Alert.alert(
-          'Recording Issue',
-          'Recording completed but no audio file was generated.',
-          [{ text: 'OK' }]
+          t('voice.recordingIssue'),
+          t('voice.noAudioGenerated'),
+          [{ text: t('common.ok') }]
         );
       }
     }
@@ -213,18 +215,18 @@ const VoiceScreenProduction: React.FC = () => {
 
       // Navigate to home screen after successful logging
       Alert.alert(
-        'Success',
-        `${parsedFoods.length} food item${parsedFoods.length !== 1 ? 's' : ''} logged successfully!`,
+        t('voice.successTitle'),
+        t('voice.itemsLogged', { count: parsedFoods.length, plural: parsedFoods.length !== 1 ? 's' : '' }),
         [
           {
-            text: 'OK',
+            text: t('common.ok'),
             onPress: () => navigation.navigate('Home' as never)
           }
         ]
       );
 
     } catch (error) {
-      Alert.alert('Error', 'Failed to save food items. Please try again.');
+      Alert.alert(t('common.error'), t('voice.failedToSave'));
     }
   }, [parsedFoods, addFoodItem, logFood, voiceProcessing.actions, updateCurrentDate, revenueCatActions, navigation]);
 
@@ -268,8 +270,8 @@ const VoiceScreenProduction: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScreenHeader
-        title="Voice Food Log 🎤"
-        subtitle="Record your meals naturally"
+        title={t('voice.screenTitle')}
+        subtitle={t('voice.screenSubtitle')}
       />
       
       {/* Usage Progress Bar */}
@@ -290,8 +292,8 @@ const VoiceScreenProduction: React.FC = () => {
             disabled={!voiceRecording.state.isInitialized || voiceState === 'processing' || voiceProcessing.data.state === 'transcribing' || voiceProcessing.data.state === 'parsing'}
           />
 
-          {/* Processing Status */}
-          {(voiceProcessing.data.state === 'transcribing' || voiceProcessing.data.state === 'parsing') && (
+          {/* Processing Status - Only show during transcribing, not parsing */}
+          {voiceProcessing.data.state === 'transcribing' && (
             <ProcessingStatus
               state={voiceProcessing.data.state}
               progress={voiceProcessing.data.progress || 0}
@@ -315,7 +317,7 @@ const VoiceScreenProduction: React.FC = () => {
                     voiceProcessing.actions.clearError();
                   }}
                 >
-                  <Text style={styles.retryButtonText}>Dismiss</Text>
+                  <Text style={styles.retryButtonText}>{t('voice.dismiss')}</Text>
                 </TouchableOpacity>
                 {(voiceProcessing.data.state === 'error' && voiceProcessing.data.transcript) && (
                   <TouchableOpacity
@@ -337,6 +339,12 @@ const VoiceScreenProduction: React.FC = () => {
             transcript={voiceProcessing.data.transcript}
             isVisible={!!voiceProcessing.data.transcript && voiceProcessing.data.state !== 'transcribing'}
             onClear={handleClearTranscript}
+            onEdit={() => {
+              // TODO: Implement edit functionality
+              console.log('Edit transcript');
+            }}
+            isProcessing={voiceProcessing.data.state === 'parsing'}
+            processingProgress={voiceProcessing.data.progress || 0}
           />
 
           {/* Voice Instructions */}

@@ -1,402 +1,322 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ParsedFoodItem } from '../../../types';
-import { ParsedFoodItemWithConfidence } from '../../../types/aiTypes';
-import { colors, fonts, spacing } from '../../../constants/theme';
-import { ScreenHeader } from '../../layout';
+import { colors, fonts, spacing, borderRadius } from '../../../constants/theme';
 import { Button } from '../Button';
-import { FoodItemCard } from '../../food/FoodItemCard';
-import { FoodDetailsModal } from '../../food/FoodDetailsModal';
-
+import { useTranslation } from '../../../hooks/useTranslation';
 
 interface FoodReviewNewProps {
-  foods: ParsedFoodItemWithConfidence[];
-  onUpdateFood: (index: number, updatedFood: ParsedFoodItemWithConfidence) => void;
+  foods: ParsedFoodItem[];
+  onEditFood: (index: number) => void;
   onRemoveFood: (index: number) => void;
-  onAddFood: () => void;
   onConfirm: () => void;
   onCancel: () => void;
-  isLoading?: boolean;
 }
 
-type ModalType = 'none' | 'details';
-
-interface NutritionTotals {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-}
-
-interface ValidationResult {
-  totalNutrition: NutritionTotals;
-  hasIssues: boolean;
-  issueCount: number;
-}
-
-// Helper function to get confidence indicator
-function getConfidenceIndicator(confidence: number) {
-  if (confidence >= 0.8) return { emoji: '🟢', color: colors.success, label: 'High' };
-  if (confidence >= 0.6) return { emoji: '🟡', color: colors.warning, label: 'Medium' };
-  return { emoji: '🔴', color: colors.error, label: 'Low' };
-}
+const formatNutritionValue = (value: number): string => {
+  return Math.round(value).toString();
+};
 
 export const FoodReviewNew: React.FC<FoodReviewNewProps> = ({
   foods,
-  onUpdateFood,
+  onEditFood,
   onRemoveFood,
-  onAddFood,
   onConfirm,
   onCancel,
-  isLoading = false,
 }) => {
-  const [activeModal, setActiveModal] = useState<ModalType>('none');
-  const [selectedFoodIndex, setSelectedFoodIndex] = useState<number | null>(null);
+  const { t, isRTL } = useTranslation();
 
-  // Foods are already processed with confidence - use them directly
-  const validatedFoods = foods;
+  // RTL text style following Arabic.md pattern
+  const rtlTextStyle = isRTL
+    ? { writingDirection: 'rtl' as const, textAlign: 'left' as const }
+    : { writingDirection: 'ltr' as const, textAlign: 'left' as const };
 
-  // Calculate totals and validation using confidence-based foods
-  const { totalNutrition, hasIssues, issueCount } = useMemo((): ValidationResult => {
-    const total: NutritionTotals = {
-      calories: 0,
-      protein: 0,
-      carbs: 0,
-      fat: 0,
-    };
+  // Validate foods and filter out invalid entries
+  const validatedFoods = useMemo(() => {
+    return foods.filter(food =>
+      food &&
+      typeof food.name === 'string' &&
+      food.name.trim() !== ''
+    );
+  }, [foods]);
 
-    let issuesCount = 0;
-
-    validatedFoods.forEach(food => {
-      // Safely add nutrition values
-      total.calories += food.calories || 0;
-      total.protein += food.protein || 0;
-      total.carbs += food.carbs || 0;
-      total.fat += food.fat || 0;
-
-      // Count items that need clarification (using confidence-based flags)
-      if (food.needsQuantityModal || food.needsCookingModal) {
-        issuesCount++;
-      }
-    });
-
-    return {
-      totalNutrition: total,
-      hasIssues: issuesCount > 0,
-      issueCount: issuesCount,
-    };
+  // Calculate meal totals
+  const totalNutrition = useMemo(() => {
+    return validatedFoods.reduce(
+      (acc, food) => ({
+        calories: acc.calories + (food.calories || 0),
+        protein: acc.protein + (food.protein || 0),
+        carbs: acc.carbs + (food.carbs || 0),
+        fat: acc.fat + (food.fat || 0),
+      }),
+      { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    );
   }, [validatedFoods]);
 
-  const selectedFood = useMemo(() => {
-    return selectedFoodIndex !== null && selectedFoodIndex < validatedFoods.length 
-      ? validatedFoods[selectedFoodIndex] 
-      : null;
-  }, [selectedFoodIndex, validatedFoods]);
-
-  // Modal handlers - unified for all food details
-  const handleFoodDetailsModal = useCallback((index: number) => {
-    console.log('Opening food details modal for index:', index);
-    setSelectedFoodIndex(index);
-    setActiveModal('details');
-  }, []);
-
-  const closeModal = useCallback(() => {
-    setActiveModal('none');
-    setSelectedFoodIndex(null);
-  }, []);
-
-  // Update handler - unified for all food details
-  const handleFoodDetailsUpdate = useCallback((updatedFood: ParsedFoodItemWithConfidence) => {
-    if (selectedFoodIndex === null) {
-      console.warn('No food selected for update');
-      return;
-    }
-
-    try {
-      onUpdateFood(selectedFoodIndex, updatedFood);
-      closeModal();
-    } catch (error) {
-      console.error('Failed to update food:', error);
-    }
-  }, [selectedFoodIndex, onUpdateFood, closeModal]);
-
-  const getConfirmButtonText = useCallback(() => {
-    if (hasIssues) {
-      return `Fix ${issueCount} issue${issueCount !== 1 ? 's' : ''} first`;
-    }
-    return `Log ${validatedFoods.length} item${validatedFoods.length !== 1 ? 's' : ''}`;
-  }, [hasIssues, issueCount, validatedFoods.length]);
-
-  const formatNutritionValue = useCallback((value: number, unit: string = '') => {
-    return `${Math.round(value * 10) / 10}${unit}`;
-  }, []);
-
   return (
-    <>
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <ScreenHeader
-          title="Review Your Meal 🍽️"
-          subtitle={`${validatedFoods.length} food items detected`}
-          rightIcon="close"
-          onRightPress={onCancel}
-        />
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={styles.headerContent}>
+          <Text style={[styles.headerTitle, rtlTextStyle]}>
+            {t('foodReview.title') || 'Review Your Meal'}
+          </Text>
+          <Text style={[styles.headerSubtitle, rtlTextStyle]}>
+            {t('foodReview.subtitle') || 'Confirm or edit the items from your recording.'}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
+          <MaterialIcons name="close" size={24} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
 
-        {/* Summary Stats */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>
-                {formatNutritionValue(totalNutrition.calories)}
-              </Text>
-              <Text style={styles.summaryLabel}>calories</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>
-                {formatNutritionValue(totalNutrition.protein, 'g')}
-              </Text>
-              <Text style={styles.summaryLabel}>protein</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>
-                {formatNutritionValue(totalNutrition.carbs, 'g')}
-              </Text>
-              <Text style={styles.summaryLabel}>carbs</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>
-                {formatNutritionValue(totalNutrition.fat, 'g')}
-              </Text>
-              <Text style={styles.summaryLabel}>fat</Text>
-            </View>
+      {/* Meal Totals Card */}
+      <View style={styles.totalsCard}>
+        <View style={styles.totalsHeader}>
+          <View>
+            <Text style={[styles.totalsTitle, rtlTextStyle]}>
+              {t('foodReview.mealTotals') || 'Meal Totals'}
+            </Text>
+            <Text style={[styles.itemCount, rtlTextStyle]}>
+              {validatedFoods.length} {validatedFoods.length === 1
+                ? (t('foodReview.item') || 'item')
+                : (t('foodReview.items') || 'items')}
+            </Text>
           </View>
-
-          {hasIssues && (
-            <View style={styles.issuesWarning}>
-              <MaterialIcons name="warning" size={16} color={colors.warning} />
-              <Text style={styles.issuesText}>
-                {issueCount} item{issueCount > 1 ? 's need' : ' needs'} more details
-              </Text>
-            </View>
-          )}
+          <View style={styles.caloriesBadge}>
+            <Text style={styles.caloriesValue}>
+              {formatNutritionValue(totalNutrition.calories)}
+            </Text>
+            <Text style={styles.caloriesLabel}>KCAL</Text>
+          </View>
         </View>
 
-        {/* Food Items List */}
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <View style={styles.foodList}>
-            {validatedFoods.map((food, index) => {
-              const confidenceIndicator = getConfidenceIndicator(food.overallConfidence);
-              const needsAttention = food.needsQuantityModal || food.needsCookingModal;
-              
-              return (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => handleFoodDetailsModal(index)}
-                  style={[
-                    styles.foodCard,
-                    needsAttention && styles.foodCardNeedsAttention
-                  ]}
-                >
-                  {/* Food Item Header */}
-                  <View style={styles.foodHeader}>
-                    <View style={styles.foodNameSection}>
-                      <Text style={styles.foodName}>{food.name}</Text>
-                      {needsAttention && (
-                        <View style={styles.attentionBadge}>
-                          <MaterialIcons name="warning" size={12} color={colors.warning} />
-                          <Text style={styles.attentionText}>Needs details</Text>
-                        </View>
-                      )}
-                    </View>
-                    
-                    <View style={styles.foodActions}>
-                      <View style={styles.confidenceBadge}>
-                        <Text style={styles.confidenceEmoji}>{confidenceIndicator.emoji}</Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => onRemoveFood(index)}
-                        style={styles.removeButton}
-                      >
-                        <MaterialIcons name="close" size={16} color={colors.textSecondary} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+        {/* Macros Row */}
+        <View style={styles.macrosRow}>
+          <View style={styles.macroItem}>
+            <Text style={[styles.macroValue, rtlTextStyle]}>
+              {formatNutritionValue(totalNutrition.protein)}G
+            </Text>
+            <Text style={[styles.macroLabel, rtlTextStyle]}>P</Text>
+          </View>
+          <View style={styles.macroItem}>
+            <Text style={[styles.macroValue, rtlTextStyle]}>
+              {formatNutritionValue(totalNutrition.carbs)}G
+            </Text>
+            <Text style={[styles.macroLabel, rtlTextStyle]}>C</Text>
+          </View>
+          <View style={styles.macroItem}>
+            <Text style={[styles.macroValue, rtlTextStyle]}>
+              {formatNutritionValue(totalNutrition.fat)}G
+            </Text>
+            <Text style={[styles.macroLabel, rtlTextStyle]}>F</Text>
+          </View>
+        </View>
+      </View>
 
-                  {/* Nutrition Summary */}
-                  <View style={styles.nutritionRow}>
-                    <Text style={styles.nutritionText}>
-                      {food.calories} cal • {food.protein}g protein • {food.carbs}g carbs • {food.fat}g fat
+      {/* Food Items List */}
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.foodList}>
+          {validatedFoods.map((food, index) => (
+            <View key={index} style={styles.foodCard}>
+              {/* Food Header */}
+              <View style={[styles.foodHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={styles.foodInfo}>
+                  <Text style={[styles.foodName, rtlTextStyle]}>{food.name}</Text>
+                  {food.quantity && food.unit && (
+                    <Text style={[styles.foodQuantity, rtlTextStyle]}>
+                      {food.quantity} {food.unit}
                     </Text>
-                  </View>
-
-                  {/* Quantity & Cooking Info */}
-                  <View style={styles.detailsRow}>
-                    <Text style={styles.detailsText}>
-                      {food.quantity} {food.unit} ({food.gramEquivalent}g)
-                    </Text>
-                    {food.cookingMethod && (
-                      <Text style={styles.cookingText}>• {food.cookingMethod}</Text>
-                    )}
-                  </View>
-
-                  {/* Issues Indicators */}
-                  {needsAttention && (
-                    <View style={styles.issuesRow}>
-                      {food.needsQuantityModal && (
-                        <View style={styles.issueBadge}>
-                          <MaterialIcons name="straighten" size={12} color={colors.warning} />
-                          <Text style={styles.issueText}>Quantity</Text>
-                        </View>
-                      )}
-                      {food.needsCookingModal && (
-                        <View style={styles.issueBadge}>
-                          <MaterialIcons name="restaurant" size={12} color={colors.warning} />
-                          <Text style={styles.issueText}>Cooking</Text>
-                        </View>
-                      )}
-                    </View>
                   )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
+                  {food.cookingMethod && (
+                    <Text style={[styles.cookingMethod, rtlTextStyle]}>
+                      {food.cookingMethod}
+                    </Text>
+                  )}
+                </View>
 
-        {/* Footer Actions */}
-        <View style={styles.footer}>
-          <Button
-            title="Cancel"
-            onPress={onCancel}
-            variant="secondary"
-            style={styles.footerButton}
-          />
-          <Button
-            title={getConfirmButtonText()}
-            onPress={onConfirm}
-            variant="primary"
-            style={[styles.footerButton, styles.confirmButton]}
-            disabled={hasIssues || isLoading}
-            loading={isLoading}
-            accessibilityLabel={hasIssues ? 'Fix issues before logging food' : 'Log all food items'}
-          />
+                {/* Action Icons */}
+                <View style={[styles.foodActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <TouchableOpacity
+                    onPress={() => onEditFood(index)}
+                    style={styles.iconButton}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <MaterialIcons name="edit" size={20} color={colors.gray400} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => onRemoveFood(index)}
+                    style={styles.iconButton}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <MaterialIcons name="delete-outline" size={20} color={colors.gray400} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Nutrition Row */}
+              <View style={styles.nutritionGrid}>
+                <View style={styles.nutritionItemFirst}>
+                  <Text style={styles.nutritionLabel}>KCAL</Text>
+                  <Text style={styles.nutritionValue}>{formatNutritionValue(food.calories)}</Text>
+                </View>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionLabel}>P</Text>
+                  <Text style={styles.nutritionValue}>{formatNutritionValue(food.protein)}G</Text>
+                </View>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionLabel}>C</Text>
+                  <Text style={styles.nutritionValue}>{formatNutritionValue(food.carbs)}G</Text>
+                </View>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionLabel}>F</Text>
+                  <Text style={styles.nutritionValue}>{formatNutritionValue(food.fat)}G</Text>
+                </View>
+              </View>
+            </View>
+          ))}
         </View>
-      </SafeAreaView>
+      </ScrollView>
 
-      {/* Unified Food Details Modal */}
-      <FoodDetailsModal
-        visible={activeModal === 'details'}
-        food={selectedFood}
-        onConfirm={handleFoodDetailsUpdate}
-        onCancel={closeModal}
-      />
-    </>
+      {/* Footer */}
+      <View style={[styles.footer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <Button
+          title={t('common.cancel') || 'Cancel'}
+          onPress={onCancel}
+          variant="secondary"
+          style={styles.footerButton}
+        />
+        <Button
+          title={t('common.confirm') || 'Confirm'}
+          onPress={onConfirm}
+          variant="primary"
+          style={styles.footerButton}
+        />
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
   },
-  summaryCard: {
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: spacing.sm,
+  headerContent: {
+    flex: 1,
   },
-  summaryItem: {
-    alignItems: 'center',
-    minWidth: 60,
-  },
-  summaryValue: {
+  headerTitle: {
     fontSize: fonts.xl,
     fontWeight: 'bold',
     color: colors.textPrimary,
     marginBottom: spacing.xs,
+    width: '100%',
   },
-  summaryLabel: {
+  headerSubtitle: {
+    fontSize: fonts.sm,
+    color: colors.textSecondary,
+    width: '100%',
+  },
+  closeButton: {
+    padding: spacing.sm,
+  },
+  // Meal Totals Card
+  totalsCard: {
+    backgroundColor: '#FFFBEA',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: '#FFF4CC',
+  },
+  totalsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  totalsTitle: {
+    fontSize: fonts.lg,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  itemCount: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  caloriesBadge: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.xs,
+  },
+  caloriesValue: {
+    fontSize: fonts['2xl'],
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  caloriesLabel: {
+    fontSize: fonts.xs,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  macrosRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: '#FFF4CC',
+  },
+  macroItem: {
+    alignItems: 'center',
+  },
+  macroValue: {
+    fontSize: fonts.base,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  macroLabel: {
     fontSize: fonts.xs,
     color: colors.textSecondary,
     fontWeight: '500',
-    textTransform: 'uppercase',
   },
-  issuesWarning: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    padding: spacing.sm,
-    backgroundColor: colors.yellow50,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.yellow200,
-  },
-  issuesText: {
-    flex: 1,
-    fontSize: fonts.sm,
-    color: colors.warning,
-    fontWeight: '500',
-  },
+  // Food List
   scrollView: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   foodList: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.white,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray200,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 4,
+    paddingBottom: spacing.lg,
   },
-  footerButton: {
-    flex: 1,
-  },
-  confirmButton: {
-    flex: 2,
-  },
-  // New food card styles with confidence indicators
   foodCard: {
     backgroundColor: colors.white,
-    borderRadius: 12,
+    borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.gray200,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  foodCardNeedsAttention: {
-    borderColor: colors.warning,
-    borderWidth: 1.5,
-    backgroundColor: colors.yellow50,
   },
   foodHeader: {
     flexDirection: 'row',
@@ -404,7 +324,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
-  foodNameSection: {
+  foodInfo: {
     flex: 1,
     marginRight: spacing.sm,
   },
@@ -413,91 +333,65 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.textPrimary,
     marginBottom: spacing.xs,
+    width: '100%',
   },
-  attentionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    backgroundColor: colors.warning + '20',
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  attentionText: {
-    fontSize: fonts.xs,
-    color: colors.warning,
-    fontWeight: '600',
-  },
-  foodActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  confidenceBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.gray200,
-  },
-  confidenceEmoji: {
-    fontSize: 12,
-  },
-  removeButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.gray100,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nutritionRow: {
-    marginBottom: spacing.sm,
-  },
-  nutritionText: {
+  foodQuantity: {
     fontSize: fonts.sm,
-    color: colors.textPrimary,
-    fontWeight: '500',
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  detailsText: {
-    fontSize: fonts.xs,
     color: colors.textSecondary,
-    fontWeight: '500',
+    marginBottom: 2,
+    width: '100%',
   },
-  cookingText: {
+  cookingMethod: {
     fontSize: fonts.xs,
     color: colors.primary,
     fontWeight: '500',
-    marginLeft: spacing.xs,
+    width: '100%',
   },
-  issuesRow: {
+  foodActions: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.sm,
   },
-  issueBadge: {
+  iconButton: {
+    padding: spacing.xs,
+  },
+  // Nutrition Grid
+  nutritionGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.warning + '15',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.warning + '30',
+    alignItems: 'flex-start',
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+    gap: spacing.md,
   },
-  issueText: {
+  nutritionItemFirst: {
+    alignItems: 'flex-start',
+  },
+  nutritionItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  nutritionLabel: {
     fontSize: fonts.xs,
-    color: colors.warning,
-    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  nutritionValue: {
+    fontSize: fonts.base,
+    fontWeight: 'normal',
+    color: colors.textPrimary,
+  },
+  // Footer
+  footer: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+  },
+  footerButton: {
+    flex: 1,
   },
 });

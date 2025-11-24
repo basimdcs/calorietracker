@@ -88,9 +88,9 @@ export const colors = {
   textOnSurface: '#000000',        // Pure black text on white surfaces
 
   // Health-specific semantic colors
-  nutritionProtein: '#FF8A65',     // Salmon for protein
-  nutritionCarbs: '#FFB74D',       // Golden for carbohydrates  
-  nutritionFat: '#89C555',         // Darker brand flesh color for healthy fats
+  nutritionProtein: '#FFB3BA',     // Soft coral pink for protein
+  nutritionCarbs: '#FFDFBA',       // Peach/golden amber for carbohydrates
+  nutritionFat: '#E0BBE4',         // Soft lavender for healthy fats
   nutritionFiber: '#2AB852',       // Darker wave gradient mid for fiber
   caloriesBurn: '#FF7043',         // Orange-red for calories burned
   caloriesConsumed: '#228F3A',     // Darker brand outer skin for consumed

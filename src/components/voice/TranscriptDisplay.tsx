@@ -4,17 +4,19 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Platform,
+  ActivityIndicator,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { colors, fonts, spacing } from '../../constants/theme';
-import { Card } from '../ui/Card';
+import { colors, fonts, spacing, borderRadius } from '../../constants/theme';
+import { useTranslation } from '../../hooks/useTranslation';
+import { useRTLStyles } from '../../utils/rtl';
 
 interface TranscriptDisplayProps {
   transcript: string;
   isVisible: boolean;
   onEdit?: () => void;
   onClear?: () => void;
+  isProcessing?: boolean;
+  processingProgress?: number;
 }
 
 export const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({
@@ -22,135 +24,120 @@ export const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({
   isVisible,
   onEdit,
   onClear,
+  isProcessing = false,
+  processingProgress = 0,
 }) => {
+  const { t } = useTranslation();
+  const { rtlText, rtlRow } = useRTLStyles();
+
   if (!isVisible || !transcript.trim()) {
     return null;
   }
 
   return (
-    <Card style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <MaterialIcons name="volume-up" size={20} color={colors.secondary} />
-          <Text style={styles.headerTitle}>What you said</Text>
-        </View>
-        <View style={styles.headerActions}>
-          {onEdit && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={onEdit}
-              accessibilityLabel="Edit transcript"
-              accessibilityRole="button"
-            >
-              <MaterialIcons name="edit" size={18} color={colors.primary} />
-            </TouchableOpacity>
-          )}
-          {onClear && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={onClear}
-              accessibilityLabel="Clear transcript"
-              accessibilityRole="button"
-            >
-              <MaterialIcons name="clear" size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+    <View style={styles.container}>
+      {/* Centered Transcript Text */}
+      <Text style={[styles.transcriptText, rtlText]}>
+        {transcript}
+      </Text>
 
-      <View style={styles.transcriptContainer}>
-        <Text 
-          style={styles.transcriptText}
-          accessibilityLabel={`Transcript: ${transcript}`}
-          accessibilityRole="text"
-        >
-          {transcript}
-        </Text>
-      </View>
+      {/* Processing State */}
+      {isProcessing && (
+        <>
+          <Text style={[styles.processingText, rtlText]}>
+            {t('voice.analyzingMeal')}
+          </Text>
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBarFill, { width: `${Math.min(100, processingProgress)}%` }]} />
+          </View>
+        </>
+      )}
 
-      {/* Quality indicator */}
-      <View style={styles.qualityIndicator}>
-        <View style={styles.qualityDot} />
-        <Text style={styles.qualityText}>
-          Transcription completed
-        </Text>
-      </View>
-    </Card>
+      {/* Action Buttons */}
+      {!isProcessing && (
+        <View style={[styles.buttonsRow, rtlRow]}>
+          <TouchableOpacity style={styles.cancelButton} onPress={onClear}>
+            <Text style={[styles.cancelButtonText, rtlText]}>{t('common.cancel')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.editButton} onPress={onEdit}>
+            <Text style={[styles.editButtonText, rtlText]}>{t('common.edit')}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: 16,
+    padding: spacing.xl,
+    marginHorizontal: spacing.lg,
+    marginVertical: spacing.lg,
     alignItems: 'center',
+  },
+  transcriptText: {
+    fontSize: fonts.lg,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+    lineHeight: fonts.lg * 1.5,
+  },
+  processingText: {
+    fontSize: fonts.base,
+    color: colors.textSecondary,
+    textAlign: 'center',
     marginBottom: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
+    width: '100%',
   },
-  headerLeft: {
+  progressBarContainer: {
+    width: '100%',
+    height: 4,
+    backgroundColor: colors.gray200,
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+    marginBottom: spacing.lg,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.full,
+  },
+  buttonsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
+    width: '100%',
+    justifyContent: 'center',
   },
-  headerTitle: {
+  cancelButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
     fontSize: fonts.base,
     fontWeight: '600',
     color: colors.textPrimary,
   },
-  headerActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  actionButton: {
-    padding: spacing.xs,
-    borderRadius: 16,
-    backgroundColor: colors.gray50,
-    minWidth: 32,
-    minHeight: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  transcriptContainer: {
-    backgroundColor: colors.gray50,
-    borderRadius: 12,
-    padding: spacing.md,
+  editButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.success + '20',
     borderWidth: 1,
-    borderColor: colors.gray200,
-    marginBottom: spacing.sm,
-  },
-  transcriptText: {
-    fontSize: fonts.base,
-    color: colors.textPrimary,
-    lineHeight: 22,
-    fontFamily: Platform.select({
-      ios: 'Georgia',
-      android: 'serif',
-      default: 'serif',
-    }),
-  },
-  qualityIndicator: {
-    flexDirection: 'row',
+    borderColor: colors.success,
     alignItems: 'center',
-    gap: spacing.xs,
   },
-  qualityDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.success,
-  },
-  qualityText: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-    fontWeight: '500',
+  editButtonText: {
+    fontSize: fonts.base,
+    fontWeight: '600',
+    color: colors.success,
   },
 });

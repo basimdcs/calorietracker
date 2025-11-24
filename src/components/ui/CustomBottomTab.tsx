@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, shadows } from '../../constants/theme';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface TabItem {
   key: string;
@@ -20,25 +21,25 @@ interface CustomBottomTabProps {
 const tabs: TabItem[] = [
   {
     key: 'Home',
-    title: 'Home',
+    title: '',
     icon: 'home',
     activeIcon: 'home',
   },
   {
     key: 'Voice',
-    title: 'Add',
+    title: '',
     icon: 'add',
     activeIcon: 'add',
   },
   {
     key: 'History',
-    title: 'History',
+    title: '',
     icon: 'history',
     activeIcon: 'history',
   },
   {
     key: 'Settings',
-    title: 'Settings',
+    title: '',
     icon: 'settings',
     activeIcon: 'settings',
   },
@@ -50,6 +51,7 @@ export const CustomBottomTab: React.FC<CustomBottomTabProps> = ({
   navigation,
 }) => {
   const insets = useSafeAreaInsets();
+  const { isRTL } = useTranslation();
   
   return (
     <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
@@ -95,10 +97,13 @@ export const CustomBottomTab: React.FC<CustomBottomTabProps> = ({
               <Text
                 style={[
                   styles.tabLabel,
-                  { color: isFocused ? colors.primary : colors.gray600 },
+                  {
+                    color: isFocused ? colors.primary : colors.gray600,
+                    writingDirection: isRTL ? 'rtl' : 'ltr',
+                  },
                 ]}
               >
-                {tab.title}
+                {label}
               </Text>
             </View>
           </TouchableOpacity>
@@ -130,5 +135,6 @@ const styles = StyleSheet.create({
     fontSize: fonts.xs,
     fontWeight: '700' as const,
     marginTop: spacing.xs,
+    textAlign: 'center',
   },
 }); 

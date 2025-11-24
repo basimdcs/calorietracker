@@ -1,260 +1,214 @@
 /**
  * Reusable DailyView Component
- * 
- * This component displays the complete daily view including:
- * - Calories consumed widget (purple gradient)
- * - Macronutrients breakdown
- * - Complete food items list with actions
- * 
- * Used in both Home screen and History screen for consistency
+ *
+ * Layout order: Date selector → Calories bar → Macros bar → Food items
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
-import Svg, { Circle } from 'react-native-svg';
-import { colors, fonts, spacing } from '../../constants/theme';
+import { colors, fonts, spacing, borderRadius, shadows } from '../../constants/theme';
 import { FoodItem } from './FoodItem';
 import { DailyLog } from '../../types';
-import { useFoodData } from '../../hooks/useFoodData';
 import { toDisplayFood } from '../../types/display';
 import { useUserCalorieGoal } from '../../utils/calorieGoal';
+import { Card } from './Card';
+import { useRTLStyles } from '../../utils/rtl';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface DailyViewProps {
   dailyLog?: DailyLog;
   date: string;
   title?: string;
   showDateHeader?: boolean;
+  showDateSelector?: boolean;
+  onDateChange?: (date: Date) => void;
   onRemoveFood?: (date: string, foodId: string) => void;
   onEditFood?: (date: string, foodId: string, quantity: number) => void;
 }
 
-/**
- * Get food emoji based on index (for fallback)
- */
-const getMealIcon = (index: number): string => {
-  switch (index) {
-    case 0: return '🥞';
-    case 1: return '🥗';
-    case 2: return '🍖';
-    default: return '🍽️';
-  }
-};
-
 export const DailyView: React.FC<DailyViewProps> = ({
   dailyLog,
   date,
-  title = "Calories Consumed",
+  title = "Calories",
   showDateHeader = false,
+  showDateSelector = false,
+  onDateChange,
   onRemoveFood,
   onEditFood,
 }) => {
-  const { removeFood } = useFoodData();
   const userCalorieGoal = useUserCalorieGoal();
+  const { rtlIcon } = useRTLStyles();
+  const { t, isRTL, currentLanguage } = useTranslation();
 
-  // Calculate values - use user's actual calorie goal from profile
+  // RTL text style following Arabic.md pattern
+  const rtlTextStyle = isRTL
+    ? { writingDirection: 'rtl' as const, textAlign: 'left' as const }
+    : { writingDirection: 'ltr' as const, textAlign: 'left' as const };
+
+  // Calculate values
   const consumed = dailyLog?.totalNutrition.calories || 0;
-  const goal = userCalorieGoal; // Single source of truth
-  const progress = Math.min(consumed / goal, 1); // Cap at 100% for display
-  const remaining = goal - consumed; // Can be negative if over goal
-  const isOverGoal = remaining < 0;
+  const goal = userCalorieGoal;
+  const progress = Math.min(consumed / goal, 1);
   const foods = dailyLog?.foods || [];
   const displayFoods = foods.map(toDisplayFood);
 
-  // Debug logging
-  console.log('📊 DailyView Render:', {
-    date,
-    dailyLogExists: !!dailyLog,
-    foodsCount: foods.length,
-    displayFoodsCount: displayFoods.length,
-    foods: foods.map(f => ({
-      id: f.id,
-      name: f.foodItem.name,
-      calories: f.nutrition.calories
-    })),
-    displayFoods: displayFoods.map(f => ({
-      id: f.id,
-      name: f.name,
-      calories: f.nutrition.calories
-    }))
-  });
+  // Calculate macro goals based on calorie goal
+  // Standard macro split: 30% protein, 45% carbs, 25% fat
+  const proteinGoal = Math.round((goal * 0.30) / 4); // 4 cal per gram of protein
+  const carbsGoal = Math.round((goal * 0.45) / 4); // 4 cal per gram of carbs
+  const fatGoal = Math.round((goal * 0.25) / 9); // 9 cal per gram of fat
 
-  // Progress circle calculations
-  const strokeDasharray = 402;
-  const strokeDashoffset = strokeDasharray - (progress * strokeDasharray);
-  
-  const handleRemoveFood = (foodId: string) => {
-    const food = foods.find(f => f.id === foodId);
-    if (!food) return;
-    
-    Alert.alert(
-      'Remove Food',
-      `Remove ${food.foodItem.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
-          style: 'destructive', 
-          onPress: () => {
-            if (onRemoveFood) {
-              onRemoveFood(date, foodId);
-            } else {
-              removeFood(date, foodId);
-            }
-          }
-        },
-      ]
-    );
+  // Date navigation
+  const currentDate = new Date(date);
+  const goToPreviousDay = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() - 1);
+    onDateChange?.(newDate);
+  };
+
+  const goToNextDay = () => {
+    const today = new Date();
+    if (currentDate.toDateString() !== today.toDateString()) {
+      const newDate = new Date(currentDate);
+      newDate.setDate(newDate.getDate() + 1);
+      onDateChange?.(newDate);
+    }
+  };
+
+  const isToday = () => {
+    const today = new Date();
+    return currentDate.toDateString() === today.toDateString();
+  };
+
+  const formatDateDisplay = () => {
+    const today = new Date();
+    const locale = currentLanguage === 'ar' ? 'ar-SA' : 'en-US';
+    if (currentDate.toDateString() === today.toDateString()) {
+      return `${t('calendar.today')}, ${currentDate.toLocaleDateString(locale, { month: 'long', day: 'numeric' })}`;
+    }
+    return currentDate.toLocaleDateString(locale, { month: 'long', day: 'numeric' });
   };
 
   return (
     <View style={styles.container}>
-      {/* Date Header (optional) */}
-      {showDateHeader && (
-        <View style={styles.dateHeader}>
-          <MaterialIcons name="today" size={24} color={colors.primary} />
-          <Text style={styles.dateTitle} numberOfLines={2}>
-            {new Date(date).toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </Text>
-        </View>
+      {/* Date Selector (optional) */}
+      {showDateSelector && (
+        <Card style={styles.dateSelector}>
+          <View style={styles.dateSelectorRow}>
+            <TouchableOpacity onPress={goToPreviousDay} style={styles.dateNavButton}>
+              <MaterialIcons name={rtlIcon("chevron-left", "chevron-right")} size={28} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.dateText}>{formatDateDisplay()}</Text>
+            <TouchableOpacity
+              onPress={goToNextDay}
+              style={styles.dateNavButton}
+              disabled={isToday()}
+            >
+              <MaterialIcons
+                name={rtlIcon("chevron-right", "chevron-left")}
+                size={28}
+                color={isToday() ? colors.gray300 : colors.textPrimary}
+              />
+            </TouchableOpacity>
+          </View>
+        </Card>
       )}
 
-      {/* Calories Widget */}
+      {/* Calories Bar */}
       <LinearGradient
-        colors={[colors.primaryLight, colors.primary, colors.primaryDark]}
+        colors={[colors.primaryLight, colors.primary]}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        locations={[0, 0.5, 1]}
+        end={{ x: 1, y: 0 }}
         style={styles.caloriesCard}
       >
-        {/* Header Section */}
-        <View style={styles.headerSection}>
-          <Text style={styles.caloriesTitle}>{title}</Text>
-        </View>
-        
-        {/* Wheel Section */}
-        <View style={styles.wheelSection}>
-          <View style={styles.circularProgressContainer}>
-            <Svg width={144} height={144} style={styles.svgProgress}>
-              <Circle
-                cx={72}
-                cy={72}
-                r={64}
-                stroke="rgba(255, 255, 255, 0.3)"
-                strokeWidth={12}
-                fill="none"
-              />
-              <Circle
-                cx={72}
-                cy={72}
-                r={64}
-                stroke="white"
-                strokeWidth={12}
-                fill="none"
-                strokeDasharray={strokeDasharray}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-                transform="rotate(-90 72 72)"
-              />
-            </Svg>
-            <View style={styles.progressCenter}>
-              <Text style={styles.caloriesNumber}>{Math.round(consumed)}</Text>
-              <Text style={styles.caloriesUnit}>kcal</Text>
-            </View>
+        <View style={styles.caloriesContent}>
+          <Text style={[styles.caloriesTitle, rtlTextStyle]}>{t('nutrition.calories')}</Text>
+          <Text style={[styles.caloriesValue, rtlTextStyle]}>
+            {Math.round(consumed)} / {Math.round(goal)} {t('nutrition.kcal')}
+          </Text>
+          <View style={styles.caloriesProgressBar}>
+            <View
+              style={[
+                styles.caloriesProgressFill,
+                {
+                  width: `${Math.min(progress * 100, 100)}%`,
+                }
+              ]}
+            />
           </View>
-        </View>
-        
-        {/* Footer Section */}
-        <View style={styles.footerSection}>
-          <Text style={styles.remainingCalories}>
-            {isOverGoal ? 'Over goal: ' : 'Remaining: '}
-            <Text style={[styles.remainingNumber, isOverGoal && styles.overGoalNumber]}>
-              {isOverGoal ? '+' : ''}{Math.round(Math.abs(remaining))} kcal
-            </Text>
-          </Text>
-          <Text style={styles.goalText}>
-            Goal: {Math.round(goal)} kcal
-          </Text>
-          <TouchableOpacity
-            onPress={async () => {
-              const url = 'https://pubmed.ncbi.nlm.nih.gov/2305711/';
-              const supported = await Linking.canOpenURL(url);
-              if (supported) {
-                await Linking.openURL(url);
-              } else {
-                Alert.alert('Error', 'Unable to open link');
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.medicalCitation}>
-              Based on Mifflin-St Jeor Equation (AJCN, 1990)
-              {'\n'}
-              <Text style={styles.citationLink}>Tap for medical source →</Text>
-            </Text>
-          </TouchableOpacity>
         </View>
       </LinearGradient>
 
-      {/* Macronutrients */}
-      <View style={styles.macroSection}>
-        <Text style={styles.sectionTitle}>Macronutrients</Text>
-        <View style={styles.macroGrid}>
-          <View style={styles.macroCard}>
-            <View style={[styles.macroIconContainer, { backgroundColor: colors.nutritionProtein + '20' }]}>
-              <MaterialIcons name="sports-gymnastics" size={24} color={colors.nutritionProtein} />
-            </View>
-            <Text style={styles.macroLabel}>Protein</Text>
-            <Text style={styles.macroValue}>{Math.round(dailyLog?.totalNutrition.protein || 0)}g</Text>
+      {/* Macros Bar - All 3 in Row */}
+      <View style={styles.macroCardsContainer}>
+        <View style={[styles.macroCard, { backgroundColor: '#FFB3BA' }]}>
+          <Text style={[styles.macroCardLabel, rtlTextStyle]}>{t('nutrition.protein')}</Text>
+          <Text style={[styles.macroCardValue, rtlTextStyle]}>
+            {Math.round(dailyLog?.totalNutrition.protein || 0)} / {proteinGoal} {t('nutrition.g')}
+          </Text>
+          <View style={styles.macroCardProgressBar}>
+            <View
+              style={[
+                styles.macroCardProgressFill,
+                { width: `${Math.min(((dailyLog?.totalNutrition.protein || 0) / proteinGoal) * 100, 100)}%` }
+              ]}
+            />
           </View>
-          <View style={styles.macroCard}>
-            <View style={[styles.macroIconContainer, { backgroundColor: colors.nutritionCarbs + '20' }]}>
-              <MaterialIcons name="grain" size={24} color={colors.nutritionCarbs} />
-            </View>
-            <Text style={styles.macroLabel}>Carbs</Text>
-            <Text style={styles.macroValue}>{Math.round(dailyLog?.totalNutrition.carbs || 0)}g</Text>
+        </View>
+
+        <View style={[styles.macroCard, { backgroundColor: '#FFDFBA' }]}>
+          <Text style={[styles.macroCardLabel, rtlTextStyle]}>{t('nutrition.carbs')}</Text>
+          <Text style={[styles.macroCardValue, rtlTextStyle]}>
+            {Math.round(dailyLog?.totalNutrition.carbs || 0)} / {carbsGoal} {t('nutrition.g')}
+          </Text>
+          <View style={styles.macroCardProgressBar}>
+            <View
+              style={[
+                styles.macroCardProgressFill,
+                { width: `${Math.min(((dailyLog?.totalNutrition.carbs || 0) / carbsGoal) * 100, 100)}%` }
+              ]}
+            />
           </View>
-          <View style={styles.macroCard}>
-            <View style={[styles.macroIconContainer, { backgroundColor: colors.nutritionFat + '20' }]}>
-              <MaterialIcons name="opacity" size={24} color={colors.nutritionFat} />
-            </View>
-            <Text style={styles.macroLabel}>Fat</Text>
-            <Text style={styles.macroValue}>{Math.round(dailyLog?.totalNutrition.fat || 0)}g</Text>
+        </View>
+
+        <View style={[styles.macroCard, { backgroundColor: '#E0BBE4' }]}>
+          <Text style={[styles.macroCardLabel, rtlTextStyle]}>{t('nutrition.fat')}</Text>
+          <Text style={[styles.macroCardValue, rtlTextStyle]}>
+            {Math.round(dailyLog?.totalNutrition.fat || 0)} / {fatGoal} {t('nutrition.g')}
+          </Text>
+          <View style={styles.macroCardProgressBar}>
+            <View
+              style={[
+                styles.macroCardProgressFill,
+                { width: `${Math.min(((dailyLog?.totalNutrition.fat || 0) / fatGoal) * 100, 100)}%` }
+              ]}
+            />
           </View>
         </View>
       </View>
 
       {/* Food Items List */}
       <View style={styles.foodSection}>
-        <Text style={styles.sectionTitle} numberOfLines={2}>
-          {showDateHeader ? 'Food Items' : "Today's Meals"}
-        </Text>
-        
+        <Text style={styles.sectionTitle}>Today's Meals</Text>
         {displayFoods.length > 0 ? (
           <View style={styles.foodList}>
-            {displayFoods.map((food) => (
+            {displayFoods.map(food => (
               <FoodItem
                 key={food.id}
                 food={food}
-                onDelete={handleRemoveFood}
-                showMacros={true}
-                showTime={true}
+                onDelete={onRemoveFood ? (id) => onRemoveFood(date, id) : undefined}
+                showActions={true}
               />
             ))}
           </View>
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText} numberOfLines={2}>
-              {showDateHeader ? 'No food logged on this date' : 'No meals logged today'}
-            </Text>
-            <Text style={styles.emptySubtext} numberOfLines={2}>
-              {!showDateHeader && 'Use the Record button to log your first meal!'}
+            <MaterialIcons name="restaurant" size={48} color={colors.gray300} />
+            <Text style={styles.emptyStateText}>No meals logged yet</Text>
+            <Text style={styles.emptyStateSubtext}>
+              Start adding your meals to track your nutrition
             </Text>
           </View>
         )}
@@ -267,118 +221,101 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  dateHeader: {
+  dateSelector: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    padding: spacing.sm,
+  },
+  dateSelectorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
+    justifyContent: 'space-between',
   },
-  dateTitle: {
+  dateNavButton: {
+    padding: spacing.xs,
+  },
+  dateText: {
     fontSize: fonts.lg,
-    fontFamily: fonts.heading,
+    fontWeight: fonts.bold,
     color: colors.textPrimary,
-    marginLeft: spacing.sm,
+    flex: 1,
+    textAlign: 'center',
   },
   caloriesCard: {
     marginHorizontal: spacing.md,
-    marginBottom: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.xl,
-    borderRadius: 28,
-    alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 12,
+    marginBottom: spacing.md,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  headerSection: {
-    paddingBottom: spacing.xl,
-    paddingTop: spacing.sm,
+  caloriesContent: {
+    padding: spacing.lg,
   },
   caloriesTitle: {
-    fontSize: fonts.base,
+    fontSize: fonts.lg,
     fontWeight: '600',
     color: colors.white,
-    opacity: 0.9,
-    textAlign: 'center',
+    marginBottom: spacing.xs,
   },
-  wheelSection: {
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-  },
-  circularProgressContainer: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  svgProgress: {
-    position: 'absolute',
-  },
-  progressCenter: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  caloriesNumber: {
-    fontSize: fonts['4xl'],
-    fontFamily: fonts.heading,
-    color: colors.white,
-    lineHeight: fonts['4xl'] * 1.1,
-  },
-  caloriesUnit: {
-    fontSize: fonts.sm,
-    color: colors.white,
-    opacity: 0.8,
-    marginTop: -4,
-  },
-  footerSection: {
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.sm,
-  },
-  remainingCalories: {
-    fontSize: fonts.sm,
-    color: colors.white,
-    opacity: 0.9,
-    textAlign: 'center',
-  },
-  remainingNumber: {
+  caloriesValue: {
+    fontSize: fonts['2xl'],
     fontWeight: '700',
     color: colors.white,
-    opacity: 1,
+    marginBottom: spacing.md,
   },
-  overGoalNumber: {
-    color: colors.yellow300,
+  caloriesProgressBar: {
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 4,
+    overflow: 'hidden',
   },
-  goalText: {
-    fontSize: fonts.xs,
-    color: colors.white,
-    opacity: 0.7,
-    textAlign: 'center',
-    marginTop: spacing.xs,
+  caloriesProgressFill: {
+    height: '100%',
+    backgroundColor: colors.white,
+    borderRadius: 4,
   },
-  medicalCitation: {
-    fontSize: 10,
-    color: colors.white,
-    opacity: 0.6,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: 4,
+  macroCardsContainer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
   },
-  citationLink: {
-    fontSize: 9,
-    color: colors.white,
-    opacity: 0.8,
-    textDecorationLine: 'underline',
-    fontStyle: 'normal',
+  macroCard: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  macroSection: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
+  macroCardLabel: {
+    fontSize: fonts.sm,
+    fontWeight: fonts.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  macroCardValue: {
+    fontSize: fonts.base,
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  macroCardProgressBar: {
+    height: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  macroCardProgressFill: {
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 3,
   },
   sectionTitle: {
     fontSize: fonts.xl,
@@ -386,67 +323,27 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.md,
   },
-  macroGrid: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  macroCard: {
-    flex: 1,
-    backgroundColor: colors.white,
-    padding: spacing.md,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  macroIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  macroLabel: {
-    fontSize: fonts.sm,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  macroValue: {
-    fontSize: fonts.lg,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
   foodSection: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     marginBottom: spacing.xl,
   },
   foodList: {
-    gap: spacing.sm,
+    width: '100%',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.xl * 2,
   },
-  emptyText: {
-    fontSize: fonts.base,
+  emptyStateText: {
+    fontSize: fonts.lg,
+    fontWeight: fonts.semibold,
     color: colors.textSecondary,
-    fontWeight: '500',
-    textAlign: 'center',
+    marginTop: spacing.md,
   },
-  emptySubtext: {
+  emptyStateSubtext: {
     fontSize: fonts.sm,
-    color: colors.textSecondary,
-    textAlign: 'center',
+    color: colors.textTertiary,
     marginTop: spacing.xs,
-    opacity: 0.8,
+    textAlign: 'center',
   },
 });

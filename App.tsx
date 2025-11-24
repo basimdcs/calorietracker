@@ -7,6 +7,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { colors, fonts } from './src/constants/theme';
 import { REVENUE_CAT_CONFIG } from './src/config/revenueCat';
 import { RevenueCatProvider, useRevenueCatContext } from './src/contexts/RevenueCatContext';
+import { LanguageProvider } from './src/contexts/LanguageContext';
 import { useUserStore } from './src/stores/userStore';
 import { useFonts } from './src/hooks/useFonts';
 import { useProfileSync } from './src/hooks/useProfileSync';
@@ -107,9 +108,11 @@ function AppContent() {
 
 export default function App() {
   return (
-    <RevenueCatProvider>
-      <AppContent />
-    </RevenueCatProvider>
+    <LanguageProvider>
+      <RevenueCatProvider>
+        <AppContent />
+      </RevenueCatProvider>
+    </LanguageProvider>
   );
 }
 

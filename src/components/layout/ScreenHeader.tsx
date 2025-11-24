@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing } from '../../constants/theme';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface ScreenHeaderProps {
   title: string;
@@ -35,6 +36,12 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   onBackPress,
   centerTitle = false,
 }) => {
+  const { currentLanguage } = useTranslation();
+
+  // Use Cairo font for Arabic, Inter for English
+  const titleFontFamily = currentLanguage === 'ar' ? 'Cairo_700Bold' : 'Inter_700Bold';
+  const subtitleFontFamily = currentLanguage === 'ar' ? 'Cairo_400Regular' : 'Inter_400Regular';
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -53,7 +60,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
               />
             </TouchableOpacity>
           )}
-          
+
           {leftIcon && !showBackButton && (
             <TouchableOpacity
               style={styles.iconButton}
@@ -71,11 +78,11 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
 
         {/* Center Section */}
         <View style={[styles.titleContainer, centerTitle && styles.titleContainerCentered]}>
-          <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+          <Text style={[styles.title, { fontFamily: titleFontFamily }]} numberOfLines={1} ellipsizeMode="tail">
             {title}
           </Text>
           {subtitle && (
-            <Text style={styles.subtitle} numberOfLines={1} ellipsizeMode="tail">
+            <Text style={[styles.subtitle, { fontFamily: subtitleFontFamily }]} numberOfLines={1} ellipsizeMode="tail">
               {subtitle}
             </Text>
           )}

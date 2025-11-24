@@ -8,45 +8,49 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { useNavigation } from '@react-navigation/native';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { DailyView } from '../../components/ui/DailyView';
 import { useUser } from '../../hooks/useUser';
 import { useFoodData } from '../../hooks/useFoodData';
+import { useRTLStyles } from '../../utils/rtl';
+import { useTranslation } from '../../hooks/useTranslation';
+import { SettingsStackParamList } from '../../types';
 
 const HomeScreen: React.FC = () => {
+  const navigation = useNavigation<StackNavigationProp<SettingsStackParamList>>();
   const { profile } = useUser();
   const { todayLog, debug, allDailyLogs } = useFoodData();
+  const { rtlMarginRight, rtlRow } = useRTLStyles();
+  const { t } = useTranslation();
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.avatarContainer}>
+          <View style={[styles.headerContent, rtlRow]}>
+            <TouchableOpacity
+              style={[styles.avatarContainer, rtlMarginRight(spacing.md)]}
+              onPress={() => navigation.navigate('Settings')}
+            >
               <View style={styles.avatarPlaceholder}>
                 <MaterialIcons name="person" size={28} color={colors.white} />
               </View>
-            </View>
-            <View style={styles.headerLeft}>
-              <Text style={styles.greeting}>Hello, {profile?.name || 'User'}</Text>
-              <Text style={styles.headerTitle}>Today's Summary</Text>
-            </View>
-            <TouchableOpacity style={styles.menuButton}>
-              <View style={styles.menuDots}>
-                <View style={styles.dot} />
-                <View style={styles.dot} />
-                <View style={styles.dot} />
-              </View>
             </TouchableOpacity>
+            <View style={styles.headerLeft}>
+              <Text style={styles.greeting}>{t('home.greeting', { name: profile?.name || t('common.user') })}</Text>
+              <Text style={styles.headerTitle}>{t('home.todaySummary')}</Text>
+            </View>
           </View>
         </View>
         
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <DailyView 
+          <DailyView
             dailyLog={todayLog}
             date={debug.todayDate}
-            title="Calories Consumed"
+            title={t('home.caloriesConsumed')}
             showDateHeader={false}
           />
         </ScrollView>
@@ -75,7 +79,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   avatarContainer: {
-    marginRight: spacing.md,
+    // marginRight handled by rtlMarginRight
   },
   avatarPlaceholder: {
     width: 40,
@@ -98,20 +102,6 @@ const styles = StyleSheet.create({
     fontSize: fonts.lg,
     fontFamily: fonts.heading,
     color: colors.textPrimary,
-  },
-  menuButton: {
-    padding: spacing.sm,
-  },
-  menuDots: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 3,
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.textPrimary,
   },
   scrollView: {
     flex: 1,

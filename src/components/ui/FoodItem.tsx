@@ -1,77 +1,57 @@
 /**
  * Reusable FoodItem Component
- * 
- * This component ensures consistent food item display across all screens.
- * It prevents the property access inconsistencies that caused bugs.
+ *
+ * Simple horizontal layout: [Icon] [Name + Quantity] [Calories] [Delete]
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { FoodItemProps } from '../../types/display';
 import { getFoodIcon } from '../../utils/foodIcons';
+import { useRTLStyles } from '../../utils/rtl';
+import { useTranslation } from '../../hooks/useTranslation';
 
-/**
- * Consistent FoodItem component for all screens
- *
- * Usage:
- * ```tsx
- * <FoodItem
- *   food={displayFood}
- *   onDelete={(id) => handleDelete(id)}
- *   showMacros={true}
- *   showTime={true}
- * />
- * ```
- */
 export const FoodItem: React.FC<FoodItemProps> = ({
   food,
   onDelete,
-  onEdit,
   showActions = true,
-  showMacros = true,
-  showTime = true,
 }) => {
-  // Use the icon from the food item (set by AI or fallback from foodIcons utility)
   const foodEmoji = food.icon || getFoodIcon(food.name);
+  const { rtlMarginRight, rtlRow } = useRTLStyles();
+  const { t } = useTranslation();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, rtlRow]}>
       {/* Food Icon */}
-      <View style={styles.iconContainer}>
+      <View style={[styles.iconContainer, rtlMarginRight(12)]}>
         <Text style={styles.emoji}>{foodEmoji}</Text>
       </View>
-      
-      {/* Food Information */}
-      <View style={styles.infoContainer}>
-        <Text style={styles.name}>{food.name}</Text>
-        <Text style={styles.quantity}>{food.displayQuantity}</Text>
-        <Text style={styles.calories}>{Math.round(food.calories)} calories</Text>
-        
-        {showMacros && (
-          <Text style={styles.macros}>
-            P: {Math.round(food.protein)}g | C: {Math.round(food.carbs)}g | F: {Math.round(food.fat)}g
-          </Text>
-        )}
+
+      {/* Food Info - Name and Quantity */}
+      <View style={[styles.infoContainer, rtlMarginRight(12)]}>
+        <Text style={styles.name} numberOfLines={1}>
+          {food.name}
+        </Text>
+        <Text style={styles.quantity} numberOfLines={1}>
+          {food.displayQuantity}
+        </Text>
       </View>
-      
-      {/* Actions */}
-      {showActions && (
-        <View style={styles.actionsContainer}>
-          {showTime && (
-            <Text style={styles.time}>{food.displayTime}</Text>
-          )}
-          
-          {onDelete && (
-            <TouchableOpacity 
-              style={styles.deleteButton}
-              onPress={() => onDelete(food.id)}
-            >
-              <MaterialIcons name="delete" size={20} color={colors.error} />
-            </TouchableOpacity>
-          )}
-        </View>
+
+      {/* Calories */}
+      <Text style={[styles.calories, rtlMarginRight(12)]}>
+        {Math.round(food.calories)} {t('nutrition.kcal')}
+      </Text>
+
+      {/* Delete Button */}
+      {showActions && onDelete && (
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => onDelete(food.id)}
+        >
+          <MaterialIcons name="close" size={20} color={colors.error} />
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -80,73 +60,58 @@ export const FoodItem: React.FC<FoodItemProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: colors.primary50,
-    padding: spacing.md,
-    borderRadius: 12,
-    marginBottom: spacing.sm,
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    height: 70,
+    width: '100%',
   },
   iconContainer: {
     width: 48,
     height: 48,
     borderRadius: 8,
-    backgroundColor: colors.white,
+    backgroundColor: colors.gray100,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
+    flexShrink: 0,
   },
   emoji: {
-    fontSize: 24,
+    fontSize: 28,
   },
   infoContainer: {
     flex: 1,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   name: {
-    fontSize: fonts.base,
+    fontSize: 16,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
+    marginBottom: 4,
   },
   quantity: {
-    fontSize: fonts.sm,
+    fontSize: 14,
+    fontWeight: '400',
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
   },
   calories: {
-    fontSize: fonts.sm,
+    fontSize: 16,
+    fontWeight: '600',
     color: colors.textPrimary,
-    fontWeight: '500',
-    marginBottom: spacing.xs,
-  },
-  macros: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-  },
-  actionsContainer: {
-    alignItems: 'flex-end',
-  },
-  time: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    flexShrink: 0,
   },
   deleteButton: {
-    padding: spacing.xs,
-    borderRadius: 8,
-    backgroundColor: `${colors.error}15`,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
 });
-
-/**
- * COMPONENT DOCUMENTATION:
- * 
- * This component solves the property access issues by:
- * 
- * 1. Using DisplayFood type which flattens nested properties
- * 2. Centralizing food emoji logic
- * 3. Providing consistent styling across all screens
- * 4. Handling optional props for different use cases
- * 
- * ALWAYS use this component instead of custom food item JSX
- * in Home, History, or any other screen that displays food items.
- */

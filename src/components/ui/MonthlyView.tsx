@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius, shadows } from '../../constants/theme';
 import { DailyLog } from '../../types';
 import { Card } from './Card';
 import { useUserCalorieGoal } from '../../utils/calorieGoal';
+import { useRTLStyles } from '../../utils/rtl';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface MonthlyViewProps {
   dailyLogs: DailyLog[];
@@ -21,15 +23,17 @@ interface DayCell {
   isCurrentMonth: boolean;
 }
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
 export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
   const userCalorieGoal = useUserCalorieGoal();
+  const { rtlIcon } = useRTLStyles();
+  const { t, currentLanguage } = useTranslation();
+
+  // Get localized weekday names
+  const WEEKDAYS = t('calendar.weekdaysShort') as string[];
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Index logs by date
   const logsByDate = useMemo(() => {
@@ -46,7 +50,8 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startDay = firstDay.getDay();
+    // Adjust for Monday-start week: getDay() returns 0 for Sunday, we want 0 for Monday
+    const startDay = (firstDay.getDay() + 6) % 7;
     const today = new Date().toISOString().split('T')[0];
 
     const cells: (DayCell | null)[] = [];
@@ -121,532 +126,263 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({ dailyLogs }) => {
     };
   }, [currentMonth, dailyLogs]);
 
-  const selectedLog = selectedDate ? logsByDate[selectedDate] : null;
-
-  const getCellColor = (calories: number, goal: number) => {
-    if (calories === 0) return colors.gray100;
-    const ratio = calories / goal;
-    if (ratio < 0.5) return colors.blue100;
-    if (ratio < 0.8) return colors.green100;
-    if (ratio <= 1.1) return colors.success;
-    if (ratio <= 1.3) return colors.yellow300;
-    return colors.red300;
-  };
-
   const handlePrevMonth = () => {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-    setSelectedDate(null);
   };
 
   const handleNextMonth = () => {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-    setSelectedDate(null);
   };
 
-  const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const locale = currentLanguage === 'ar' ? 'ar-SA' : 'en-US';
+  const monthName = currentMonth.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+
+  // Calculate the progress percentage for calorie bars
+  const getProgressPercentage = (calories: number, goal: number) => {
+    if (calories === 0 || goal === 0) return 0;
+    return Math.min((calories / goal) * 100, 100);
+  };
 
   return (
-    <Card style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.titleSection}>
-            <MaterialIcons name="calendar-month" size={24} color={colors.primary} />
-            <View style={styles.titleContent}>
-              <Text style={styles.title}>Monthly Calendar</Text>
-              <Text style={styles.subtitle}>{monthName}</Text>
+    <View style={styles.container}>
+      {/* Month Navigation */}
+      <Card style={styles.monthNavCard}>
+        <View style={styles.monthNavRow}>
+          <TouchableOpacity onPress={handlePrevMonth} style={styles.monthNavButton}>
+            <MaterialIcons name={rtlIcon("chevron-left", "chevron-right")} size={28} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.monthTitle}>{monthName}</Text>
+          <TouchableOpacity onPress={handleNextMonth} style={styles.monthNavButton}>
+            <MaterialIcons name={rtlIcon("chevron-right", "chevron-left")} size={28} color={colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
+      </Card>
+
+      {/* Summary Stats Card */}
+      <Card style={styles.summaryCard}>
+        <View style={styles.summaryRow}>
+          {/* Average Calories */}
+          <View style={styles.summarySection}>
+            <Text style={styles.summaryLabel}>Avg.{'\n'}Calories</Text>
+            <Text style={styles.summaryValue}>{monthStats.avgCalories}</Text>
+            <Text style={styles.summaryUnit}>kcal</Text>
+          </View>
+
+          {/* Macros Pills */}
+          <View style={styles.macrosPills}>
+            <View style={[styles.macroPill, { backgroundColor: '#FFB3BA' }]}>
+              <Text style={styles.macroPillLabel}>Protein</Text>
+              <Text style={styles.macroPillValue}>{Math.round(monthStats.totalProtein / (monthStats.daysLogged || 1))}g</Text>
+            </View>
+            <View style={[styles.macroPill, { backgroundColor: '#FFDFBA' }]}>
+              <Text style={styles.macroPillLabel}>Carbs</Text>
+              <Text style={styles.macroPillValue}>{Math.round(monthStats.totalCarbs / (monthStats.daysLogged || 1))}g</Text>
+            </View>
+            <View style={[styles.macroPill, { backgroundColor: '#E0BBE4' }]}>
+              <Text style={styles.macroPillLabel}>Fat</Text>
+              <Text style={styles.macroPillValue}>{Math.round(monthStats.totalFat / (monthStats.daysLogged || 1))}g</Text>
             </View>
           </View>
-          <View style={styles.monthNav}>
-            <TouchableOpacity
-              onPress={handlePrevMonth}
-              style={styles.navButton}
-              accessibilityLabel="Previous month"
-            >
-              <MaterialIcons name="chevron-left" size={24} color={colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleNextMonth}
-              style={styles.navButton}
-              accessibilityLabel="Next month"
-            >
-              <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
+        </View>
+      </Card>
+
+      {/* Calendar Grid */}
+      <Card style={styles.calendarCard}>
+        <Text style={styles.calendarTitle}>Daily Calorie Intake</Text>
+
+        {/* Weekday Headers */}
+        <View style={styles.weekdayRow}>
+          {WEEKDAYS.map(day => (
+            <View key={day} style={styles.weekdayCell}>
+              <Text style={styles.weekdayText}>{day}</Text>
+            </View>
+          ))}
         </View>
 
         {/* Calendar Grid */}
-        <View style={styles.calendarSection}>
-          {/* Weekday headers */}
-          <View style={styles.weekdayRow}>
-            {WEEKDAYS.map(day => (
-              <View key={day} style={styles.weekdayCell}>
-                <Text style={styles.weekdayText}>{day}</Text>
-              </View>
-            ))}
-          </View>
+        {calendarCells.map((week, weekIndex) => (
+          <View key={weekIndex} style={styles.weekRow}>
+            {week.map((cell, cellIndex) => {
+              if (!cell) {
+                return <View key={`empty-${weekIndex}-${cellIndex}`} style={styles.dayCell} />;
+              }
 
-          {/* Calendar grid */}
-          <View style={styles.calendarGrid}>
-            {calendarCells.map((week, weekIndex) => (
-              <View key={weekIndex} style={styles.weekRow}>
-                {week.map((cell, cellIndex) => {
-                  if (!cell) {
-                    return <View key={`empty-${weekIndex}-${cellIndex}`} style={styles.dayCell} />;
-                  }
+              const progressPercentage = getProgressPercentage(cell.calories, cell.goal);
 
-                  const isSelected = selectedDate === cell.dateKey;
-                  const cellColor = getCellColor(cell.calories, cell.goal);
-
-                  return (
-                    <Pressable
-                      key={cell.dateKey}
+              return (
+                <View key={cell.dateKey} style={styles.dayCell}>
+                  <Text style={styles.dayNumber}>{cell.day}</Text>
+                  {/* Progress bar */}
+                  <View style={styles.progressBarContainer}>
+                    <View
                       style={[
-                        styles.dayCell,
-                        { backgroundColor: cellColor },
-                        isSelected && styles.dayCellSelected,
-                        cell.isToday && styles.dayCellToday,
+                        styles.progressBarFill,
+                        { width: `${progressPercentage}%` }
                       ]}
-                      onPress={() => setSelectedDate(isSelected ? null : cell.dateKey)}
-                      accessibilityLabel={`${cell.date.toDateString()}, ${cell.calories} calories`}
-                    >
-                      <Text style={[
-                        styles.dayNumber,
-                        cell.isToday && styles.dayNumberToday,
-                      ]}>
-                        {cell.day}
-                      </Text>
-                      {cell.calories > 0 && (
-                        <Text style={styles.calorieText} numberOfLines={1}>
-                          {cell.calories > 999 ? `${Math.round(cell.calories / 1000)}k` : cell.calories}
-                        </Text>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ))}
-          </View>
-
-          {/* Legend */}
-          <View style={styles.legend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendBox, { backgroundColor: colors.success }]} />
-              <Text style={styles.legendText}>On target</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendBox, { backgroundColor: colors.yellow300 }]} />
-              <Text style={styles.legendText}>Over</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendBox, { backgroundColor: colors.blue100 }]} />
-              <Text style={styles.legendText}>Under</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Selected day details */}
-        {selectedLog && (
-          <View style={styles.detailsCard}>
-            <View style={styles.detailsHeader}>
-              <MaterialIcons name="today" size={20} color={colors.primary} />
-              <Text style={styles.detailsTitle}>
-                {new Date(selectedDate!).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </Text>
-            </View>
-
-            <View style={styles.detailsStats}>
-              <View style={styles.detailStat}>
-                <Text style={styles.detailStatValue}>
-                  {Math.round(selectedLog.totalNutrition.calories)}
-                </Text>
-                <Text style={styles.detailStatLabel}>Calories</Text>
-              </View>
-              <View style={styles.detailStat}>
-                <Text style={styles.detailStatValue}>{selectedLog.foods.length}</Text>
-                <Text style={styles.detailStatLabel}>Items</Text>
-              </View>
-              <View style={styles.detailStat}>
-                <Text style={styles.detailStatValue}>
-                  {Math.round(selectedLog.totalNutrition.protein)}g
-                </Text>
-                <Text style={styles.detailStatLabel}>Protein</Text>
-              </View>
-            </View>
-
-            {selectedLog.foods.length > 0 && (
-              <View style={styles.foodList}>
-                <Text style={styles.foodListTitle}>Food items:</Text>
-                {selectedLog.foods.slice(0, 3).map(food => (
-                  <View key={food.id} style={styles.foodItem}>
-                    <Text style={styles.foodName} numberOfLines={1}>
-                      • {food.foodItem.name}
-                    </Text>
-                    <Text style={styles.foodCalories}>
-                      {Math.round(food.nutrition.calories)} cal
-                    </Text>
+                    />
                   </View>
-                ))}
-                {selectedLog.foods.length > 3 && (
-                  <Text style={styles.moreItems}>
-                    +{selectedLog.foods.length - 3} more items
-                  </Text>
-                )}
-              </View>
-            )}
+                  {cell.calories > 0 && (
+                    <Text style={styles.calorieValue}>{cell.calories}</Text>
+                  )}
+                  <Text style={styles.calorieUnit}>kcal</Text>
+                </View>
+              );
+            })}
           </View>
-        )}
-
-        {/* Monthly Stats */}
-        <View style={styles.statsSection}>
-          <Text style={styles.statsTitle}>Monthly Summary</Text>
-
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <MaterialIcons name="local-fire-department" size={24} color={colors.error} />
-              <Text style={styles.statValue}>{monthStats.totalCalories.toLocaleString()}</Text>
-              <Text style={styles.statLabel}>Total Calories</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <MaterialIcons name="trending-up" size={24} color={colors.primary} />
-              <Text style={styles.statValue}>{monthStats.avgCalories}</Text>
-              <Text style={styles.statLabel}>Daily Average</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <MaterialIcons name="check-circle" size={24} color={colors.success} />
-              <Text style={styles.statValue}>{monthStats.daysLogged}</Text>
-              <Text style={styles.statLabel}>Days Logged</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <MaterialIcons name="track-changes" size={24} color={colors.blue600} />
-              <Text style={styles.statValue}>{monthStats.onTargetDays}</Text>
-              <Text style={styles.statLabel}>On Target</Text>
-            </View>
-          </View>
-
-          {/* Macros summary */}
-          <View style={styles.macrosCard}>
-            <Text style={styles.macrosTitle}>Total Macros</Text>
-            <View style={styles.macrosRow}>
-              <View style={styles.macroItem}>
-                <MaterialIcons name="fitness-center" size={18} color={colors.blue600} />
-                <Text style={styles.macroValue}>{monthStats.totalProtein}g</Text>
-                <Text style={styles.macroLabel}>Protein</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <MaterialIcons name="breakfast-dining" size={18} color={colors.yellow600} />
-                <Text style={styles.macroValue}>{monthStats.totalCarbs}g</Text>
-                <Text style={styles.macroLabel}>Carbs</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <MaterialIcons name="water-drop" size={18} color={colors.green600} />
-                <Text style={styles.macroValue}>{monthStats.totalFat}g</Text>
-                <Text style={styles.macroLabel}>Fat</Text>
-              </View>
-            </View>
-          </View>
-
-          {monthStats.bestDay && (
-            <View style={styles.highlightCard}>
-              <MaterialIcons name="emoji-events" size={20} color={colors.warning} />
-              <View style={styles.highlightContent}>
-                <Text style={styles.highlightLabel}>Best Day</Text>
-                <Text style={styles.highlightValue}>
-                  {new Date(monthStats.bestDay.date).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                  })} • {Math.round(monthStats.bestDay.totalNutrition.calories)} cal
-                </Text>
-              </View>
-            </View>
-          )}
-        </View>
+        ))}
       </Card>
+
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.surface,
-    ...shadows.md,
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
   },
-  header: {
+
+  // Month Navigation Styles
+  monthNavCard: {
+    padding: spacing.sm,
+  },
+  monthNavRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
   },
-  titleSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1,
+  monthNavButton: {
+    padding: spacing.xs,
   },
-  titleContent: {
-    flex: 1,
-  },
-  title: {
-    fontSize: fonts.xl,
+  monthTitle: {
+    fontSize: fonts.lg,
     fontWeight: fonts.bold,
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
   },
-  subtitle: {
-    fontSize: fonts.sm,
+
+  // Summary Card Styles
+  summaryCard: {
+    padding: spacing.md,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  summarySection: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  summaryLabel: {
+    fontSize: fonts.xs,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+  summaryValue: {
+    fontSize: 32,
+    fontWeight: fonts.bold,
+    color: colors.success,
+  },
+  summaryUnit: {
+    fontSize: fonts.xs,
     color: colors.textSecondary,
   },
-  monthNav: {
-    flexDirection: 'row',
+
+  // Macros Pills Styles
+  macrosPills: {
+    flex: 1,
     gap: spacing.xs,
   },
-  navButton: {
-    width: 36,
-    height: 36,
+  macroPill: {
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.primary + '15',
-    justifyContent: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  calendarSection: {
-    marginBottom: spacing.lg,
+  macroPillLabel: {
+    fontSize: fonts.sm,
+    fontWeight: fonts.semibold,
+    color: colors.textPrimary,
   },
+  macroPillValue: {
+    fontSize: fonts.sm,
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+  },
+
+  // Calendar Card Styles
+  calendarCard: {
+    padding: spacing.md,
+  },
+  calendarTitle: {
+    fontSize: fonts.lg,
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+
+  // Weekday Header Styles
   weekdayRow: {
     flexDirection: 'row',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   weekdayCell: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: spacing.xs,
   },
   weekdayText: {
     fontSize: fonts.xs,
     fontWeight: fonts.semibold,
     color: colors.textSecondary,
   },
-  calendarGrid: {
-    gap: spacing.xs,
-  },
+
+  // Calendar Grid Styles
   weekRow: {
     flexDirection: 'row',
     gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
   dayCell: {
     flex: 1,
-    aspectRatio: 1,
+    backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    padding: spacing.xs,
-    justifyContent: 'center',
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.gray200,
-  },
-  dayCellSelected: {
-    borderWidth: 2,
-    borderColor: colors.primary,
-    ...shadows.sm,
-  },
-  dayCellToday: {
-    borderWidth: 2,
-    borderColor: colors.accent,
+    padding: spacing.xs,
+    alignItems: 'center',
+    gap: 2,
+    minHeight: 70,
   },
   dayNumber: {
     fontSize: fonts.sm,
-    fontWeight: fonts.semibold,
-    color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  dayNumberToday: {
-    color: colors.accent,
     fontWeight: fonts.bold,
+    color: colors.textPrimary,
   },
-  calorieText: {
+  progressBarContainer: {
+    width: '100%',
+    height: 4,
+    backgroundColor: colors.gray200,
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginVertical: 2,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.success,
+    borderRadius: 2,
+  },
+  calorieValue: {
+    fontSize: 11,
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+  },
+  calorieUnit: {
     fontSize: 9,
     color: colors.textSecondary,
-    fontWeight: fonts.medium,
-  },
-  legend: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.md,
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray200,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  legendBox: {
-    width: 12,
-    height: 12,
-    borderRadius: 3,
-  },
-  legendText: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-  },
-  detailsCard: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.primary + '30',
-  },
-  detailsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  detailsTitle: {
-    fontSize: fonts.base,
-    fontWeight: fonts.semibold,
-    color: colors.textPrimary,
-  },
-  detailsStats: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  detailStat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  detailStatValue: {
-    fontSize: fonts.lg,
-    fontWeight: fonts.bold,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  detailStatLabel: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-  },
-  foodList: {
-    borderTopWidth: 1,
-    borderTopColor: colors.gray200,
-    paddingTop: spacing.sm,
-  },
-  foodListTitle: {
-    fontSize: fonts.xs,
-    fontWeight: fonts.semibold,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  foodItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.xs,
-  },
-  foodName: {
-    flex: 1,
-    fontSize: fonts.sm,
-    color: colors.textPrimary,
-  },
-  foodCalories: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-    marginLeft: spacing.sm,
-  },
-  moreItems: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: spacing.xs,
-  },
-  statsSection: {
-    gap: spacing.md,
-  },
-  statsTitle: {
-    fontSize: fonts.lg,
-    fontWeight: fonts.bold,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: '47%',
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  statValue: {
-    fontSize: fonts.lg,
-    fontWeight: fonts.bold,
-    color: colors.textPrimary,
-  },
-  statLabel: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  macrosCard: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-  },
-  macrosTitle: {
-    fontSize: fonts.sm,
-    fontWeight: fonts.semibold,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-  },
-  macrosRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  macroItem: {
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  macroValue: {
-    fontSize: fonts.base,
-    fontWeight: fonts.bold,
-    color: colors.textPrimary,
-  },
-  macroLabel: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-  },
-  highlightCard: {
-    backgroundColor: colors.yellow50,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.yellow200,
-  },
-  highlightContent: {
-    flex: 1,
-  },
-  highlightLabel: {
-    fontSize: fonts.xs,
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  highlightValue: {
-    fontSize: fonts.sm,
-    fontWeight: fonts.semibold,
-    color: colors.textPrimary,
   },
 });

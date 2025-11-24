@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,29 +6,21 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  Alert,
 } from 'react-native';
-import { Calendar } from 'react-native-calendars';
-import { MaterialIcons } from '@expo/vector-icons';
 import { colors, fonts, spacing, shadows, borderRadius } from '../../constants/theme';
 import { useFoodStore } from '../../stores/foodStore';
-import { DailyLog, LoggedFood } from '../../types';
+import { DailyLog } from '../../types';
 import { Card } from '../../components/ui/Card';
 import { DailyView, WeeklyView, MonthlyView } from '../../components/ui';
+import { useTranslation } from '../../hooks/useTranslation';
 
 type ViewMode = 'daily' | 'weekly' | 'monthly';
-
 
 const HistoryScreen: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
-  const { dailyLogs, debugStoreState, removeLoggedFood } = useFoodStore();
-
-  // Debug logs
-  React.useEffect(() => {
-    console.log('📊 History Screen - Daily Logs:', dailyLogs);
-    console.log('📊 History Screen - Daily Logs Count:', dailyLogs.length);
-  }, [dailyLogs]);
+  const { dailyLogs, removeLoggedFood } = useFoodStore();
+  const { t } = useTranslation();
 
   // Group food items by date
   const groupedByDate = dailyLogs.reduce((acc, log) => {
@@ -40,17 +32,8 @@ const HistoryScreen: React.FC = () => {
   const selectedDateKey = selectedDate.toISOString().split('T')[0];
   const selectedDateLog = groupedByDate[selectedDateKey];
 
-
-
-  const getMarkedDates = () => {
-    const marked: any = {};
-    dailyLogs.forEach(log => {
-      marked[log.date] = {
-        marked: true,
-        dotColor: colors.primary,
-      };
-    });
-    return marked;
+  const handleDateChange = (newDate: Date) => {
+    setSelectedDate(newDate);
   };
 
   const renderViewModeSelector = () => (
@@ -67,7 +50,7 @@ const HistoryScreen: React.FC = () => {
             styles.viewModeText,
             viewMode === 'daily' && styles.viewModeTextActive,
           ]}>
-            Daily
+            {t('history.daily')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -81,7 +64,7 @@ const HistoryScreen: React.FC = () => {
             styles.viewModeText,
             viewMode === 'weekly' && styles.viewModeTextActive,
           ]}>
-            Weekly
+            {t('history.weekly')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -95,47 +78,10 @@ const HistoryScreen: React.FC = () => {
             styles.viewModeText,
             viewMode === 'monthly' && styles.viewModeTextActive,
           ]}>
-            Monthly
+            {t('history.monthly')}
           </Text>
         </TouchableOpacity>
       </View>
-    </Card>
-  );
-
-  const renderCalendar = () => (
-    <Card style={styles.calendarCard}>
-      <View style={styles.cardHeader}>
-        <MaterialIcons name="calendar-today" size={24} color={colors.primary} />
-        <Text style={styles.cardTitle}>Calendar View</Text>
-      </View>
-      <Calendar
-        onDayPress={(day) => setSelectedDate(new Date(day.timestamp))}
-        markedDates={getMarkedDates()}
-        theme={{
-          backgroundColor: colors.surface,
-          calendarBackground: colors.surface,
-          textSectionTitleColor: colors.textPrimary,
-          selectedDayBackgroundColor: colors.primary,
-          selectedDayTextColor: colors.textOnPrimary,
-          todayTextColor: colors.primary,
-          dayTextColor: colors.textPrimary,
-          textDisabledColor: colors.textTertiary,
-          dotColor: colors.primary,
-          selectedDotColor: colors.textOnPrimary,
-          arrowColor: colors.primary,
-          monthTextColor: colors.textPrimary,
-          indicatorColor: colors.primary,
-          textDayFontFamily: fonts.body,
-          textMonthFontFamily: fonts.heading,
-          textDayHeaderFontFamily: fonts.body,
-          textDayFontWeight: fonts.light,
-          textMonthFontWeight: fonts.bold,
-          textDayHeaderFontWeight: fonts.medium,
-          textDayFontSize: fonts.base,
-          textMonthFontSize: fonts.lg,
-          textDayHeaderFontSize: fonts.sm,
-        }}
-      />
     </Card>
   );
 
@@ -151,38 +97,27 @@ const HistoryScreen: React.FC = () => {
           <DailyView
             dailyLog={selectedDateLog}
             date={selectedDateKey}
-            title="Calories Consumed"
-            showDateHeader={true}
+            showDateHeader={false}
+            showDateSelector={true}
+            onDateChange={handleDateChange}
             onRemoveFood={removeLoggedFood}
           />
         );
     }
   };
 
-
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.headerLeft}>
-              <Text style={styles.headerTitle}>
-                📊 History & Reports
-              </Text>
-              <Text style={styles.headerSubtitle}>
-                Track your nutrition journey
-              </Text>
-            </View>
-          </View>
+          <Text style={styles.headerTitle}>{t('history.screenTitle')}</Text>
+          <Text style={styles.headerSubtitle}>{t('history.screenSubtitle')}</Text>
         </View>
-        
+
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
             {renderViewModeSelector()}
-            
-            {viewMode === 'daily' && renderCalendar()}
             {renderContent()}
           </View>
         </ScrollView>
@@ -194,37 +129,26 @@ const HistoryScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
   container: {
     flex: 1,
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: colors.white,
   },
   header: {
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
+    backgroundColor: colors.white,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    ...shadows.sm,
-    shadowColor: colors.black,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flex: 1,
+    paddingVertical: spacing.lg,
   },
   headerTitle: {
-    fontSize: fonts.xl,
-    fontWeight: fonts.bold,
+    fontSize: fonts.lg,
+    fontFamily: fonts.heading,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   headerSubtitle: {
-    fontSize: fonts.base,
+    fontSize: fonts.sm,
+    fontFamily: fonts.body,
     color: colors.textSecondary,
     fontWeight: fonts.normal,
   },
@@ -232,13 +156,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: spacing.lg,
-    gap: spacing.lg,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
+    gap: spacing.sm,
   },
   viewModeCard: {
-    ...shadows.md,
-    shadowColor: colors.primary,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xs,
   },
   viewModeContainer: {
     flexDirection: 'row',
@@ -263,22 +187,6 @@ const styles = StyleSheet.create({
   },
   viewModeTextActive: {
     color: colors.textOnPrimary,
-  },
-  calendarCard: {
-    ...shadows.md,
-    shadowColor: colors.primary,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  cardTitle: {
-    fontSize: fonts.lg,
-    fontWeight: fonts.bold,
-    color: colors.textPrimary,
-    marginLeft: spacing.sm,
-    flex: 1,
   },
 });
 
