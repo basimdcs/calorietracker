@@ -52,6 +52,7 @@ const HomeScreen: React.FC = () => {
             date={debug.todayDate}
             title={t('home.caloriesConsumed')}
             showDateHeader={false}
+            onEmptyStatePress={() => navigation.navigate('Voice' as any)}
           />
         </ScrollView>
       </View>

@@ -155,6 +155,8 @@ export default {
     ctaSubtitle: 'Just say what you ate and we\'ll track your macros',
     startRecording: 'Start Recording',
     caloriesConsumed: 'Calories Consumed',
+    noMealsYet: 'No meals recorded yet!',
+    tapToStartRecording: 'Tap here to start speaking what you ate.',
   },
 
   // Voice Screen

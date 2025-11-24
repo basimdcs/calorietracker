@@ -26,6 +26,7 @@ interface DailyViewProps {
   onDateChange?: (date: Date) => void;
   onRemoveFood?: (date: string, foodId: string) => void;
   onEditFood?: (date: string, foodId: string, quantity: number) => void;
+  onEmptyStatePress?: () => void;
 }
 
 export const DailyView: React.FC<DailyViewProps> = ({
@@ -37,6 +38,7 @@ export const DailyView: React.FC<DailyViewProps> = ({
   onDateChange,
   onRemoveFood,
   onEditFood,
+  onEmptyStatePress,
 }) => {
   const userCalorieGoal = useUserCalorieGoal();
   const { rtlIcon } = useRTLStyles();
@@ -204,13 +206,20 @@ export const DailyView: React.FC<DailyViewProps> = ({
             ))}
           </View>
         ) : (
-          <View style={styles.emptyState}>
-            <MaterialIcons name="restaurant" size={48} color={colors.gray300} />
-            <Text style={styles.emptyStateText}>No meals logged yet</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Start adding your meals to track your nutrition
+          <TouchableOpacity
+            style={styles.emptyState}
+            onPress={onEmptyStatePress}
+            activeOpacity={0.8}
+            disabled={!onEmptyStatePress}
+          >
+            <View style={styles.microphoneButton}>
+              <MaterialIcons name="mic" size={48} color={colors.white} />
+            </View>
+            <Text style={[styles.emptyStateText, rtlTextStyle]}>{t('home.noMealsYet')}</Text>
+            <Text style={[styles.emptyStateSubtext, rtlTextStyle]}>
+              {t('home.tapToStartRecording')}
             </Text>
-          </View>
+          </TouchableOpacity>
         )}
       </View>
     </View>
@@ -333,17 +342,35 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     paddingVertical: spacing.xl * 2,
+    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderRadius: borderRadius.xl,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#86EFAC', // light green
+    backgroundColor: '#F0FDF4', // very light green
+  },
+  microphoneButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#4ADE80', // green
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+    ...shadows.md,
   },
   emptyStateText: {
     fontSize: fonts.lg,
-    fontWeight: fonts.semibold,
-    color: colors.textSecondary,
-    marginTop: spacing.md,
+    fontWeight: fonts.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   emptyStateSubtext: {
-    fontSize: fonts.sm,
-    color: colors.textTertiary,
-    marginTop: spacing.xs,
+    fontSize: fonts.base,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
 });

@@ -155,6 +155,8 @@ export default {
     ctaSubtitle: 'فقط قل ما أكلته وسنتتبع المغذيات الكبرى',
     startRecording: 'ابدأ التسجيل',
     caloriesConsumed: 'السعرات المستهلكة',
+    noMealsYet: 'لم يتم تسجيل وجبات بعد!',
+    tapToStartRecording: 'اضغط هنا لتبدأ في قول ما أكلته.',
   },
 
   // شاشة التسجيل الصوتي
