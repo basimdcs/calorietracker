@@ -187,6 +187,76 @@ extra: {
 - UI components implement prop interfaces from types
 - Consistent file naming: PascalCase for components, camelCase for utilities
 
+### RTL (Right-to-Left) Support - CRITICAL RULES
+
+The app is fully bilingual (English/Arabic) with RTL support. **ALWAYS follow these rules when making UI changes:**
+
+#### Bottom-Up Approach (CRITICAL)
+**ALWAYS fix base UI components FIRST, then screens will inherit correct RTL behavior automatically.**
+
+#### RTL Implementation Checklist
+
+1. **Base UI Components MUST Have RTL Support** (Do This FIRST):
+   ```typescript
+   // In EVERY reusable component that renders text (Input, Button, Card, etc.):
+   import { useRTLStyles } from '../../utils/rtl';
+
+   export const MyComponent = () => {
+     const { rtlText, rtlRow } = useRTLStyles();
+
+     return (
+       <>
+         <Text style={[styles.text, rtlText]}>{text}</Text>
+         <View style={[styles.row, rtlRow]}>...</View>
+       </>
+     );
+   };
+   ```
+
+2. **Screen-Level RTL** (Do This SECOND):
+   - Headers with horizontal layouts
+   - Navigation button groups
+   - Action button containers
+   - Any row-based layouts
+
+3. **Required RTL Utilities** (`src/utils/rtl.ts`):
+   - `rtlText` - Apply to ALL Text components for proper alignment
+   - `rtlRow` - Apply to ALL flexDirection: 'row' containers
+   - `rtlIcon()` - Use for directional icons (arrows, chevrons)
+   - `rtlMarginRight()`, `rtlMarginLeft()` - For directional spacing
+   - `rtlPaddingRight()`, `rtlPaddingLeft()` - For directional padding
+
+4. **Common Mistake to AVOID**:
+   ```typescript
+   // ❌ WRONG - Only adding RTL to screens
+   <Text style={styles.label}>{label}</Text>  // In Input component
+   <Text style={[styles.text, rtlText]}>{t('key')}</Text>  // In screen
+
+   // ✅ CORRECT - Add RTL to base component
+   <Text style={[styles.label, rtlText]}>{label}</Text>  // In Input component
+   <Text style={[styles.text, rtlText]}>{t('key')}</Text>  // In screen
+   ```
+
+5. **When to Use Each Utility**:
+   - `rtlText`: ALL Text and TextInput components
+   - `rtlRow`: Containers with `flexDirection: 'row'` that have multiple children
+   - `rtlIcon()`: Arrow icons (arrow-back/arrow-forward, chevron-left/chevron-right)
+   - Margin/Padding: When elements need directional spacing
+
+6. **Translation Requirements**:
+   - All user-facing text must use `t('key')` from `useTranslation()`
+   - Add keys to both `src/localization/locales/en.ts` and `ar.ts`
+   - Validate helpers for constants (ActivityLevel, Goal, etc.) that need translation
+
+#### RTL Testing Checklist
+Before committing RTL changes, verify:
+- [ ] All Text components have `rtlText` styling
+- [ ] All row containers have `rtlRow` styling
+- [ ] Directional icons flip correctly (arrows, chevrons)
+- [ ] Button groups reverse order in RTL
+- [ ] Headers reverse layout (back button, title, actions)
+- [ ] Base UI components (Input, Button, etc.) have built-in RTL support
+
 ### Critical Development Rules
 
 #### Native Module Safety
