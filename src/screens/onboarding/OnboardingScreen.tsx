@@ -416,20 +416,20 @@ const OnboardingScreen: React.FC = () => {
 
     return (
       <Card style={styles.compactStepCard}>
-        <Text style={styles.compactStepTitle}>🔥 Your Daily Target</Text>
-        <Text style={styles.compactStepSubtitle}>
-          {showCustomEditor ? 'Adjust your target' : 'Ready to start tracking!'}
+        <Text style={[styles.compactStepTitle, rtlText]}>{t('onboarding.step5.title')}</Text>
+        <Text style={[styles.compactStepSubtitle, rtlText]}>
+          {showCustomEditor ? t('onboarding.step5.subtitleCustom') : t('onboarding.step5.subtitle')}
         </Text>
-        
+
         {!showCustomEditor ? (
           // Compact Summary View
           <>
             {/* Compact Calorie Target Display */}
             <View style={styles.compactCalorieTargetContainer}>
               <Text style={styles.compactCalorieTargetNumber}>{currentCalories.toLocaleString()}</Text>
-              <Text style={styles.compactCalorieTargetLabel}>calories/day</Text>
+              <Text style={[styles.compactCalorieTargetLabel, rtlText]}>{t('onboarding.step5.caloriesPerDay')}</Text>
               {customCalories && (
-                <Text style={styles.compactCustomLabel}>✨ Custom</Text>
+                <Text style={[styles.compactCustomLabel, rtlText]}>{t('onboarding.step5.custom')}</Text>
               )}
               <TouchableOpacity
                 onPress={async () => {
@@ -438,15 +438,14 @@ const OnboardingScreen: React.FC = () => {
                   if (supported) {
                     await Linking.openURL(url);
                   } else {
-                    Alert.alert('Error', 'Unable to open link');
+                    Alert.alert(t('common.error'), 'Unable to open link');
                   }
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.medicalCitation}>
-                  Calculated using Mifflin-St Jeor Equation{'\n'}(American Journal of Clinical Nutrition, 1990)
-                  {'\n'}
-                  <Text style={styles.citationLink}>Tap for medical source →</Text>
+                <Text style={[styles.medicalCitation, rtlText]}>
+                  {t('onboarding.step5.medicalCitation')}
+                  <Text style={styles.citationLink}>{t('onboarding.step5.citationLink')}</Text>
                 </Text>
               </TouchableOpacity>
             </View>
@@ -455,28 +454,28 @@ const OnboardingScreen: React.FC = () => {
             <View style={styles.compactStatsContainer}>
               <View style={styles.compactStatItem}>
                 <Text style={styles.compactStatValue}>{bmr}</Text>
-                <Text style={styles.compactStatLabel}>BMR</Text>
+                <Text style={[styles.compactStatLabel, rtlText]}>{t('onboarding.step5.bmr')}</Text>
               </View>
               <View style={styles.compactStatItem}>
                 <Text style={styles.compactStatValue}>{tdee}</Text>
-                <Text style={styles.compactStatLabel}>TDEE</Text>
+                <Text style={[styles.compactStatLabel, rtlText]}>{t('onboarding.step5.tdee')}</Text>
               </View>
               <View style={styles.compactStatItem}>
-                <Text style={styles.compactStatValue}>
-                  {data.goal === 'lose' ? 'Lose' : data.goal === 'gain' ? 'Gain' : 'Maintain'}
+                <Text style={[styles.compactStatValue, rtlText]}>
+                  {data.goal === 'lose' ? t('onboarding.step5.goalLose') : data.goal === 'gain' ? t('onboarding.step5.goalGain') : t('onboarding.step5.goalMaintain')}
                 </Text>
-                <Text style={styles.compactStatLabel}>Goal</Text>
+                <Text style={[styles.compactStatLabel, rtlText]}>{t('onboarding.step5.goal')}</Text>
               </View>
             </View>
 
             {/* Compact Customize Button */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.compactCustomizeButton}
               onPress={() => setShowCustomEditor(true)}
             >
               <MaterialIcons name="tune" size={16} color={colors.brandOuterSkin} />
-              <Text style={styles.compactCustomizeButtonText}>
-                {customCalories ? 'Edit' : 'Customize'}
+              <Text style={[styles.compactCustomizeButtonText, rtlText]}>
+                {customCalories ? t('onboarding.step5.editButton') : t('onboarding.step5.customize')}
               </Text>
             </TouchableOpacity>
           </>
@@ -485,8 +484,8 @@ const OnboardingScreen: React.FC = () => {
           <>
             {/* Free-Form Calorie Input */}
             <View style={styles.compactCalorieContainer}>
-              <Text style={styles.compactCalorieLabel}>Enter your daily calorie target:</Text>
-              
+              <Text style={[styles.compactCalorieLabel, rtlText]}>{t('onboarding.step5.enterTarget')}</Text>
+
               {/* Manual Input */}
               <View style={styles.manualInputContainer}>
                 <TextInput
@@ -511,37 +510,41 @@ const OnboardingScreen: React.FC = () => {
                   onSubmitEditing={() => Keyboard.dismiss()}
                   placeholder="e.g., 2000"
                 />
-                <Text style={styles.caloriesUnit}>calories</Text>
+                <Text style={[styles.caloriesUnit, rtlText]}>{t('onboarding.step5.caloriesPerDay')}</Text>
               </View>
 
-              <Text style={styles.rangeHint}>💡 Recommended: 1,200 - 4,000 calories</Text>
-              <Text style={styles.freeFormHint}>Enter any value between 800 - 6,000 that fits your goals</Text>
+              <Text style={[styles.rangeHint, rtlText]}>{t('onboarding.step5.recommended')}</Text>
+              <Text style={[styles.freeFormHint, rtlText]}>{t('onboarding.step5.hint')}</Text>
             </View>
 
             {/* Compact Impact Display */}
             <View style={styles.compactImpactContainer}>
               <View style={styles.compactImpactRow}>
                 <View style={styles.compactImpactItem}>
-                  <Text style={styles.compactImpactLabel}>Daily {type}:</Text>
+                  <Text style={[styles.compactImpactLabel, rtlText]}>
+                    {type === 'deficit' ? t('onboarding.step5.dailyDeficit') :
+                     type === 'surplus' ? t('onboarding.step5.dailySurplus') :
+                     t('onboarding.step5.balanced')}
+                  </Text>
                   <Text style={[
                     styles.compactImpactValue,
-                    { color: type === 'deficit' ? colors.secondary : 
+                    { color: type === 'deficit' ? colors.secondary :
                              type === 'surplus' ? colors.brandOuterSkin : colors.gray600 }
                   ]}>
-                    {amount > 0 ? `${amount.toLocaleString()} cal` : 'Balanced'}
+                    {amount > 0 ? `${amount.toLocaleString()} cal` : t('onboarding.step5.balanced')}
                   </Text>
                 </View>
-                
+
                 <View style={styles.compactImpactItem}>
-                  <Text style={styles.compactImpactLabel}>Weekly change:</Text>
+                  <Text style={[styles.compactImpactLabel, rtlText]}>{t('onboarding.step5.weeklyChange')}</Text>
                   <Text style={[
                     styles.compactImpactValue,
-                    { color: weeklyChange < 0 ? colors.secondary : 
+                    { color: weeklyChange < 0 ? colors.secondary :
                              weeklyChange > 0 ? colors.brandOuterSkin : colors.gray600 }
                   ]}>
-                    {weeklyChange !== 0 
+                    {weeklyChange !== 0
                       ? `${weeklyChange > 0 ? '+' : ''}${weeklyChange.toFixed(1)} lbs`
-                      : 'Maintain'
+                      : t('onboarding.step5.maintain')
                     }
                   </Text>
                 </View>
@@ -550,22 +553,22 @@ const OnboardingScreen: React.FC = () => {
 
             {/* Reset Button */}
             {customCalories && customCalories !== recommendedCalories && (
-              <TouchableOpacity 
-                style={styles.editorResetButton} 
+              <TouchableOpacity
+                style={styles.editorResetButton}
                 onPress={() => setCustomCalories(null)}
               >
                 <MaterialIcons name="refresh" size={18} color={colors.brandOuterSkin} />
-                <Text style={styles.editorResetButtonText}>Reset to Recommended</Text>
+                <Text style={[styles.editorResetButtonText, rtlText]}>{t('onboarding.step5.resetToRecommended')}</Text>
               </TouchableOpacity>
             )}
 
             {/* Back to Summary */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.backToSummaryButton}
               onPress={() => setShowCustomEditor(false)}
             >
               <MaterialIcons name="check" size={18} color={colors.white} />
-              <Text style={styles.backToSummaryButtonText}>Done Customizing</Text>
+              <Text style={[styles.backToSummaryButtonText, rtlText]}>{t('onboarding.step5.doneCustomizing')}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -592,11 +595,11 @@ const OnboardingScreen: React.FC = () => {
           {/* Small Banner */}
           <View style={styles.smallBanner}>
             <View style={styles.smallBannerContent}>
-              <Text style={styles.smallBannerTitle}>Profile Setup</Text>
-              <Text style={styles.smallBannerStep}>Step {step} of 5</Text>
+              <Text style={[styles.smallBannerTitle, rtlText]}>{t('onboarding.profileSetup')}</Text>
+              <Text style={[styles.smallBannerStep, rtlText]}>{t('onboarding.stepOf', { current: step, total: 5 })}</Text>
             </View>
-            <BrandProgressIndicator 
-              progress={((step - 1) / 4) * 100} 
+            <BrandProgressIndicator
+              progress={((step - 1) / 4) * 100}
               height={3}
               style={styles.smallProgressIndicator}
             />
@@ -612,7 +615,7 @@ const OnboardingScreen: React.FC = () => {
         <View style={styles.footer}>
           {step > 1 && (
             <Button
-              title="Back"
+              title={t('common.back')}
               onPress={prevStep}
               variant="outline"
               style={styles.backButton}
@@ -620,12 +623,12 @@ const OnboardingScreen: React.FC = () => {
           )}
           <Button
             title={
-              step === 0 ? "Get Started" :
-              step === 1 ? "Continue" :
-              step === 2 ? "Continue" : 
-              step === 3 ? "Continue" :
-              step === 4 ? "Set My Goals" :
-              step === 5 ? "Complete Setup" : "Continue"
+              step === 0 ? t('onboarding.getStarted') :
+              step === 1 ? t('common.continue') :
+              step === 2 ? t('common.continue') :
+              step === 3 ? t('common.continue') :
+              step === 4 ? t('onboarding.setMyGoals') :
+              step === 5 ? t('onboarding.completeSetup') : t('common.continue')
             }
             onPress={nextStep}
             style={styles.nextButton}
