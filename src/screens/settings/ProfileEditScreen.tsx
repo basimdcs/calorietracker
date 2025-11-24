@@ -14,15 +14,19 @@ import { useNavigation } from '@react-navigation/native';
 import { colors, fonts, spacing } from '../../constants/theme';
 import { Button, Card, Input } from '../../components/ui';
 import { useUserStore } from '../../stores/userStore';
-import { 
-  UserProfile, 
+import {
+  UserProfile,
   Gender
 } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
+import { useRTLStyles } from '../../utils/rtl';
 
 const ProfileEditScreen: React.FC = () => {
   const navigation = useNavigation();
   const { profile, updateProfile } = useUserStore();
-  
+  const { t } = useTranslation();
+  const { rtlText } = useRTLStyles();
+
   const [formData, setFormData] = useState<Partial<UserProfile>>({
     name: profile?.name || '',
     age: profile?.age || 0,
@@ -38,16 +42,16 @@ const ProfileEditScreen: React.FC = () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.name?.trim()) {
-      newErrors.name = 'Name is required';
+      newErrors.name = t('profileEdit.nameRequired');
     }
     if (!formData.age || formData.age < 13 || formData.age > 120) {
-      newErrors.age = 'Age must be between 13 and 120';
+      newErrors.age = t('profileEdit.ageRange');
     }
     if (!formData.height || formData.height < 100 || formData.height > 250) {
-      newErrors.height = 'Height must be between 100 and 250 cm';
+      newErrors.height = t('profileEdit.heightRange');
     }
     if (!formData.weight || formData.weight < 30 || formData.weight > 300) {
-      newErrors.weight = 'Weight must be between 30 and 300 kg';
+      newErrors.weight = t('profileEdit.weightRange');
     }
 
     setErrors(newErrors);
@@ -56,7 +60,7 @@ const ProfileEditScreen: React.FC = () => {
 
   const handleSave = () => {
     if (!validateForm()) {
-      Alert.alert('Validation Error', 'Please check the form for errors.');
+      Alert.alert(t('profileEdit.validationError'), t('profileEdit.checkFormErrors'));
       return;
     }
 
@@ -74,8 +78,8 @@ const ProfileEditScreen: React.FC = () => {
     };
 
     updateProfile(updatedProfile);
-    Alert.alert('Success', 'Your profile has been updated successfully!', [
-      { text: 'OK', onPress: () => navigation.goBack() }
+    Alert.alert(t('common.success'), t('profileEdit.profileUpdated'), [
+      { text: t('common.ok'), onPress: () => navigation.goBack() }
     ]);
   };
 
@@ -93,12 +97,12 @@ const ProfileEditScreen: React.FC = () => {
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Gender</Text>
+            <Text style={[styles.modalTitle, rtlText]}>{t('profileEdit.gender')}</Text>
             <TouchableOpacity onPress={() => setShowGenderPicker(false)}>
               <MaterialIcons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
-          
+
           {(['male', 'female'] as Gender[]).map((gender) => (
             <TouchableOpacity
               key={gender}
@@ -114,8 +118,9 @@ const ProfileEditScreen: React.FC = () => {
               <Text style={[
                 styles.pickerItemText,
                 formData.gender === gender && styles.selectedPickerItemText,
+                rtlText,
               ]}>
-                {gender === 'male' ? 'Male' : 'Female'}
+                {gender === 'male' ? t('profileEdit.male') : t('profileEdit.female')}
               </Text>
               {formData.gender === gender && (
                 <MaterialIcons name="check" size={20} color={colors.primary} />
@@ -132,7 +137,7 @@ const ProfileEditScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={[styles.loadingText, rtlText]}>{t('common.loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -146,9 +151,9 @@ const ProfileEditScreen: React.FC = () => {
           <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
             <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <Text style={[styles.headerTitle, rtlText]}>{t('profileEdit.title')}</Text>
           <TouchableOpacity onPress={handleSave} style={styles.headerButton}>
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={[styles.saveButtonText, rtlText]}>{t('common.save')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -157,34 +162,34 @@ const ProfileEditScreen: React.FC = () => {
             
             {/* Basic Information */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Basic Information</Text>
+              <Text style={[styles.sectionTitle, rtlText]}>{t('profileEdit.basicInformation')}</Text>
               <Card style={styles.card}>
                 <Input
-                  label="Full Name"
+                  label={t('profileEdit.fullName')}
                   value={formData.name || ''}
                   onChangeText={(text) => setFormData({ ...formData, name: text })}
-                  placeholder="Enter your full name"
+                  placeholder={t('profileEdit.namePlaceholder')}
                   error={errors.name}
                 />
-                
+
                 <Input
-                  label="Age"
+                  label={t('profileEdit.age')}
                   value={formData.age?.toString() || ''}
                   onChangeText={(text) => setFormData({ ...formData, age: parseInt(text) || 0 })}
-                  placeholder="Enter your age"
+                  placeholder={t('profileEdit.agePlaceholder')}
                   keyboardType="numeric"
                   error={errors.age}
                   style={styles.inputSpacing}
                 />
 
                 <View style={styles.inputSpacing}>
-                  <Text style={styles.inputLabel}>Gender</Text>
+                  <Text style={[styles.inputLabel, rtlText]}>{t('profileEdit.gender')}</Text>
                   <TouchableOpacity
                     style={styles.pickerButton}
                     onPress={() => setShowGenderPicker(true)}
                   >
-                    <Text style={styles.pickerButtonText}>
-                      {formData.gender === 'male' ? 'Male' : 'Female'}
+                    <Text style={[styles.pickerButtonText, rtlText]}>
+                      {formData.gender === 'male' ? t('profileEdit.male') : t('profileEdit.female')}
                     </Text>
                     <MaterialIcons name="expand-more" size={24} color={colors.textSecondary} />
                   </TouchableOpacity>
@@ -194,22 +199,22 @@ const ProfileEditScreen: React.FC = () => {
 
             {/* Physical Information */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Physical Information</Text>
+              <Text style={[styles.sectionTitle, rtlText]}>{t('profileEdit.physicalInformation')}</Text>
               <Card style={styles.card}>
                 <Input
-                  label="Height (cm)"
+                  label={t('profileEdit.height')}
                   value={formData.height?.toString() || ''}
                   onChangeText={(text) => setFormData({ ...formData, height: parseFloat(text) || 0 })}
-                  placeholder="Enter your height in cm"
+                  placeholder={t('profileEdit.heightPlaceholder')}
                   keyboardType="numeric"
                   error={errors.height}
                 />
-                
+
                 <Input
-                  label="Weight (kg)"
+                  label={t('profileEdit.weight')}
                   value={formData.weight?.toString() || ''}
                   onChangeText={(text) => setFormData({ ...formData, weight: parseFloat(text) || 0 })}
-                  placeholder="Enter your weight in kg"
+                  placeholder={t('profileEdit.weightPlaceholder')}
                   keyboardType="numeric"
                   error={errors.weight}
                   style={styles.inputSpacing}
@@ -224,13 +229,13 @@ const ProfileEditScreen: React.FC = () => {
         {/* Action Buttons */}
         <View style={styles.actions}>
           <Button
-            title="Cancel"
+            title={t('common.cancel')}
             onPress={handleCancel}
             variant="outline"
             style={styles.actionButton}
           />
           <Button
-            title="Save Changes"
+            title={t('profileEdit.saveChanges')}
             onPress={handleSave}
             variant="primary"
             style={styles.actionButton}
